@@ -33,9 +33,15 @@
       opacity: 0;
       pointer-events: none;
     }
-    @media (max-width: 640px) {
-      .panel.start-collapsed { transform: translateX(-120%); opacity: 0; pointer-events: none; }
-    }
+   @media (max-width: 640px) {
+  /* Only hide when BOTH classes are present */
+  .panel.start-collapsed.collapsed { 
+    transform: translateX(-120%); 
+    opacity: 0; 
+    pointer-events: none; 
+  }
+}
+
 
     .row { margin: 6px 0; font-size: 14px; }
     .ok { color: #0a7 } .warn { color: #a60 } .err { color: #b00 }
@@ -385,10 +391,12 @@
   if (window.innerWidth <= 640) panel.classList.add('start-collapsed','collapsed');
 
   function setCollapsed(on) {
-    panel.classList.toggle('collapsed', on);
-    toggleBtn.textContent = on ? '☰' : '✕';
-    toggleBtn.title = on ? 'Show controls' : 'Hide controls';
-  }
+  if (!on) panel.classList.remove('start-collapsed'); // <-- add this line
+  panel.classList.toggle('collapsed', on);
+  toggleBtn.textContent = on ? '☰' : '✕';
+  toggleBtn.title = on ? 'Show controls' : 'Hide controls';
+}
+
   toggleBtn.addEventListener('click', () => {
     setCollapsed(!panel.classList.contains('collapsed'));
   });
