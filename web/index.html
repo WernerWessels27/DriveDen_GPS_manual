@@ -23,7 +23,7 @@
       box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 
-      /* NEW: mobile-friendly + animated collapse */
+      /* mobile-friendly + animated collapse */
       max-height: 75vh;
       overflow: auto;
       transition: transform .25s ease, opacity .2s ease;
@@ -33,15 +33,14 @@
       opacity: 0;
       pointer-events: none;
     }
-   @media (max-width: 640px) {
-  /* Only hide when BOTH classes are present */
-  .panel.start-collapsed.collapsed { 
-    transform: translateX(-120%); 
-    opacity: 0; 
-    pointer-events: none; 
-  }
-}
-
+    @media (max-width: 640px) {
+      /* Only hide when BOTH classes are present */
+      .panel.start-collapsed.collapsed { 
+        transform: translateX(-120%); 
+        opacity: 0; 
+        pointer-events: none; 
+      }
+    }
 
     .row { margin: 6px 0; font-size: 14px; }
     .ok { color: #0a7 } .warn { color: #a60 } .err { color: #b00 }
@@ -53,7 +52,7 @@
     .pill { padding: 4px 8px; border-radius: 999px; background: #eee; cursor: pointer; }
     .pill.active { background: #06b6d4; color: white; }
 
-    /* NEW: floating toggle button */
+    /* Floating buttons */
     .fab {
       position: fixed;
       right: 12px;
@@ -68,6 +67,22 @@
       color: #fff;
       box-shadow: 0 6px 16px rgba(0,0,0,.2);
       cursor: pointer;
+    }
+    .fab-left {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 10001;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 0;
+      font-size: 22px;
+      background: #111827;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(0,0,0,.2);
+      cursor: pointer;
+      display: none; /* hidden until we stop following */
     }
   </style>
 </head>
@@ -129,15 +144,17 @@
   <div class="row muted">Tip: Allow location when prompted; accuracy improves outdoors.</div>
 </div>
 
-<!-- NEW: floating toggle button -->
+<!-- Existing panel toggle (bottom-right) -->
 <button id="panelToggle" class="fab" title="Show controls">☰</button>
+<!-- NEW: recenter button (bottom-left) -->
+<button id="recenterBtn" class="fab-left" title="Recenter">🎯</button>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
 <script>
   const map = L.map('map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-  // === NEW: Golf cart icon for your location ===
+  // === Golf cart icon for your location ===
   const cartSvg = encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32">
       <rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/>
@@ -157,7 +174,7 @@
     className: 'you-icon'
   });
 
-  // Replace the old circle marker with a marker using the cart icon
+  // Cart marker (your location)
   let you = L.marker([0,0], { icon: cartIcon }).addTo(map);
 
   let movedOnce = false;
@@ -167,6 +184,10 @@
 
   let manualMode = false;
   let awaiting = null; // 'tee' | 'front' | 'mid' | 'back'
+
+  // NEW: follow state (Google Maps style)
+  let follow = true;
+  const recenterBtn = document.getElementById('recenterBtn');
 
   function meters(a, b){
     const toRad = d => d * Math.PI / 180, R = 6371000;
@@ -213,13 +234,34 @@
       lastPos = p;
       you.setLatLng([p.lat, p.lng]);
       updateDistances(p);
+
+      // Smart follow behavior
+      if (follow) {
+        const currentZoom = map.getZoom();
+        map.setView([p.lat, p.lng], currentZoom || 17);
+        recenterBtn.style.display = 'none';
+      }
+
       const acc = Math.round(pos.coords.accuracy || 0);
       status.textContent = `Accuracy: ${acc} m`;
-      if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
+      if (!movedOnce && !follow) { movedOnce = true; }
+      if (!movedOnce && follow) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
     }, err => {
       status.textContent = err.message;
     }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
   }
+
+  // Stop following on any manual map interaction, show recenter button
+  map.on('dragstart', () => { follow = false; recenterBtn.style.display = 'block'; });
+  map.on('zoomstart', () => { follow = false; recenterBtn.style.display = 'block'; });
+
+  // Recenter button behavior
+  recenterBtn.addEventListener('click', () => {
+    if (!lastPos) return;
+    follow = true;
+    map.setView([lastPos.lat, lastPos.lng], map.getZoom() || 17);
+    recenterBtn.style.display = 'none';
+  });
 
   async function searchCourses(){
     const q = document.getElementById('q').value.trim() || 'Pretoria';
@@ -385,24 +427,19 @@
     document.getElementById('status').textContent = `Loaded course ${pid}`;
   };
 
-  // === NEW: collapse/expand panel ===
+  // Collapse/expand panel
   const panel = document.querySelector('.panel');
   const toggleBtn = document.getElementById('panelToggle');
   if (window.innerWidth <= 640) panel.classList.add('start-collapsed','collapsed');
-
   function setCollapsed(on) {
-  if (!on) panel.classList.remove('start-collapsed'); // <-- add this line
-  panel.classList.toggle('collapsed', on);
-  toggleBtn.textContent = on ? '☰' : '✕';
-  toggleBtn.title = on ? 'Show controls' : 'Hide controls';
-}
-
+    if (!on) panel.classList.remove('start-collapsed');
+    panel.classList.toggle('collapsed', on);
+    toggleBtn.textContent = on ? '☰' : '✕';
+    toggleBtn.title = on ? 'Show controls' : 'Hide controls';
+  }
   toggleBtn.addEventListener('click', () => {
     setCollapsed(!panel.classList.contains('collapsed'));
   });
-  // Optionally auto-collapse after loading a hole:
-  // document.getElementById('btnLoad').addEventListener('click', () => setCollapsed(true));
-  // document.getElementById('btnLoadPid').addEventListener('click', () => setCollapsed(true));
 
   // init
   map.setView([-25.7542, 28.2322], 15);
