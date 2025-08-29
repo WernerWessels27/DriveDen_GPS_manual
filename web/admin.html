@@ -23,6 +23,7 @@
     .pill.active { background: #06b6d4; color: #fff; border-color: #06b6d4; }
     .muted { font-size: 12px; opacity: .75; }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; }
+    .ok { color:#0a7 } .warn { color:#a60 } .err { color:#b00 }
 
     /* Floating buttons (recenter & panel toggle) */
     .fab-left, .fab-right {
@@ -83,6 +84,14 @@
     <button id="btnClearDraft">Clear draft</button>
   </div>
 
+  <!-- NEW: Distance HUD -->
+  <div class="row" style="margin-top:10px;"><strong>Distances (m)</strong></div>
+  <div class="row">You → Tee: <span id="dTee">–</span></div>
+  <div class="row">You → Front: <span id="dFront">–</span></div>
+  <div class="row">You → Mid: <span id="dMid">–</span></div>
+  <div class="row">You → Back: <span id="dBack">–</span></div>
+  <div class="row muted">GPS <span id="gpsAcc" class="ok">–</span></div>
+
   <div class="row muted">
     Tap a “Set …” then tap the map to place that point. Save each hole. Export when done.
     <span id="status" class="badge">Ready</span>
@@ -95,16 +104,11 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
 <script>
-  // --- Map (CARTO Voyager) ---
-  const map = L.map('map')
-
-// NEW (OSM Standard — clearer fairways/greens)
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
-
-
-  
+  // --- Map (OSM Standard: clearer golf features for capture) ---
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
   map.setView([-25.7542, 28.2322], 15);
 
   // --- Live location (golf cart icon) ---
@@ -130,18 +134,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   map.on('zoomstart', () => { follow = false; recenterBtn.style.display = 'block'; });
   recenterBtn.onclick = () => { if (!lastPos) return; follow = true; map.setView([lastPos.lat, lastPos.lng], map.getZoom() || 17); recenterBtn.style.display = 'none'; };
 
-  if ('geolocation' in navigator) {
-    navigator.geolocation.watchPosition(pos => {
-      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      lastPos = p;
-      you.setLatLng([p.lat, p.lng]);
-      if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display = 'none'; }
-      if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
-    }, _=>{}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
-  }
-
   // --- UI refs ---
   const status = document.getElementById('status');
+  const gpsAcc = document.getElementById('gpsAcc');
   const draftTag = document.getElementById('draftTag');
   const progress = document.getElementById('progress');
   const panel = document.querySelector('.panel');
@@ -194,6 +189,33 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   let awaiting = null; // 'tee'|'front'|'mid'|'back'
   const markers = {};
   const holes = []; // { number, par, strokeIndex, tee, green{center,front,mid,back} }
+
+  // --- Distance helpers ---
+  const dTee = document.getElementById('dTee');
+  const dFront = document.getElementById('dFront');
+  const dMid = document.getElementById('dMid');
+  const dBack = document.getElementById('dBack');
+
+  function meters(a, b){
+    const toRad = d => d * Math.PI / 180, R = 6371000;
+    const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+    const s1 = Math.sin(dLat/2), s2 = Math.sin(dLng/2);
+    const q = s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
+    return 2*R*Math.asin(Math.sqrt(q));
+  }
+  function updateDistances(){
+    if (!lastPos) { dTee.textContent = dFront.textContent = dMid.textContent = dBack.textContent = '–'; return; }
+    const p = lastPos;
+    const get = (n) => markers[n] ? markers[n].getLatLng() : null;
+    const tee = get('tee');
+    const fr  = get('front');
+    const mi  = get('mid');
+    const ba  = get('back');
+    dTee.textContent   = tee ? Math.round(meters(p, {lat:tee.lat,lng:tee.lng})) : '–';
+    dFront.textContent = fr  ? Math.round(meters(p, {lat:fr.lat, lng:fr.lng}))  : '–';
+    dMid.textContent   = mi  ? Math.round(meters(p, {lat:mi.lat, lng:mi.lng}))  : '–';
+    dBack.textContent  = ba  ? Math.round(meters(p, {lat:ba.lat, lng:ba.lng}))  : '–';
+  }
 
   // --- Autosave helpers ---
   const LS_LAST_ID = 'dd_builder_last_courseId';
@@ -259,22 +281,23 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   btns.back.onclick = () => setAwait('back');
 
   function setMarker(name, pos, label) {
-    if (markers[name]) { markers[name].setLatLng([pos.lat, pos.lng]); return; }
+    if (markers[name]) { markers[name].setLatLng([pos.lat, pos.lng]); updateDistances(); return; }
     markers[name] = L.circleMarker([pos.lat, pos.lng], style(name)).addTo(map);
     if (label) markers[name].bindTooltip(label);
+    updateDistances();
   }
 
   map.on('click', (e) => {
     if (!awaiting) return;
     const pos = { lat: e.latlng.lat, lng: e.latlng.lng };
     setMarker(awaiting, pos, awaiting.charAt(0).toUpperCase() + awaiting.slice(1));
-    // convenience: use mid as center if not set
-    if (awaiting === 'mid' && !markers.center) markers.center = markers.mid;
+    if (awaiting === 'mid' && !markers.center) markers.center = markers.mid; // convenience
     setAwait(null);
   });
 
   function clearHoleMarkers() {
     ['tee','front','mid','back'].forEach(n => { if (markers[n]) { map.removeLayer(markers[n]); delete markers[n]; } });
+    updateDistances();
   }
 
   btnClear.onclick = () => {
@@ -404,6 +427,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       refreshSavedList();
       saveDraft();
       status.textContent = 'Imported course JSON';
+      updateDistances();
     } catch (err) {
       alert('Invalid JSON file');
     } finally {
@@ -420,6 +444,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     refreshSavedList();
     draftTag.style.display = 'none';
     status.textContent = 'New course';
+    updateDistances();
   };
 
   btnClearDraft.onclick = () => {
@@ -429,7 +454,27 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     clearDraft(id);
     status.textContent = `Cleared draft "${id}"`;
   };
+
+  // --- GPS watch (also drives distance HUD) ---
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(pos => {
+      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      lastPos = p;
+      you.setLatLng([p.lat, p.lng]);
+      if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display = 'none'; }
+      if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
+
+      // Accuracy indicator
+      const acc = Math.round(pos.coords.accuracy || 0);
+      gpsAcc.textContent = `±${acc} m`;
+      gpsAcc.className = acc < 12 ? 'ok' : (acc < 25 ? 'warn' : 'err');
+
+      updateDistances();
+    }, _=>{}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+  } else {
+    gpsAcc.textContent = 'GPS not supported';
+    gpsAcc.className = 'err';
+  }
 </script>
 </body>
 </html>
-
