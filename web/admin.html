@@ -96,10 +96,15 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
 <script>
   // --- Map (CARTO Voyager) ---
-  const map = L.map('map');
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, attribution: '&copy; OSM & CARTO'
-  }).addTo(map);
+  const map = L.map('map')
+
+// NEW (OSM Standard — clearer fairways/greens)
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+
+  
   map.setView([-25.7542, 28.2322], 15);
 
   // --- Live location (golf cart icon) ---
