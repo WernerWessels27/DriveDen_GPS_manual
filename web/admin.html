@@ -1,1 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DriveDen – Course Builder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #map { height: 100%; position: relative; }
+
+    .panel {
+      position: fixed; top: 10px; left: 10px; z-index: 10000;
+      background: rgba(255,255,255,.96); padding: 12px; border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.18); width: 360px; max-width: calc(100% - 20px);
+    }
+    .row { margin: 8px 0; font-size: 14px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    input, select, button { width: 100%; padding: 8px; font-size: 14px; }
+
+    .pill { padding: 6px 10px; border-radius: 999px; cursor: pointer; border: 1px solid #e5e7eb; background: #f8fafc; text-align:center; }
+    .pill.active { background: #06b6d4; color: #fff; border-color: #06b6d4; }
+    .muted { font-size: 12px; opacity: .75; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; }
+
+    /* Floating buttons (recenter & panel toggle) */
+    .fab-left, .fab-right {
+      position: fixed; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%;
+      border: 0; font-size: 22px; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer;
+    }
+    .fab-left { left: 12px; background: #111827; display:none; }
+    .fab-right { right: 12px; background: #06b6d4; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel">
+  <div class="row" style="display:flex;align-items:center;gap:8px;">
+    <strong>DriveDen – Course Builder</strong>
+    <span id="progress" class="badge" title="Saved holes count">0 / 18</span>
+    <span id="draftTag" class="badge" style="display:none;" title="Autosaved draft">Draft</span>
+  </div>
+
+  <div class="grid2">
+    <input id="courseName" placeholder="Course Name (e.g., Waterkloof GC)" />
+    <input id="courseId" placeholder="Course ID (e.g., waterkloof-za)" />
+  </div>
+
+  <div class="grid3">
+    <input id="holeNumber" type="number" min="1" max="18" placeholder="Hole #" />
+    <input id="holePar" type="number" min="3" max="6" placeholder="Par" />
+    <input id="strokeIndex" type="number" min="1" max="18" placeholder="Stroke idx" />
+  </div>
+
+  <div class="grid3">
+    <div id="btnTee"   class="pill">Set Tee</div>
+    <div id="btnFront" class="pill">Set Front</div>
+    <div id="btnMid"   class="pill">Set Mid</div>
+    <div id="btnBack"  class="pill">Set Back</div>
+    <button id="btnClear">Clear hole</button>
+    <button id="btnSaveHole">Save hole</button>
+  </div>
+
+  <div class="row">
+    <select id="savedList"></select>
+    <div class="grid2" style="margin-top:6px">
+      <button id="btnLoadHole">Load selected</button>
+      <button id="btnDeleteHole">Delete selected</button>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <button id="btnExport">Export Course JSON</button>
+    <label class="pill" style="display:flex;align-items:center;justify-content:center">
+      Import JSON<input id="fileImport" type="file" accept="application/json" style="display:none">
+    </label>
+  </div>
+
+  <div class="grid2" style="margin-top:6px">
+    <button id="btnNewCourse">New course</button>
+    <button id="btnClearDraft">Clear draft</button>
+  </div>
+
+  <div class="row muted">
+    Tap a “Set …” then tap the map to place that point. Save each hole. Export when done.
+    <span id="status" class="badge">Ready</span>
+  </div>
+</div>
+
+<!-- Recenter & Panel Toggle -->
+<button id="recenterBtn" class="fab-left" title="Recenter">🎯</button>
+<button id="panelToggle" class="fab-right" title="Hide panel">✕</button>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+<script>
+  // --- Map (CARTO Voyager) ---
+  const map = L.map('map');
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, attribution: '&copy; OSM & CARTO'
+  }).addTo(map);
+  map.setView([-25.7542, 28.2322], 15);
+
+  // --- Live location (golf cart icon) ---
+  const cartSvg = encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32">
+      <rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/>
+      <polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/>
+      <circle cx="13" cy="24" r="4" fill="#111827"/>
+      <circle cx="13" cy="24" r="2" fill="#e5e7eb"/>
+      <circle cx="27" cy="24" r="4" fill="#111827"/>
+      <circle cx="27" cy="24" r="2" fill="#e5e7eb"/>
+      <rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/>
+      <circle cx="34" cy="16" r="2" fill="#14b8a6"/>
+    </svg>
+  `);
+  const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
+  let you = L.marker([0,0], { icon: cartIcon }).addTo(map);
+
+  // --- Smart follow + recenter ---
+  let follow = true, lastPos = null, movedOnce = false;
+  const recenterBtn = document.getElementById('recenterBtn');
+  map.on('dragstart', () => { follow = false; recenterBtn.style.display = 'block'; });
+  map.on('zoomstart', () => { follow = false; recenterBtn.style.display = 'block'; });
+  recenterBtn.onclick = () => { if (!lastPos) return; follow = true; map.setView([lastPos.lat, lastPos.lng], map.getZoom() || 17); recenterBtn.style.display = 'none'; };
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(pos => {
+      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      lastPos = p;
+      you.setLatLng([p.lat, p.lng]);
+      if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display = 'none'; }
+      if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
+    }, _=>{}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+  }
+
+  // --- UI refs ---
+  const status = document.getElementById('status');
+  const draftTag = document.getElementById('draftTag');
+  const progress = document.getElementById('progress');
+  const panel = document.querySelector('.panel');
+  const toggleBtn = document.getElementById('panelToggle');
+
+  const fieldCourseName = document.getElementById('courseName');
+  const fieldCourseId = document.getElementById('courseId');
+  const fieldHole = document.getElementById('holeNumber');
+  const fieldPar = document.getElementById('holePar');
+  const fieldSI = document.getElementById('strokeIndex');
+
+  const btns = {
+    tee: document.getElementById('btnTee'),
+    front: document.getElementById('btnFront'),
+    mid: document.getElementById('btnMid'),
+    back: document.getElementById('btnBack')
+  };
+  const btnClear = document.getElementById('btnClear');
+  const btnSaveHole = document.getElementById('btnSaveHole');
+  const btnLoadHole = document.getElementById('btnLoadHole');
+  const btnDeleteHole = document.getElementById('btnDeleteHole');
+  const btnExport = document.getElementById('btnExport');
+  const fileImport = document.getElementById('fileImport');
+  const btnNewCourse = document.getElementById('btnNewCourse');
+  const btnClearDraft = document.getElementById('btnClearDraft');
+  const savedList = document.getElementById('savedList');
+
+  // --- Collapsible panel ---
+  let panelHidden = false;
+  toggleBtn.onclick = () => {
+    panelHidden = !panelHidden;
+    panel.style.display = panelHidden ? 'none' : 'block';
+    toggleBtn.textContent = panelHidden ? '☰' : '✕';
+    toggleBtn.title = panelHidden ? 'Show panel' : 'Hide panel';
+  };
+
+  // --- Marker styles ---
+  function style(name) {
+    const palette = {
+      tee:   { color: '#2563eb', fillColor: '#3b82f6' },
+      front: { color: '#059669', fillColor: '#10b981' },
+      mid:   { color: '#b45309', fillColor: '#f59e0b' },
+      back:  { color: '#b91c1c', fillColor: '#ef4444' }
+    };
+    const base = palette[name] || { color: '#111827', fillColor: '#374151' };
+    return { radius: 7, weight: 2, opacity: 1, fillOpacity: 0.9, ...base };
+  }
+
+  // --- Builder state ---
+  let awaiting = null; // 'tee'|'front'|'mid'|'back'
+  const markers = {};
+  const holes = []; // { number, par, strokeIndex, tee, green{center,front,mid,back} }
+
+  // --- Autosave helpers ---
+  const LS_LAST_ID = 'dd_builder_last_courseId';
+  function draftKey(id){ return `dd_builder_draft_${id||''}`; }
+
+  function loadDraft(id) {
+    const raw = localStorage.getItem(draftKey(id));
+    if (!raw) { draftTag.style.display = 'none'; return null; }
+    try {
+      const d = JSON.parse(raw);
+      fieldCourseName.value = d.name || '';
+      fieldCourseId.value = d.courseId || id || '';
+      holes.length = 0;
+      (d.holes || []).forEach(h => holes.push(h));
+      refreshSavedList();
+      showProgress();
+      draftTag.style.display = 'inline-block';
+      status.textContent = `Loaded draft "${d.courseId}"`;
+      return d;
+    } catch { draftTag.style.display = 'none'; return null; }
+  }
+
+  function saveDraft() {
+    const id = (fieldCourseId.value || '').trim();
+    if (!id) return;
+    const draft = {
+      name: (fieldCourseName.value || '').trim(),
+      courseId: id,
+      holes: holes.slice().sort((a,b)=>a.number-b.number)
+    };
+    localStorage.setItem(draftKey(id), JSON.stringify(draft));
+    localStorage.setItem(LS_LAST_ID, id);
+    draftTag.style.display = 'inline-block';
+  }
+
+  function clearDraft(id) {
+    localStorage.removeItem(draftKey(id));
+    if (localStorage.getItem(LS_LAST_ID) === id) localStorage.removeItem(LS_LAST_ID);
+    draftTag.style.display = 'none';
+  }
+
+  // Load last draft on open (if any)
+  const lastId = localStorage.getItem(LS_LAST_ID);
+  if (lastId) loadDraft(lastId);
+
+  // When courseId changes, try to load its draft
+  fieldCourseId.addEventListener('change', () => {
+    const id = (fieldCourseId.value || '').trim();
+    if (!id) return;
+    loadDraft(id) || (holes.length = 0, refreshSavedList(), showProgress());
+    localStorage.setItem(LS_LAST_ID, id);
+  });
+
+  // --- UI actions ---
+  function setAwait(which) {
+    awaiting = which;
+    for (const k of Object.keys(btns)) btns[k].classList.toggle('active', k === which);
+    status.textContent = which ? `Tap map to set ${which}` : 'Ready';
+  }
+  btns.tee.onclick = () => setAwait('tee');
+  btns.front.onclick = () => setAwait('front');
+  btns.mid.onclick = () => setAwait('mid');
+  btns.back.onclick = () => setAwait('back');
+
+  function setMarker(name, pos, label) {
+    if (markers[name]) { markers[name].setLatLng([pos.lat, pos.lng]); return; }
+    markers[name] = L.circleMarker([pos.lat, pos.lng], style(name)).addTo(map);
+    if (label) markers[name].bindTooltip(label);
+  }
+
+  map.on('click', (e) => {
+    if (!awaiting) return;
+    const pos = { lat: e.latlng.lat, lng: e.latlng.lng };
+    setMarker(awaiting, pos, awaiting.charAt(0).toUpperCase() + awaiting.slice(1));
+    // convenience: use mid as center if not set
+    if (awaiting === 'mid' && !markers.center) markers.center = markers.mid;
+    setAwait(null);
+  });
+
+  function clearHoleMarkers() {
+    ['tee','front','mid','back'].forEach(n => { if (markers[n]) { map.removeLayer(markers[n]); delete markers[n]; } });
+  }
+
+  btnClear.onclick = () => {
+    clearHoleMarkers();
+    status.textContent = 'Cleared hole markers';
+  };
+
+  function toHoleObject() {
+    const n = Number(fieldHole.value);
+    const par = Number(fieldPar.value);
+    const si = Number(fieldSI.value);
+    if (!n || !par || !si) { alert('Enter Hole #, Par, and Stroke Index'); return null; }
+    const get = (n) => markers[n] ? markers[n].getLatLng() : null;
+    const hole = {
+      number: n,
+      par,
+      strokeIndex: si,
+      tee: get('tee') && { lat: get('tee').lat, lng: get('tee').lng },
+      green: {
+        center: null,
+        front: get('front') && { lat: get('front').lat, lng: get('front').lng },
+        mid:   get('mid')   && { lat: get('mid').lat,   lng: get('mid').lng   },
+        back:  get('back')  && { lat: get('back').lat,  lng: get('back').lng  }
+      }
+    };
+    if (hole.green.mid && !hole.green.center) hole.green.center = { ...hole.green.mid };
+    return hole;
+  }
+
+  function refreshSavedList() {
+    savedList.innerHTML = '';
+    holes
+      .slice().sort((a,b) => a.number - b.number)
+      .forEach((h, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = `Hole ${h.number} · Par ${h.par} · SI ${h.strokeIndex}`;
+        savedList.appendChild(opt);
+      });
+    showProgress();
+  }
+
+  function showProgress(){
+    const unique = new Set(holes.map(h => h.number)).size;
+    progress.textContent = `${unique} / 18`;
+  }
+
+  btnSaveHole.onclick = () => {
+    const h = toHoleObject();
+    if (!h) return;
+    const idx = holes.findIndex(x => x.number === h.number);
+    if (idx >= 0) holes[idx] = h; else holes.push(h);
+    refreshSavedList();
+    saveDraft();
+    status.textContent = `Saved hole ${h.number}`;
+  };
+
+  btnLoadHole.onclick = () => {
+    const i = Number(savedList.value);
+    const h = holes.slice().sort((a,b)=>a.number-b.number)[i];
+    if (!h) return;
+    clearHoleMarkers();
+    if (h.tee) setMarker('tee', h.tee, 'Tee');
+    if (h.green.front) setMarker('front', h.green.front, 'Front');
+    if (h.green.mid) setMarker('mid', h.green.mid, 'Mid');
+    if (h.green.back) setMarker('back', h.green.back, 'Back');
+    fieldHole.value = h.number;
+    fieldPar.value = h.par;
+    fieldSI.value = h.strokeIndex;
+    status.textContent = `Loaded hole ${h.number}`;
+  };
+
+  btnDeleteHole.onclick = () => {
+    const i = Number(savedList.value);
+    const sorted = holes.slice().sort((a,b)=>a.number-b.number);
+    const h = sorted[i];
+    if (!h) return;
+    if (!confirm(`Delete hole ${h.number}?`)) return;
+    const idx = holes.findIndex(x => x.number === h.number);
+    holes.splice(idx,1);
+    refreshSavedList();
+    saveDraft();
+    clearHoleMarkers();
+    status.textContent = `Deleted hole ${h.number}`;
+  };
+
+  btnExport.onclick = () => {
+    const name = (fieldCourseName.value || '').trim();
+    const id = (fieldCourseId.value || '').trim();
+    if (!name || !id) { alert('Enter Course Name and Course ID'); return; }
+    if (holes.length === 0) { alert('No holes saved'); return; }
+    const course = {
+      name, courseId: id,
+      holes: holes
+        .slice()
+        .sort((a,b)=>a.number-b.number)
+        .map(h => ({
+          number: h.number, par: h.par, strokeIndex: h.strokeIndex,
+          tee: h.tee || null,
+          green: {
+            center: h.green.center || h.green.mid || null,
+            front: h.green.front || null,
+            mid:   h.green.mid   || null,
+            back:  h.green.back  || null
+          }
+        }))
+    };
+    const blob = new Blob([JSON.stringify(course, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `course-${id}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status.textContent = `Exported course-${id}.json`;
+  };
+
+  document.getElementById('fileImport').onchange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const json = JSON.parse(text);
+      fieldCourseName.value = json.name || '';
+      fieldCourseId.value = json.courseId || '';
+      holes.length = 0;
+      (json.holes || []).forEach(h => holes.push(h));
+      refreshSavedList();
+      saveDraft();
+      status.textContent = 'Imported course JSON';
+    } catch (err) {
+      alert('Invalid JSON file');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  btnNewCourse.onclick = () => {
+    if (!confirm('Start a new course? Unsaved changes will remain in the current draft.')) return;
+    clearHoleMarkers();
+    fieldCourseName.value = '';
+    fieldCourseId.value = '';
+    holes.length = 0;
+    refreshSavedList();
+    draftTag.style.display = 'none';
+    status.textContent = 'New course';
+  };
+
+  btnClearDraft.onclick = () => {
+    const id = (fieldCourseId.value || '').trim();
+    if (!id) { alert('Enter the Course ID to clear its draft'); return; }
+    if (!confirm(`Clear local draft for "${id}"?`)) return;
+    clearDraft(id);
+    status.textContent = `Cleared draft "${id}"`;
+  };
+</script>
+</body>
+</html>
 
