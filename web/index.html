@@ -4,38 +4,59 @@
   <meta charset="utf-8" />
   <title>DriveDen GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#06b6d4" />
+  <meta name="theme-color" content="#14532d" />
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+
   <style>
+    :root{
+      --brand:#14532d;           /* dark green */
+      --brand-2:#166534;         /* green 700-ish */
+      --accent:#15803d;          /* green 700 */
+      --panel:#ffffffee;
+      --text:#111827;
+      --muted:#6b7280;
+      --chip:#e6f6ea;            /* pale green chip */
+      --chipText:#14532d;
+    }
+
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; position: relative; }
 
     /* Logo only */
     .brand {
       position: fixed; top: 10px; left: 10px; z-index: 10000;
-      background: rgba(255,255,255,.9); padding: 6px 10px; border-radius: 10px;
+      background: var(--panel); padding: 6px 10px; border-radius: 10px;
       box-shadow: 0 6px 16px rgba(0,0,0,.15);
       display:flex; align-items:center; gap:8px;
     }
     .brand img { height: 34px; }
 
     /* Hole nav (top center) */
+    .holeWrap{
+      position: fixed; z-index:10000; left:50%; transform:translateX(-50%);
+      top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px;
+    }
     .holeNav {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 6px 10px; border-radius: 10px;
+      background: var(--panel); padding: 6px 10px; border-radius: 10px;
       box-shadow: 0 6px 16px rgba(0,0,0,.15);
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center;
     }
-    .holeNav button { border:0; background:#06b6d4; color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
+    .holeNav button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; }
+
+    /* Scorecard button (under hole bubble) */
+    .scoreBtn {
+      border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer;
+      box-shadow: 0 6px 12px rgba(0,0,0,.15);
+    }
 
     /* WIND (top-right) */
     .windBox{
       position: fixed; top: 10px; right: 10px; z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 8px 10px; border-radius: 10px;
+      background: var(--panel); padding: 8px 10px; border-radius: 10px;
       box-shadow: 0 6px 16px rgba(0,0,0,.15);
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       display:flex; flex-direction:column; gap:8px; min-width: 160px;
@@ -45,51 +66,53 @@
     .windSock { width:26px; height:26px; }
     .windData { display:flex; flex-direction:column; line-height:1.1; }
     .windSpeed { font-weight:600; }
-    .windDirTxt { font-size:12px; opacity:.8; }
+    .windDirTxt { font-size:12px; color:var(--muted); }
     .windArrow { width:20px; height:20px; transform-origin:50% 50%; opacity:.85; }
 
     /* toggles under wind */
     .toggles { display:flex; gap:8px; flex-wrap:wrap; }
     .toggle {
-      background:#f3f4f6; border:1px solid #e5e7eb; color:#111827;
+      background:#f3f4f6; border:1px solid #e5e7eb; color:var(--text);
       padding:6px 10px; border-radius:999px; font-size:12px; cursor:pointer;
       user-select:none;
     }
-    .toggle.active { background:#06b6d4; color:#fff; border-color:#06b6d4; }
+    .toggle.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 
     /* Distances (left) */
     .distBox {
       position: fixed; top: 60px; left: 10px; z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 10px 12px; border-radius: 10px;
+      background: var(--panel); padding: 10px 12px; border-radius: 10px;
       box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 180px;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 190px;
     }
     .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
     .col { display:flex; flex-direction:column; align-items:flex-end; }
-    .label { opacity:.75; }
-    .value { font-weight:600; }
-    .delta { font-size:12px; opacity:.8; }
-    .muted { font-size: 12px; opacity: .7; margin-top: 4px; }
+    .label { color:var(--muted); }
+    .value { font-weight:700; }
+    .delta { font-size:12px; color:var(--muted); }
+    .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
 
     /* Bottom info bar */
     .footer {
       position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 10px;
+      background: var(--panel); padding: 8px 12px; border-radius: 10px;
       box-shadow: 0 6px 16px rgba(0,0,0,.15);
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       display:flex; justify-content:center; gap:18px; font-size:14px;
     }
-    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:600; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--chipText); font-weight:700; }
 
     /* Right-side control panel */
-    .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: rgba(255,255,255,.97); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
+    .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
     .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
     select, button, input { width: 100%; padding: 8px; font-size: 14px; }
 
     /* Floating buttons */
-    .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #06b6d4; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
-    .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #111827; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
+    .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
+    /* Subtle crosshair recenter */
+    .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--brand); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
+    .fab-left svg { width:22px; height:22px; }
 
     /* --- Measure marker UX fixes --- */
     .dd-measure { pointer-events: auto; } /* allow clicks */
@@ -98,8 +121,8 @@
       left: -6px; top: -6px;
       width: 12px; height: 12px;
       border-radius: 50%;
-      background: #111827;              /* dark dot marks exact point */
-      border: 2px solid #ffffff;        /* white ring */
+      background: #111827;              /* exact point */
+      border: 2px solid #ffffff;        /* ring */
       box-shadow: 0 0 0 2px rgba(0,0,0,.25);
     }
     .dd-measure .bubble {
@@ -126,17 +149,56 @@
       cursor: pointer;
       font-weight: 700;
     }
+
+    /* -------- SCORECARD ---------- */
+    .scorecard {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      top: 86px; z-index:10000;
+      width: min(960px, calc(100% - 20px));
+      background: var(--panel); border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      padding: 10px 10px 12px;
+      max-height: 70vh; overflow:auto;
+      display:none;
+    }
+    .scorecard.show { display:block; }
+    .sc-row { display:grid; grid-template-columns: 48px 48px repeat(4, 1fr); gap:6px; align-items:center; }
+    .sc-head { font-weight:700; position: sticky; top:0; background: var(--panel); padding:6px 0; }
+    .sc-hole { text-align:center; }
+    .sc-par  { text-align:center; color:var(--muted); }
+    .sc-cell { display:flex; gap:6px; align-items:center; justify-content:center; }
+    .sc-score {
+      width: 44px; text-align:center; padding:6px 6px; border:1px solid #e5e7eb; border-radius:8px; font-weight:700; background:#fff;
+    }
+    .sc-chip { font-size:11px; padding:2px 6px; border-radius:999px; }
+    /* PGA-like coloring: birdie = under par (green), bogey = over par (red) */
+    .even   { background:#e5e7eb; color:#111827; }
+    .under  { background:#dcfce7; color:#166534; border:1px solid #86efac; }  /* birdie+ */
+    .over   { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }  /* bogey+ */
+
+    .sc-players { display:flex; gap:8px; align-items:center; margin: 6px 0 10px; }
+    .sc-players input { width: 120px; }
+    .sc-tools { display:flex; gap:8px; align-items:center; margin: 4px 0 8px; }
+    .sc-totals { display:flex; gap:12px; justify-content:flex-end; padding:8px 0; }
+    .sc-button {
+      border:0; background:var(--accent); color:#fff; border-radius:8px; padding:6px 10px; cursor:pointer;
+    }
+    .sc-muted { color:var(--muted); font-size:12px; }
   </style>
 </head>
 <body>
   <!-- logo -->
   <div class="brand"><img src="driveden-logo.svg" alt="DriveDen"></div>
 
-  <!-- hole nav -->
-  <div class="holeNav">
-    <button id="prevHole">◀</button>
-    <div class="holeTitle" id="holeTitle">Hole –</div>
-    <button id="nextHole">▶</button>
+  <!-- hole + scorecard button -->
+  <div class="holeWrap">
+    <div class="holeNav">
+      <button id="prevHole">◀</button>
+      <div class="holeTitle" id="holeTitle">Hole –</div>
+      <button id="nextHole">▶</button>
+    </div>
+    <button id="scoreToggle" class="scoreBtn">Scorecard</button>
   </div>
 
   <!-- WIND + toggles -->
@@ -209,30 +271,66 @@
 
   <!-- toggles -->
   <button id="panelToggle" class="fab">☰</button>
-  <button id="recenterBtn" class="fab-left">🎯</button>
+
+  <!-- subtle crosshair recenter -->
+  <button id="recenterBtn" class="fab-left" title="Recenter">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="2" fill="#ffffff"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="12" cy="12" r="7" fill="none" stroke="#ffffff" stroke-width="1.5" opacity=".7"/>
+    </svg>
+  </button>
+
+  <!-- SCORECARD overlay -->
+  <div id="scorecard" class="scorecard" aria-live="polite">
+    <div class="sc-players">
+      <strong>Players:</strong>
+      <select id="scCount" style="width:80px">
+        <option value="1">1</option><option value="2">2</option>
+        <option value="3">3</option><option value="4">4</option>
+      </select>
+      <input id="p1" placeholder="Player 1" />
+      <input id="p2" placeholder="Player 2" style="display:none"/>
+      <input id="p3" placeholder="Player 3" style="display:none"/>
+      <input id="p4" placeholder="Player 4" style="display:none"/>
+    </div>
+    <div class="sc-tools">
+      <button id="scClear" class="sc-button" style="background:#b91c1c">Clear</button>
+      <button id="scClose" class="sc-button">Close</button>
+      <div class="sc-muted">Tap into a score cell to edit. Colors: green = under par, grey = par, red = over par.</div>
+    </div>
+
+    <div class="sc-row sc-head">
+      <div class="sc-hole">H</div>
+      <div class="sc-par">Par</div>
+      <div class="sc-hole" id="hP1">P1</div>
+      <div class="sc-hole" id="hP2" style="display:none">P2</div>
+      <div class="sc-hole" id="hP3" style="display:none">P3</div>
+      <div class="sc-hole" id="hP4" style="display:none">P4</div>
+    </div>
+    <div id="scBody"></div>
+    <div class="sc-totals" id="scTotals">Totals…</div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
     // ------- Base layers & overlays -------
-    // Esri World Imagery (great aerial detail)
     const esriImagery = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community' }
+      { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
     );
-    // CARTO Voyager (clean labels/roads)
     const cartoVoyager = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
       { maxZoom: 19, attribution: '&copy; OpenStreetMap & CARTO' }
     );
-    // OpenTopoMap contours overlay (low opacity)
     const contours = L.tileLayer(
       'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      { maxZoom: 17, opacity: 0.35, attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Style: &copy; OpenTopoMap (CC-BY-SA)' }
+      { maxZoom: 17, opacity: 0.35, attribution: '© OpenStreetMap, SRTM · OpenTopoMap (CC-BY-SA)' }
     );
 
     // Map & defaults
     const map = L.map('map', { zoomControl: true, layers: [esriImagery] });
-    let currentBase = 'imagery'; // 'imagery' or 'voyager'
+    let currentBase = 'imagery';
     let contoursOn = false;
 
     // Cart icon
@@ -258,13 +356,15 @@
     const recenterBtn = document.getElementById('recenterBtn');
     const panel = document.getElementById('panel'), toggleBtn = document.getElementById('panelToggle');
     const courseSel = document.getElementById('courseSelect'), holesSel = document.getElementById('holes');
+    const tgBase = document.getElementById('tgBase');
+    const tgContours = document.getElementById('tgContours');
 
     // Wind widget
     const windSpeedEl = document.getElementById('windSpeed');
     const windDirTxtEl = document.getElementById('windDirTxt');
     const windArrowEl = document.getElementById('windArrow');
     let windCache = { ts: 0, lat: null, lng: null, speed: null, dir: null };
-    const WIND_TTL = 10 * 60 * 1000; // 10 minutes
+    const WIND_TTL = 10 * 60 * 1000;
 
     function degToCompass(d){
       const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
@@ -310,14 +410,13 @@
     function mstyle(name){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[name]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:0.9,color:p[0],fillColor:p[1]}; }
     function setMarker(n,pos,label){ if(!pos)return; if(markers[n]){markers[n].setLatLng([pos.lat,pos.lng]);return;} markers[n]=L.circleMarker([pos.lat,pos.lng],mstyle(n)).addTo(map); if(label)markers[n].bindTooltip(label); }
     function clearMarkers(){ ['front','mid','back'].forEach(n=>{ if(markers[n]){ map.removeLayer(markers[n]); delete markers[n]; }}); }
-
     function meters(a,b){ const R=6371000,toRad=d=>d*Math.PI/180; const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2); const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.asin(Math.sqrt(q)); }
 
     // Elevation (current position) — throttle & cache
     let lastElev = null, lastElevAt = 0;
     async function fetchCurrentElevation(p){
       const now = Date.now();
-      if (lastElev !== null && (now - lastElevAt) < 30000) return lastElev; // 30s throttle
+      if (lastElev !== null && (now - lastElevAt) < 30000) return lastElev;
       try{
         const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${p.lat},${p.lng}`);
         const js = await r.json();
@@ -346,7 +445,8 @@
         if (pts.length) map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])));
       }
       if (lastPos) updateDistancesAndDeltas();
-      updateMeasure(); // keep measure line if present
+      updateMeasure();
+      highlightCurrentRow();
     }
 
     async function updateDistancesAndDeltas(){
@@ -374,14 +474,10 @@
     }
     function setMeasure(latlng){
       measureTarget = latlng;
-
-      // Line from you -> target
       if (measureLine) map.removeLayer(measureLine);
       if (lastPos) {
         measureLine = L.polyline([[lastPos.lat,lastPos.lng],[latlng.lat,latlng.lng]], {weight:3,opacity:0.9}).addTo(map);
       }
-
-      // Marker with visible anchor dot + offset bubble + big close button
       const txt = measureDistanceText() || '– m';
       const icon = L.divIcon({
         className: 'dd-measure',
@@ -394,39 +490,30 @@
             </div>
           </div>
         `,
-        iconSize: [0,0],
-        iconAnchor: [0,0]
+        iconSize: [0,0], iconAnchor: [0,0]
       });
-
       if (measureMarker) map.removeLayer(measureMarker);
       measureMarker = L.marker([latlng.lat,latlng.lng], { icon, zIndexOffset: 10000 }).addTo(map);
-
-      // Prevent clicks on the bubble from triggering map clicks underneath
       measureMarker.on('add', () => {
         const el = measureMarker.getElement();
         if (!el) return;
         if (L && L.DomEvent) { L.DomEvent.disableClickPropagation(el); }
-
         const btn = el.querySelector('.measure-close');
         if (btn) {
           btn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            clearMeasure();
+            ev.preventDefault(); ev.stopPropagation(); clearMeasure();
           });
         }
       });
     }
     function updateMeasure(){
       if (!measureTarget) return;
-      if (measureLine) {
-        if (lastPos) measureLine.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
-      }
+      if (measureLine && lastPos) measureLine.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
       if (measureMarker) {
         const el = measureMarker.getElement();
         if (el) {
           const span = el.querySelector('.measure-text');
-          if (span) { const txt = measureDistanceText() || '– m'; span.textContent = txt; }
+          if (span) span.textContent = measureDistanceText() || '– m';
         }
       }
     }
@@ -435,11 +522,7 @@
       if (measureLine){ map.removeLayer(measureLine); measureLine=null; }
       if (measureMarker){ map.removeLayer(measureMarker); measureMarker=null; }
     }
-
-    // Map clicks: set/relocate measure point
-    map.on('click', (e) => {
-      setMeasure({ lat: e.latlng.lat, lng: e.latlng.lng });
-    });
+    map.on('click', (e) => { setMeasure({ lat: e.latlng.lat, lng: e.latlng.lng }); });
 
     // GPS
     if ('geolocation' in navigator) {
@@ -447,19 +530,14 @@
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastPos = p;
         you.setLatLng([p.lat, p.lng]);
-
         if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display='none'; }
         if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
-
         status.textContent = `Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
-
         await updateDistancesAndDeltas();
         ensureWind();
-        updateMeasure(); // live update measure distance
+        updateMeasure();
       }, err => { status.textContent = err.message; }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
-    } else {
-      status.textContent = 'Geolocation not supported';
-    }
+    } else { status.textContent = 'Geolocation not supported'; }
 
     // Follow/recenter
     map.on('dragstart',()=>{follow=false;recenterBtn.style.display='block';});
@@ -481,6 +559,8 @@
         holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
         if(holes.length){ currentIndex=0; updateHoleUI(true); }
         status.textContent=`Loaded course: ${course.name||id}`;
+        buildScorecard();
+        loadSavedScores(id);
       }catch{ status.textContent=`Failed to load course ${id}`; }
     }
 
@@ -490,20 +570,10 @@
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); };
 
     // ---------- Basemap & Contours toggles ----------
-    const tgBase = document.getElementById('tgBase');
-    const tgContours = document.getElementById('tgContours');
-
     function setBase(which){
       if (which === currentBase) return;
-      if (which === 'imagery') {
-        map.removeLayer(cartoVoyager);
-        esriImagery.addTo(map);
-        tgBase.textContent = 'Map: Imagery';
-      } else {
-        map.removeLayer(esriImagery);
-        cartoVoyager.addTo(map);
-        tgBase.textContent = 'Map: Voyager';
-      }
+      if (which === 'imagery') { map.removeLayer(cartoVoyager); esriImagery.addTo(map); tgBase.textContent = 'Map: Imagery'; }
+      else { map.removeLayer(esriImagery); cartoVoyager.addTo(map); tgBase.textContent = 'Map: Voyager'; }
       currentBase = which;
     }
     function setContours(on){
@@ -512,13 +582,203 @@
     }
     tgBase.onclick = () => setBase(currentBase === 'imagery' ? 'voyager' : 'imagery');
     tgContours.onclick = () => setContours(!contoursOn);
-
-    // Set initial states
-    setBase('imagery');
-    setContours(false);
+    setBase('imagery'); setContours(false);
 
     // SW
     if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
+
+    /* ===================== SCORECARD ===================== */
+    const scoreToggle = document.getElementById('scoreToggle');
+    const scorecard = document.getElementById('scorecard');
+    const scBody = document.getElementById('scBody');
+    const scTotals = document.getElementById('scTotals');
+    const scCount = document.getElementById('scCount');
+    const nameEls = [document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
+    const headEls = [document.getElementById('hP1'),document.getElementById('hP2'),document.getElementById('hP3'),document.getElementById('hP4')];
+    const scClose = document.getElementById('scClose');
+    const scClear = document.getElementById('scClear');
+
+    let playerCount = 1;
+    let scores = []; // [player][holeIndex] -> number or null
+    let courseIdForScores = null;
+
+    scoreToggle.onclick = () => { scorecard.classList.toggle('show'); highlightCurrentRow(); };
+
+    scClose.onclick = () => scorecard.classList.remove('show');
+    scClear.onclick = () => {
+      if (!confirm('Clear all scores for this course?')) return;
+      scores = Array.from({length:4},()=>Array(holes.length).fill(null));
+      persistScores();
+      renderScores();
+    };
+
+    scCount.onchange = () => {
+      playerCount = Number(scCount.value);
+      for (let i=0;i<4;i++){
+        nameEls[i].style.display = (i<playerCount)?'':'none';
+        headEls[i].style.display = (i<playerCount)?'':'none';
+      }
+      persistScoresMeta();
+      renderScores();
+    };
+
+    nameEls.forEach((inp,idx)=>{
+      inp.addEventListener('input', ()=>{
+        headEls[idx].textContent = inp.value || `P${idx+1}`;
+        persistScoresMeta();
+      });
+    });
+
+    function buildScorecard(){
+      // init players
+      playerCount = Number(scCount.value);
+      for (let i=0;i<4;i++){
+        nameEls[i].style.display = (i<playerCount)?'':'none';
+        headEls[i].style.display = (i<playerCount)?'':'none';
+        headEls[i].textContent = nameEls[i].value || `P${i+1}`;
+      }
+
+      // rows 1..18 (or however many holes exist)
+      scBody.innerHTML = '';
+      holes.forEach((h,idx)=>{
+        const row = document.createElement('div');
+        row.className = 'sc-row';
+        row.dataset.hole = h.number;
+
+        const cellHole = document.createElement('div'); cellHole.className='sc-hole'; cellHole.textContent=h.number;
+        const cellPar  = document.createElement('div'); cellPar.className='sc-par';  cellPar.textContent=h.par ?? '-';
+        row.appendChild(cellHole); row.appendChild(cellPar);
+
+        for (let p=0;p<4;p++){
+          const wrap = document.createElement('div'); wrap.className='sc-cell'; wrap.style.display=(p<playerCount)?'flex':'none';
+          const input = document.createElement('input'); input.className='sc-score'; input.type='number'; input.min='1';
+          input.placeholder='–'; input.dataset.p=String(p); input.dataset.i=String(idx);
+          input.addEventListener('input', ()=>{ onScoreChange(p,idx,input.value?Number(input.value):null); });
+          const chip = document.createElement('span'); chip.className='sc-chip even'; chip.textContent='E';
+          wrap.appendChild(input); wrap.appendChild(chip);
+          row.appendChild(wrap);
+        }
+        scBody.appendChild(row);
+      });
+
+      // init score array
+      if (!scores.length || scores[0].length !== holes.length){
+        scores = Array.from({length:4},()=>Array(holes.length).fill(null));
+      }
+      renderScores();
+    }
+
+    function relationToPar(score, par){
+      if (score==null || par==null) return {cls:'even', txt:'–'};
+      const d = score - par;
+      if (d === 0) return {cls:'even', txt:'E'};
+      if (d < 0)   return {cls:'under', txt:(d===-1?'−1':`−${Math.abs(d)}`)};
+      return {cls:'over', txt:(d===1?'+1':`+${d}`)};
+    }
+
+    function renderScores(){
+      // fill inputs + chips
+      const rows = scBody.querySelectorAll('.sc-row');
+      rows.forEach((row,idx)=>{
+        const par = holes[idx]?.par ?? null;
+        const cells = row.querySelectorAll('.sc-cell');
+        cells.forEach((cell,p)=>{
+          if (p>=playerCount){ cell.style.display='none'; return; }
+          cell.style.display='flex';
+          const input = cell.querySelector('.sc-score');
+          const chip = cell.querySelector('.sc-chip');
+          const v = scores[p][idx];
+          input.value = v ?? '';
+          const rel = relationToPar(v, par);
+          chip.className = `sc-chip ${rel.cls}`;
+          chip.textContent = rel.txt;
+        });
+      });
+
+      // totals
+      const totals = [];
+      const toPars = [];
+      for (let p=0;p<playerCount;p++){
+        let t=0, d=0;
+        for (let i=0;i<holes.length;i++){
+          const v=scores[p][i]; const par=holes[i]?.par??null;
+          if (v!=null){ t+=v; if(par!=null) d += (v-par); }
+        }
+        totals.push(t || 0);
+        toPars.push(d || 0);
+      }
+      const parts = [];
+      for (let p=0;p<playerCount;p++){
+        const nm = (nameEls[p].value || `P${p+1}`);
+        const dp = toPars[p];
+        const tag = dp===0?'E':(dp>0?`+${dp}`:`${dp}`);
+        parts.push(`${nm}: ${totals[p]||0} (${tag})`);
+      }
+      scTotals.textContent = parts.join('   •   ');
+    }
+
+    function onScoreChange(p,i,val){
+      scores[p][i] = (typeof val==='number' && !Number.isNaN(val)) ? val : null;
+      persistScores();
+      renderScores();
+    }
+
+    function highlightCurrentRow(){
+      const rows = scBody.querySelectorAll('.sc-row');
+      rows.forEach(r=>r.style.outline='none');
+      const idx = currentIndex;
+      const row = rows[idx];
+      if (row){ row.style.outline='2px solid var(--accent)'; row.scrollIntoView({block:'nearest'}); }
+    }
+
+    function persistScoresMeta(){
+      if (!courseIdForScores) return;
+      const meta = {
+        count: playerCount,
+        names: nameEls.map((el,i)=> i<playerCount ? (el.value || `P${i+1}`) : null)
+      };
+      localStorage.setItem(`dd_scores_meta_${courseIdForScores}`, JSON.stringify(meta));
+    }
+    function persistScores(){
+      if (!courseIdForScores) return;
+      localStorage.setItem(`dd_scores_${courseIdForScores}`, JSON.stringify(scores));
+      persistScoresMeta();
+    }
+    function loadSavedScores(id){
+      courseIdForScores = id;
+      // meta
+      try {
+        const meta = JSON.parse(localStorage.getItem(`dd_scores_meta_${id}`) || 'null');
+        if (meta){
+          scCount.value = String(meta.count || 1);
+          playerCount = Number(scCount.value);
+          meta.names?.forEach((nm,i)=>{ if(nm!=null){ nameEls[i].value = nm; headEls[i].textContent = nm; }});
+          for (let i=0;i<4;i++){
+            nameEls[i].style.display = (i<playerCount)?'':'none';
+            headEls[i].style.display = (i<playerCount)?'':'none';
+          }
+        }
+      } catch {}
+      // scores
+      try {
+        const saved = JSON.parse(localStorage.getItem(`dd_scores_${id}`) || 'null');
+        if (saved && Array.isArray(saved) && saved.length===4 && saved[0].length===holes.length){
+          scores = saved;
+        } else {
+          scores = Array.from({length:4},()=>Array(holes.length).fill(null));
+        }
+      } catch {
+        scores = Array.from({length:4},()=>Array(holes.length).fill(null));
+      }
+      renderScores();
+    }
+    /* =================== /SCORECARD =================== */
+
+    // Init
+    loadCourseList();
+    const urlParams=new URLSearchParams(location.search);
+    const cid=urlParams.get('course');
+    if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
   </script>
 </body>
 </html>
