@@ -5,62 +5,28 @@
   <title>DriveDen GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#14532d" />
-  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 
   <style>
     :root{
-      --brand:#14532d;           /* dark green */
-      --brand-2:#166534;         /* green 700-ish */
-      --accent:#15803d;          /* green 700 */
-      --panel:#ffffffee;
-      --text:#111827;
-      --muted:#6b7280;
-      --chip:#e6f6ea;            /* pale green chip */
-      --chipText:#14532d;
+      --brand:#14532d; --brand-2:#166534; --accent:#15803d;
+      --panel:#ffffffee; --text:#111827; --muted:#6b7280;
+      --chip:#e6f6ea; --chipText:#14532d;
     }
-
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; position: relative; }
 
-    /* Logo only */
-    .brand {
-      position: fixed; top: 10px; left: 10px; z-index: 10000;
-      background: var(--panel); padding: 6px 10px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      display:flex; align-items:center; gap:8px;
-    }
+    .brand { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; }
     .brand img { height: 34px; }
 
-    /* Hole nav (top center) */
-    .holeWrap{
-      position: fixed; z-index:10000; left:50%; transform:translateX(-50%);
-      top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px;
-    }
-    .holeNav {
-      background: var(--panel); padding: 6px 10px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center;
-    }
+    .holeWrap{ position: fixed; z-index:10000; left:50%; transform:translateX(-50%); top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center; }
     .holeNav button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; }
+    .scoreBtn { border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; box-shadow: 0 6px 12px rgba(0,0,0,.15); }
 
-    /* Scorecard button (under hole bubble) */
-    .scoreBtn {
-      border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer;
-      box-shadow: 0 6px 12px rgba(0,0,0,.15);
-    }
-
-    /* WIND (top-right) */
-    .windBox{
-      position: fixed; top: 10px; right: 10px; z-index: 10000;
-      background: var(--panel); padding: 8px 10px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      display:flex; flex-direction:column; gap:8px; min-width: 160px;
-    }
+    .windBox{ position: fixed; top: 10px; right: 10px; z-index: 10000; background: var(--panel); padding: 8px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; flex-direction:column; gap:8px; min-width: 160px; }
     .windRow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .windLeft { display:flex; align-items:center; gap:8px; }
     .windSock { width:26px; height:26px; }
@@ -68,23 +34,11 @@
     .windSpeed { font-weight:600; }
     .windDirTxt { font-size:12px; color:var(--muted); }
     .windArrow { width:20px; height:20px; transform-origin:50% 50%; opacity:.85; }
-
-    /* toggles under wind */
     .toggles { display:flex; gap:8px; flex-wrap:wrap; }
-    .toggle {
-      background:#f3f4f6; border:1px solid #e5e7eb; color:var(--text);
-      padding:6px 10px; border-radius:999px; font-size:12px; cursor:pointer;
-      user-select:none;
-    }
+    .toggle { background:#f3f4f6; border:1px solid #e5e7eb; color:var(--text); padding:6px 10px; border-radius:999px; font-size:12px; cursor:pointer; user-select:none; }
     .toggle.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 
-    /* Distances (left) */
-    .distBox {
-      position: fixed; top: 60px; left: 10px; z-index: 10000;
-      background: var(--panel); padding: 10px 12px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 190px;
-    }
+    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 190px; }
     .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
     .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { color:var(--muted); }
@@ -92,105 +46,29 @@
     .delta { font-size:12px; color:var(--muted); }
     .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
 
-    /* Bottom info bar */
-    .footer {
-      position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000;
-      background: var(--panel); padding: 8px 12px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      display:flex; justify-content:center; gap:18px; font-size:14px;
-    }
+    .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: var(--panel); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; justify-content:center; gap:18px; font-size:14px; }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--chipText); font-weight:700; }
 
-    /* Right-side control panel */
     .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
     .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
     select, button, input { width: 100%; padding: 8px; font-size: 14px; }
 
-    /* Floating buttons */
     .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
-    /* Subtle crosshair recenter */
     .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--brand); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
     .fab-left svg { width:22px; height:22px; }
 
-    /* --- Measure marker UX fixes --- */
-    .dd-measure { pointer-events: auto; } /* allow clicks */
-    .dd-measure .anchor-dot {
-      position: absolute;
-      left: -6px; top: -6px;
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      background: #111827;              /* exact point */
-      border: 2px solid #ffffff;        /* ring */
-      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
-    }
-    .dd-measure .bubble {
-      position: absolute;
-      transform: translate(8px, -28px); /* nudge so pin isn’t hidden */
-    }
-    .measure-bubble {
-      background: rgba(17,24,39,.95);
-      color: #fff;
-      padding: 6px 8px;
-      border-radius: 8px;
-      font-size: 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 6px 12px rgba(0,0,0,.25);
-      user-select: none;
-    }
-    .measure-close {
-      width: 24px; height: 24px;       /* bigger tap target */
-      display: inline-flex; align-items: center; justify-content: center;
-      background: rgba(255,255,255,.15);
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    /* -------- SCORECARD ---------- */
-    .scorecard {
-      position: fixed; left: 50%; transform: translateX(-50%);
-      top: 86px; z-index:10000;
-      width: min(960px, calc(100% - 20px));
-      background: var(--panel); border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      padding: 10px 10px 12px;
-      max-height: 70vh; overflow:auto;
-      display:none;
-    }
-    .scorecard.show { display:block; }
-    .sc-row { display:grid; grid-template-columns: 48px 48px repeat(4, 1fr); gap:6px; align-items:center; }
-    .sc-head { font-weight:700; position: sticky; top:0; background: var(--panel); padding:6px 0; }
-    .sc-hole { text-align:center; }
-    .sc-par  { text-align:center; color:var(--muted); }
-    .sc-cell { display:flex; gap:6px; align-items:center; justify-content:center; }
-    .sc-score {
-      width: 44px; text-align:center; padding:6px 6px; border:1px solid #e5e7eb; border-radius:8px; font-weight:700; background:#fff;
-    }
-    .sc-chip { font-size:11px; padding:2px 6px; border-radius:999px; }
-    .even   { background:#e5e7eb; color:#111827; }
-    .under  { background:#dcfce7; color:#166534; border:1px solid #86efac; }
-    .over   { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }
-
-    .sc-players { display:flex; gap:8px; align-items:center; margin: 6px 0 10px; }
-    .sc-players input { width: 120px; }
-    .sc-tools { display:flex; gap:8px; align-items:center; margin: 4px 0 8px; }
-    .sc-totals { display:flex; gap:12px; justify-content:flex-end; padding:8px 0; }
-    .sc-button {
-      border:0; background:var(--accent); color:#fff; border-radius:8px; padding:6px 10px; cursor:pointer;
-    }
-    .sc-muted { color:var(--muted); font-size:12px; }
+    /* Measure tool (fixed close behavior) */
+    .dd-measure { pointer-events: auto; }
+    .dd-measure .anchor-dot { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #111827; border: 2px solid #ffffff; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+    .dd-measure .bubble { position: absolute; transform: translate(8px, -28px); }
+    .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
+    .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
   </style>
 </head>
 <body>
-  <!-- logo -->
   <div class="brand"><img src="driveden-logo.svg" alt="DriveDen"></div>
 
-  <!-- hole + scorecard button -->
   <div class="holeWrap">
     <div class="holeNav">
       <button id="prevHole">◀</button>
@@ -200,11 +78,9 @@
     <button id="scoreToggle" class="scoreBtn">Scorecard</button>
   </div>
 
-  <!-- WIND + toggles -->
   <div class="windBox" id="windBox" title="10 m wind at 10 m height">
     <div class="windRow">
       <div class="windLeft">
-        <!-- windsock icon -->
         <svg class="windSock" viewBox="0 0 64 64" aria-hidden="true">
           <rect x="8" y="8" width="6" height="48" rx="3" fill="#1f2937"></rect>
           <polygon points="14,14 54,20 54,28 14,34" fill="#e11d48"></polygon>
@@ -217,7 +93,6 @@
           <div class="windDirTxt" id="windDirTxt">–</div>
         </div>
       </div>
-      <!-- direction arrow (shows where wind COMES FROM) -->
       <svg class="windArrow" id="windArrow" viewBox="0 0 24 24" aria-hidden="true">
         <polygon points="12,3 6,12 10,12 10,21 14,21 14,12 18,12" fill="#111827"></polygon>
       </svg>
@@ -228,33 +103,20 @@
     </div>
   </div>
 
-  <!-- distances -->
   <div class="distBox">
-    <div class="row">
-      <span class="label">Front</span>
-      <span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span>
-    </div>
-    <div class="row">
-      <span class="label">Mid</span>
-      <span class="col"><span class="value" id="dMid">–</span><span class="delta" id="eMid">–</span></span>
-    </div>
-    <div class="row">
-      <span class="label">Back</span>
-      <span class="col"><span class="value" id="dBack">–</span><span class="delta" id="eBack">–</span></span>
-    </div>
+    <div class="row"><span class="label">Front</span><span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span></div>
+    <div class="row"><span class="label">Mid</span><span class="col"><span class="value" id="dMid">–</span><span class="delta" id="eMid">–</span></span></div>
+    <div class="row"><span class="label">Back</span><span class="col"><span class="value" id="dBack">–</span><span class="delta" id="eBack">–</span></span></div>
     <div class="muted" id="status">Getting GPS…</div>
   </div>
 
-  <!-- bottom bar -->
   <div class="footer">
     <div>Par <span class="badge" id="par">–</span></div>
     <div>Stroke <span class="badge" id="stroke">–</span></div>
   </div>
 
-  <!-- map -->
   <div id="map"></div>
 
-  <!-- control panel -->
   <div class="panel hidden" id="panel">
     <div><strong>Select course</strong></div>
     <div class="grid" style="margin-top:6px;">
@@ -268,10 +130,7 @@
     </div>
   </div>
 
-  <!-- toggles -->
   <button id="panelToggle" class="fab">☰</button>
-
-  <!-- subtle crosshair recenter -->
   <button id="recenterBtn" class="fab-left" title="Recenter">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="2" fill="#ffffff"/>
@@ -280,14 +139,11 @@
     </svg>
   </button>
 
-  <!-- SCORECARD overlay -->
+  <!-- SCORECARD -->
   <div id="scorecard" class="scorecard" aria-live="polite">
     <div class="sc-players">
       <strong>Players:</strong>
-      <select id="scCount" style="width:80px">
-        <option value="1">1</option><option value="2">2</option>
-        <option value="3">3</option><option value="4">4</option>
-      </select>
+      <select id="scCount" style="width:80px"><option>1</option><option>2</option><option>3</option><option>4</option></select>
       <input id="p1" placeholder="Player 1" />
       <input id="p2" placeholder="Player 2" style="display:none"/>
       <input id="p3" placeholder="Player 3" style="display:none"/>
@@ -296,16 +152,12 @@
     <div class="sc-tools">
       <button id="scClear" class="sc-button" style="background:#b91c1c">Clear</button>
       <button id="scClose" class="sc-button">Close</button>
-      <div class="sc-muted">Tap into a score cell to edit. Colors: green = under par, grey = par, red = over par.</div>
+      <div class="sc-muted">Tap a score to edit. Colors: green = under par, grey = par, red = over.</div>
     </div>
-
     <div class="sc-row sc-head">
-      <div class="sc-hole">H</div>
-      <div class="sc-par">Par</div>
-      <div class="sc-hole" id="hP1">P1</div>
-      <div class="sc-hole" id="hP2" style="display:none">P2</div>
-      <div class="sc-hole" id="hP3" style="display:none">P3</div>
-      <div class="sc-hole" id="hP4" style="display:none">P4</div>
+      <div class="sc-hole">H</div><div class="sc-par">Par</div>
+      <div class="sc-hole" id="hP1">P1</div><div class="sc-hole" id="hP2" style="display:none">P2</div>
+      <div class="sc-hole" id="hP3" style="display:none">P3</div><div class="sc-hole" id="hP4" style="display:none">P4</div>
     </div>
     <div id="scBody"></div>
     <div class="sc-totals" id="scTotals">Totals…</div>
@@ -313,559 +165,271 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
-    // ------- Base layers & overlays -------
-    const esriImagery = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
-    );
-    const cartoVoyager = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      { maxZoom: 19, attribution: '&copy; OpenStreetMap & CARTO' }
-    );
-    const contours = L.tileLayer(
-      'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      { maxZoom: 17, opacity: 0.35, attribution: '© OpenStreetMap, SRTM · OpenTopoMap (CC-BY-SA)' }
-    );
+    // ---- base layers ----
+    const esriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' });
+    const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap & CARTO' });
+    const contours = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, opacity: .35, attribution: '© OpenStreetMap, SRTM · OpenTopoMap (CC-BY-SA)' });
 
-    // Map & defaults
     const map = L.map('map', { zoomControl: true, layers: [esriImagery] });
-    let currentBase = 'imagery';
-    let contoursOn = false;
+    let currentBase='imagery', contoursOn=false;
 
-    // Cart icon
+    // cart icon
     const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
     const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
     const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
 
-    // State
-    let lastPos = null, follow = true, movedOnce = false;
-    let holes = []; let currentIndex = 0; let courseList = [];
-    const markers = {}; // front/mid/back
+    // state
+    let lastPos=null, follow=true, movedOnce=false;
+    let holes=[], currentIndex=0, courseList=[];
+    const markers={};
+    let measureTarget=null, measureMarker=null, measureLine=null;
+    let suppressClickUntil=0; // prevent map click after pressing [×]
 
-    // Measure tool
-    let measureTarget = null; // {lat,lng}
-    let measureMarker = null, measureLine = null;
+    // ui refs
+    const status=document.getElementById('status');
+    const dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
+    const eFront=document.getElementById('eFront'), eMid=document.getElementById('eMid'), eBack=document.getElementById('eBack');
+    const parEl=document.getElementById('par'), strokeEl=document.getElementById('stroke');
+    const holeTitle=document.getElementById('holeTitle');
+    const recenterBtn=document.getElementById('recenterBtn');
+    const panel=document.getElementById('panel'), toggleBtn=document.getElementById('panelToggle');
+    const courseSel=document.getElementById('courseSelect'), holesSel=document.getElementById('holes');
+    const tgBase=document.getElementById('tgBase'), tgContours=document.getElementById('tgContours');
 
-    // UI refs
-    const status = document.getElementById('status');
-    const dFront = document.getElementById('dFront'), dMid = document.getElementById('dMid'), dBack = document.getElementById('dBack');
-    const eFront = document.getElementById('eFront'), eMid = document.getElementById('eMid'), eBack = document.getElementById('eBack');
-    const parEl = document.getElementById('par'), strokeEl = document.getElementById('stroke');
-    const holeTitle = document.getElementById('holeTitle');
-    const recenterBtn = document.getElementById('recenterBtn');
-    const panel = document.getElementById('panel'), toggleBtn = document.getElementById('panelToggle');
-    const courseSel = document.getElementById('courseSelect'), holesSel = document.getElementById('holes');
-    const tgBase = document.getElementById('tgBase');
-    const tgContours = document.getElementById('tgContours');
+    // wind
+    const windSpeedEl=document.getElementById('windSpeed'), windDirTxtEl=document.getElementById('windDirTxt'), windArrowEl=document.getElementById('windArrow');
+    let windCache={ts:0,lat:null,lng:null,speed:null,dir:null}; const WIND_TTL=10*60*1000;
 
-    // Wind widget
-    const windSpeedEl = document.getElementById('windSpeed');
-    const windDirTxtEl = document.getElementById('windDirTxt');
-    const windArrowEl = document.getElementById('windArrow');
-    let windCache = { ts: 0, lat: null, lng: null, speed: null, dir: null };
-    const WIND_TTL = 10 * 60 * 1000;
+    function degToCompass(d){ const dirs=['N','NE','E','SE','S','SW','W','NW','N']; return dirs[Math.round(((d%360)/45))]; }
+    async function fetchWind(lat,lng){ try{ const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&windspeed_unit=ms`); const j=await r.json(); const cw=j?.current_weather; if(typeof cw?.windspeed==='number'&&typeof cw?.winddirection==='number') return {speed:cw.windspeed,dir:cw.winddirection}; }catch{} return {speed:null,dir:null}; }
+    async function ensureWind(){ if(!lastPos)return; const now=Date.now(); if(now-windCache.ts>WIND_TTL){ const {speed,dir}=await fetchWind(lastPos.lat,lastPos.lng); windCache={ts:now,lat:lastPos.lat,lng:lastPos.lng,speed,dir}; } renderWind(); }
+    function renderWind(){ const {speed,dir}=windCache; windSpeedEl.textContent=(typeof speed==='number')?`${speed.toFixed(1)} m/s`:'– m/s'; windDirTxtEl.textContent=(typeof dir==='number')?`${degToCompass(dir)} (${Math.round(dir)}°)`:'–'; windArrowEl.style.transform=`rotate(${(typeof dir==='number'?dir:0)}deg)`; }
 
-    function degToCompass(d){
-      const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
-      const i = Math.round(((d % 360) / 45));
-      return dirs[i];
-    }
-    async function fetchWind(lat, lng){
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&windspeed_unit=ms`;
-        const r = await fetch(url);
-        const j = await r.json();
-        const cw = j && j.current_weather;
-        if (cw && typeof cw.windspeed === 'number' && typeof cw.winddirection === 'number') {
-          return { speed: cw.windspeed, dir: cw.winddirection };
-        }
-      } catch {}
-      return { speed: null, dir: null };
-    }
-    async function ensureWind(){
-      if (!lastPos) return;
-      const now = Date.now();
-      if (now - windCache.ts > WIND_TTL) {
-        const { speed, dir } = await fetchWind(lastPos.lat, lastPos.lng);
-        windCache = { ts: now, lat: lastPos.lat, lng: lastPos.lng, speed, dir };
-      }
-      renderWind();
-    }
-    function renderWind(){
-      const { speed, dir } = windCache;
-      windSpeedEl.textContent = (typeof speed === 'number') ? `${speed.toFixed(1)} m/s` : '– m/s';
-      windDirTxtEl.textContent = (typeof dir === 'number') ? `${degToCompass(dir)} (${Math.round(dir)}°)` : '–';
-      windArrowEl.style.transform = `rotate(${(typeof dir==='number'?dir:0)}deg)`;
-    }
+    // panel toggle
+    function setPanelHidden(h){ panel.classList.toggle('hidden',h); toggleBtn.textContent=h?'☰':'✕'; }
+    setPanelHidden(true); toggleBtn.onclick=()=>setPanelHidden(!panel.classList.contains('hidden'));
 
-    // Panel toggle
-    function setPanelHidden(h){ panel.classList.toggle('hidden', h); toggleBtn.textContent = h ? '☰' : '✕'; }
-    setPanelHidden(true); toggleBtn.onclick = () => setPanelHidden(!panel.classList.contains('hidden'));
-
-    // Map init view
+    // map start
     map.setView([-25.7542, 28.2322], 15);
 
-    // Helpers
-    function mstyle(name){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[name]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:0.9,color:p[0],fillColor:p[1]}; }
+    // helpers
+    function mstyle(n){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[n]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:.9,color:p[0],fillColor:p[1]}; }
     function setMarker(n,pos,label){ if(!pos)return; if(markers[n]){markers[n].setLatLng([pos.lat,pos.lng]);return;} markers[n]=L.circleMarker([pos.lat,pos.lng],mstyle(n)).addTo(map); if(label)markers[n].bindTooltip(label); }
     function clearMarkers(){ ['front','mid','back'].forEach(n=>{ if(markers[n]){ map.removeLayer(markers[n]); delete markers[n]; }}); }
     function meters(a,b){ const R=6371000,toRad=d=>d*Math.PI/180; const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2); const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.asin(Math.sqrt(q)); }
 
-    // Elevation (current position) — throttle & cache
-    let lastElev = null, lastElevAt = 0;
+    // current elevation cache
+    let lastElev=null,lastElevAt=0;
     async function fetchCurrentElevation(p){
-      const now = Date.now();
-      if (lastElev !== null && (now - lastElevAt) < 30000) return lastElev;
-      try{
-        const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${p.lat},${p.lng}`);
-        const js = await r.json();
-        const v = js?.results?.[0]?.elevation;
-        if (typeof v === 'number') { lastElev = v; lastElevAt = now; return v; }
-      }catch{}
-      return null;
+      const now=Date.now();
+      if(lastElev!==null && (now-lastElevAt)<30000) return lastElev;
+      try{ const r=await fetch(`/elevation?lat=${p.lat}&lng=${p.lng}`); const js=await r.json(); const v=js?.results?.[0]?.elevation; if(typeof v==='number'){ lastElev=v; lastElevAt=now; return v; } }catch{} return null;
     }
-    function fmtDelta(d){ if (d == null) return '–'; if (Math.abs(d) < 0.5) return '±0 m'; return d>0 ? `↑ ${Math.round(d)} m` : `↓ ${Math.round(Math.abs(d))} m`; }
+    function fmtDelta(d){ if(d==null) return '–'; if(Math.abs(d)<0.5) return '±0 m'; return d>0?`↑ ${Math.round(d)} m`:`↓ ${Math.round(Math.abs(d))} m`; }
 
     function updateHoleUI(center=true){
       if(!holes.length) return;
-      const h = holes[currentIndex];
+      const h=holes[currentIndex];
       clearMarkers();
-      setMarker('front', h.green.front || h.green.center, 'Front');
-      setMarker('mid',   h.green.mid   || h.green.center, 'Mid');
-      setMarker('back',  h.green.back  || h.green.center, 'Back');
+      setMarker('front',h.green.front||h.green.center,'Front');
+      setMarker('mid',  h.green.mid  ||h.green.center,'Mid');
+      setMarker('back', h.green.back ||h.green.center,'Back');
 
-      holeTitle.textContent = `Hole ${h.number}`;
-      parEl.textContent = h.par ?? '–';
-      strokeEl.textContent = h.strokeIndex ?? '–';
-      holesSel.value = String(h.number);
+      holeTitle.textContent=`Hole ${h.number}`;
+      parEl.textContent=h.par??'–'; strokeEl.textContent=h.strokeIndex??'–';
+      holesSel.value=String(h.number);
 
-      if (center) {
-        const pts = [h.green.front, h.green.mid, h.green.back, h.green.center].filter(Boolean);
-        if (pts.length) map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])));
-      }
-      if (lastPos) updateDistancesAndDeltas();
+      if(center){ const pts=[h.green.front,h.green.mid,h.green.back,h.green.center].filter(Boolean); if(pts.length) map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng]))); }
+      if(lastPos) updateDistancesAndDeltas();
       updateMeasure();
       highlightCurrentRow();
     }
 
     async function updateDistancesAndDeltas(){
-      if (!lastPos || !holes.length) return;
-      const h = holes[currentIndex];
-      const f = h.green.front || h.green.center, m = h.green.mid || h.green.center, b = h.green.back || h.green.center;
-      dFront.textContent = Math.round(meters(lastPos, f));
-      dMid.textContent   = Math.round(meters(lastPos, m));
-      dBack.textContent  = Math.round(meters(lastPos, b));
+      if(!lastPos || !holes.length) return;
+      const h=holes[currentIndex]; const f=h.green.front||h.green.center, m=h.green.mid||h.green.center, b=h.green.back||h.green.center;
+      dFront.textContent=Math.round(meters(lastPos,f));
+      dMid.textContent  =Math.round(meters(lastPos,m));
+      dBack.textContent =Math.round(meters(lastPos,b));
 
-      let curElev = await fetchCurrentElevation(lastPos);
-      const df = (h.elevation?.front ?? null);
-      const dm = (h.elevation?.mid   ?? null);
-      const db = (h.elevation?.back  ?? null);
-      eFront.textContent = (curElev!=null && df!=null) ? fmtDelta(df - curElev) : '–';
-      eMid.textContent   = (curElev!=null && dm!=null) ? fmtDelta(dm - curElev) : '–';
-      eBack.textContent  = (curElev!=null && db!=null) ? fmtDelta(db - curElev) : '–';
+      const curElev=await fetchCurrentElevation(lastPos);
+      const df=h.elevation?.front??null, dm=h.elevation?.mid??null, db=h.elevation?.back??null;
+      eFront.textContent=(curElev!=null&&df!=null)?fmtDelta(df-curElev):'–';
+      eMid.textContent  =(curElev!=null&&dm!=null)?fmtDelta(dm-curElev):'–';
+      eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
     }
 
-    // ----- Measure tool -----
-    function measureDistanceText(){
-      if (!measureTarget || !lastPos) return null;
-      const d = meters(lastPos, measureTarget);
-      return `${Math.round(d)} m`;
-    }
+    // ---------- Measure tool (fixed close) ----------
+    function measureDistanceText(){ if(!measureTarget || !lastPos) return null; const d=meters(lastPos,measureTarget); return `${Math.round(d)} m`; }
     function setMeasure(latlng){
-      measureTarget = latlng;
-      if (measureLine) map.removeLayer(measureLine);
-      if (lastPos) {
-        measureLine = L.polyline([[lastPos.lat,lastPos.lng],[latlng.lat,latlng.lng]], {weight:3,opacity:0.9}).addTo(map);
-      }
-      const txt = measureDistanceText() || '– m';
-      const icon = L.divIcon({
-        className: 'dd-measure',
-        html: `
-          <div class="anchor-dot"></div>
-          <div class="bubble">
-            <div class="measure-bubble">
-              <span class="measure-text">${txt}</span>
-              <span class="measure-close" aria-label="Clear">×</span>
-            </div>
-          </div>
-        `,
-        iconSize: [0,0], iconAnchor: [0,0]
+      measureTarget=latlng;
+      if(measureLine) map.removeLayer(measureLine);
+      if(lastPos){ measureLine=L.polyline([[lastPos.lat,lastPos.lng],[latlng.lat,latlng.lng]],{weight:3,opacity:.9}).addTo(map); }
+      const txt=measureDistanceText()||'– m';
+      const icon=L.divIcon({
+        className:'dd-measure',
+        html:`<div class="anchor-dot"></div><div class="bubble"><div class="measure-bubble"><span class="measure-text">${txt}</span><span class="measure-close" aria-label="Clear">×</span></div></div>`,
+        iconSize:[0,0], iconAnchor:[0,0]
       });
-      if (measureMarker) map.removeLayer(measureMarker);
-      measureMarker = L.marker([latlng.lat,latlng.lng], { icon, zIndexOffset: 10000 }).addTo(map);
-      measureMarker.on('add', () => {
-        const el = measureMarker.getElement();
-        if (!el) return;
-        if (L && L.DomEvent) { L.DomEvent.disableClickPropagation(el); }
-        const btn = el.querySelector('.measure-close');
-        if (btn) {
-          btn.addEventListener('click', (ev) => {
-            ev.preventDefault(); ev.stopPropagation(); clearMeasure();
+      if(measureMarker) map.removeLayer(measureMarker);
+      measureMarker=L.marker([latlng.lat,latlng.lng],{icon,zIndexOffset:10000,interactive:true}).addTo(map);
+      measureMarker.on('add',()=>{
+        const el=measureMarker.getElement(); if(!el) return;
+        // stop all clicks inside from reaching the map
+        L.DomEvent.disableClickPropagation(el);
+        el.querySelectorAll('*').forEach(n=>L.DomEvent.on(n,'click',L.DomEvent.stopPropagation));
+        const btn=el.querySelector('.measure-close');
+        if(btn){
+          btn.addEventListener('click',(ev)=>{
+            ev.preventDefault(); ev.stopPropagation();
+            suppressClickUntil=Date.now()+250; // ignore next map click
+            clearMeasure();
           });
         }
       });
     }
     function updateMeasure(){
-      if (!measureTarget) return;
-      if (measureLine && lastPos) measureLine.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
-      if (measureMarker) {
-        const el = measureMarker.getElement();
-        if (el) {
-          const span = el.querySelector('.measure-text');
-          if (span) span.textContent = measureDistanceText() || '– m';
-        }
+      if(!measureTarget) return;
+      if(measureLine && lastPos) measureLine.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
+      if(measureMarker){
+        const el=measureMarker.getElement();
+        if(el){ const span=el.querySelector('.measure-text'); if(span) span.textContent=measureDistanceText()||'– m'; }
       }
     }
-    function clearMeasure(){
-      measureTarget = null;
-      if (measureLine){ map.removeLayer(measureLine); measureLine=null; }
-      if (measureMarker){ map.removeLayer(measureMarker); measureMarker=null; }
+    function clearMeasure(){ measureTarget=null; if(measureLine){map.removeLayer(measureLine);measureLine=null;} if(measureMarker){map.removeLayer(measureMarker);measureMarker=null;} }
+
+    function onMapClick(e){
+      if(Date.now()<suppressClickUntil) return; // clicked [×]
+      setMeasure({lat:e.latlng.lat,lng:e.latlng.lng});
     }
-    map.on('click', (e) => { setMeasure({ lat: e.latlng.lat, lng: e.latlng.lng }); });
+    map.on('click', onMapClick);
 
     // GPS
-    if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition(async pos => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        lastPos = p;
-        you.setLatLng([p.lat, p.lng]);
-        if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display='none'; }
-        if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
-        status.textContent = `Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
-        await updateDistancesAndDeltas();
-        ensureWind();
-        updateMeasure();
-      }, err => { status.textContent = err.message; }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
-    } else { status.textContent = 'Geolocation not supported'; }
+    if('geolocation' in navigator){
+      navigator.geolocation.watchPosition(async pos=>{
+        const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
+        lastPos=p; you.setLatLng([p.lat,p.lng]);
+        if(follow){ map.setView([p.lat,p.lng], map.getZoom()||17); recenterBtn.style.display='none'; }
+        if(!movedOnce){ map.setView([p.lat,p.lng],17); movedOnce=true; }
+        status.textContent=`Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
+        await updateDistancesAndDeltas(); ensureWind(); updateMeasure();
+      }, err=>{ status.textContent=err.message; }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
+    } else { status.textContent='Geolocation not supported'; }
 
-    // Follow/recenter
     map.on('dragstart',()=>{follow=false;recenterBtn.style.display='block';});
     map.on('zoomstart',()=>{follow=false;recenterBtn.style.display='block';});
     recenterBtn.onclick=()=>{ if(!lastPos)return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); recenterBtn.style.display='none'; };
 
-    // Courses list
-    async function loadCourseList(){
-      try{ const r=await fetch('/courses/index.json'); const js=await r.json(); courseList=js.courses||[]; courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);}); }catch{ courseSel.innerHTML=''; }
-    }
+    // course list + load
+    async function loadCourseList(){ try{ const r=await fetch('/courses/index.json'); const js=await r.json(); courseList=js.courses||[]; courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);}); }catch{ courseSel.innerHTML=''; } }
     async function loadCourse(id){
-      clearMarkers(); holes=[]; currentIndex=0; holesSel.innerHTML=''; holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
+      holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
       try{
         const r=await fetch(`/courses/${encodeURIComponent(id)}.json`); const raw=await r.json();
-        const root = raw.course || raw;
-        holes=(root.holes||[]).map(h=>({ number: (h.number ?? h.hole ?? h.holeNumber ?? null)*1, par: (h.par!=null?Number(h.par):null), strokeIndex: (h.strokeIndex ?? h.stroke ?? h.si ?? null)*1 || null,
-          green:{ center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null },
-          elevation:{ front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null }
-        })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
+        const root=raw.course||raw;
+        holes=(root.holes||[]).map(h=>({ number:(h.number??h.hole??h.holeNumber??null)*1, par:(h.par!=null?Number(h.par):null), strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null, green:{center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null}, elevation:{front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null} })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
 
-        holesSel.innerHTML='';
-        holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
+        holesSel.innerHTML=''; holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
         if(holes.length){ currentIndex=0; updateHoleUI(true); }
         status.textContent=`Loaded course: ${root.name||id}`;
 
-        // Auto-fill any missing elevations, then refresh UI (no recenter)
-        await autofillElevationsForCourse(id);
-
-        buildScorecard();
-        loadSavedScores(id);
+        await autofillElevationsForCourse(id); // fills missing F/M/B
+        buildScorecard(); loadSavedScores(id);
       }catch{ status.textContent=`Failed to load course ${id}`; }
     }
-
-    document.getElementById('btnLoadCourse').onclick=()=>{const id=courseSel.value; if(!id)return; loadCourse(id);};
-    document.getElementById('btnGoHole').onclick=()=>{const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true);} };
+    document.getElementById('btnLoadCourse').onclick=()=>{ const id=courseSel.value; if(!id)return; loadCourse(id); };
+    document.getElementById('btnGoHole').onclick=()=>{ const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true);} };
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); };
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); };
 
-    // ---------- Basemap & Contours toggles ----------
-    function setBase(which){
-      if (which === currentBase) return;
-      if (which === 'imagery') { map.removeLayer(cartoVoyager); esriImagery.addTo(map); tgBase.textContent = 'Map: Imagery'; }
-      else { map.removeLayer(esriImagery); cartoVoyager.addTo(map); tgBase.textContent = 'Map: Voyager'; }
-      currentBase = which;
-    }
-    function setContours(on){
-      if (on && !contoursOn) { contours.addTo(map); tgContours.classList.add('active'); tgContours.textContent='Contours: On'; contoursOn = true; }
-      else if (!on && contoursOn) { map.removeLayer(contours); tgContours.classList.remove('active'); tgContours.textContent='Contours: Off'; contoursOn = false; }
-    }
+    // base & contours toggles
+    function setBase(which){ if(which===currentBase) return; if(which==='imagery'){ map.removeLayer(cartoVoyager); esriImagery.addTo(map); tgBase.textContent='Map: Imagery'; } else { map.removeLayer(esriImagery); cartoVoyager.addTo(map); tgBase.textContent='Map: Voyager'; } currentBase=which; }
+    function setContours(on){ if(on && !contoursOn){ contours.addTo(map); tgContours.classList.add('active'); tgContours.textContent='Contours: On'; contoursOn=true; } else if(!on && contoursOn){ map.removeLayer(contours); tgContours.classList.remove('active'); tgContours.textContent='Contours: Off'; contoursOn=false; } }
     setBase('imagery'); setContours(false);
-    tgBase.onclick = () => setBase(currentBase === 'imagery' ? 'voyager' : 'imagery');
-    tgContours.onclick = () => setContours(!contoursOn);
+    tgBase.onclick=()=>setBase(currentBase==='imagery'?'voyager':'imagery');
+    tgContours.onclick=()=>setContours(!contoursOn);
 
-    // SW
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
-
-    /* ===================== ELEVATION AUTOFILL ===================== */
-    const ELEV_CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
-    function loadElevCache(courseId){
-      try {
-        const raw = localStorage.getItem('dd_elev_' + courseId);
-        const obj = raw ? JSON.parse(raw) : null;
-        if (!obj || !obj.ts || (Date.now() - obj.ts) > ELEV_CACHE_TTL) return { ts: Date.now(), holes:{} };
-        return obj;
-      } catch { return { ts: Date.now(), holes:{} }; }
+    /* ===== Elevation autofill via /elevation proxy ===== */
+    const ELEV_CACHE_TTL=1000*60*60*24*30;
+    function loadElevCache(courseId){ try{ const raw=localStorage.getItem('dd_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
+    function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('dd_elev_'+courseId, JSON.stringify(cache)); }catch{} }
+    async function fetchElevPoint(lat,lng){
+      try{
+        const r=await fetch(`/elevation?lat=${lat}&lng=${lng}`);
+        if(r.ok){ const j=await r.json(); const v=j?.results?.[0]?.elevation; if(typeof v==='number') return v; }
+      }catch{}
+      return null;
     }
-    function saveElevCache(courseId, cache){
-      try { cache.ts = Date.now(); localStorage.setItem('dd_elev_' + courseId, JSON.stringify(cache)); } catch {}
-    }
-// Replace the old fetchElevPoint with this:
-async function fetchElevPoint(lat, lng){
-  // Use our own proxy to avoid CORS
-  try{
-    const r = await fetch(`/elevation?lat=${lat}&lng=${lng}`);
-    if (r.ok) {
-      const j = await r.json();
-      const v = j?.results?.[0]?.elevation;
-      if (typeof v === 'number') return v;
-    }
-  }catch{}
-
-  // If the proxy ever fails, return null (UI will show "–")
-  return null;
-}
-
-
     async function autofillElevationsForCourse(courseId){
-      if (!holes.length) return;
-
-      // 1) apply cache first
-      const cache = loadElevCache(courseId);
-      holes.forEach(h=>{
-        const ch = cache.holes?.[h.number];
-        if (ch){
-          h.elevation = h.elevation || {};
-          if (ch.front!=null && (h.elevation.front==null)) h.elevation.front = ch.front;
-          if (ch.mid  !=null && (h.elevation.mid  ==null)) h.elevation.mid   = ch.mid;
-          if (ch.back !=null && (h.elevation.back ==null)) h.elevation.back  = ch.back;
-        }
-      });
-
-      // 2) collect missing jobs
-      const jobs = [];
-      for (const h of holes){
-        const pts = [
-          ['front', h.green.front],
-          ['mid',   h.green.mid   || h.green.center],
-          ['back',  h.green.back]
-        ];
-        for (const [key,pt] of pts){
-          if (!pt) continue;
-          if (h.elevation?.[key] == null){
-            jobs.push({ hole: h, key, lat: pt.lat, lng: pt.lng });
-          }
-        }
+      if(!holes.length) return;
+      const cache=loadElevCache(courseId);
+      holes.forEach(h=>{ const ch=cache.holes?.[h.number]; if(ch){ h.elevation=h.elevation||{}; if(ch.front!=null && h.elevation.front==null) h.elevation.front=ch.front; if(ch.mid!=null && h.elevation.mid==null) h.elevation.mid=ch.mid; if(ch.back!=null && h.elevation.back==null) h.elevation.back=ch.back; } });
+      const jobs=[];
+      for(const h of holes){
+        const pts=[['front',h.green.front],['mid',h.green.mid||h.green.center],['back',h.green.back]];
+        for(const [key,pt] of pts){ if(!pt) continue; if(h.elevation?.[key]==null) jobs.push({hole:h,key,lat:pt.lat,lng:pt.lng}); }
       }
-      if (!jobs.length){ updateHoleUI(false); return; }
-
-      // 3) fetch sequentially (polite)
-      for (const job of jobs){
-        const v = await fetchElevPoint(job.lat, job.lng);
-        if (!job.hole.elevation) job.hole.elevation = {};
-        if (v != null) job.hole.elevation[job.key] = v;
-
-        const entry = cache.holes[job.hole.number] || {};
-        if (v != null) entry[job.key] = v;
-        cache.holes[job.hole.number] = entry;
-
-        // refresh UI gradually for feedback
-        if (job.hole === holes[currentIndex]) updateDistancesAndDeltas();
+      if(!jobs.length){ updateHoleUI(false); return; }
+      for(const job of jobs){
+        const v=await fetchElevPoint(job.lat,job.lng);
+        if(!job.hole.elevation) job.hole.elevation={};
+        if(v!=null) job.hole.elevation[job.key]=v;
+        const entry=cache.holes[job.hole.number]||{}; if(v!=null) entry[job.key]=v; cache.holes[job.hole.number]=entry;
+        if(job.hole===holes[currentIndex]) updateDistancesAndDeltas();
       }
-      saveElevCache(courseId, cache);
-      updateHoleUI(false);
+      saveElevCache(courseId,cache); updateHoleUI(false);
     }
-    /* =================== /ELEVATION AUTOFILL =================== */
+    /* =================== /elevation =================== */
 
     /* ===================== SCORECARD ===================== */
-    const scoreToggle = document.getElementById('scoreToggle');
-    const scorecard = document.getElementById('scorecard');
-    const scBody = document.getElementById('scBody');
-    const scTotals = document.getElementById('scTotals');
-    const scCount = document.getElementById('scCount');
-    const nameEls = [document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
-    const headEls = [document.getElementById('hP1'),document.getElementById('hP2'),document.getElementById('hP3'),document.getElementById('hP4')];
-    const scClose = document.getElementById('scClose');
-    const scClear = document.getElementById('scClear');
+    const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
+    const scBody=document.getElementById('scBody'), scTotals=document.getElementById('scTotals'), scCount=document.getElementById('scCount');
+    const nameEls=[document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
+    const headEls=[document.getElementById('hP1'),document.getElementById('hP2'),document.getElementById('hP3'),document.getElementById('hP4')];
+    const scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear');
+    let playerCount=1, scores=[], courseIdForScores=null;
 
-    let playerCount = 1;
-    let scores = []; // [player][holeIndex]
-    let courseIdForScores = null;
-
-    scoreToggle.onclick = () => { scorecard.classList.toggle('show'); highlightCurrentRow(); };
-    scClose.onclick = () => scorecard.classList.remove('show');
-    scClear.onclick = () => {
-      if (!confirm('Clear all scores for this course?')) return;
-      scores = Array.from({length:4},()=>Array(holes.length).fill(null));
-      persistScores();
-      renderScores();
-    };
-
-    scCount.onchange = () => {
-      playerCount = Number(scCount.value);
-      for (let i=0;i<4;i++){
-        nameEls[i].style.display = (i<playerCount)?'':'none';
-        headEls[i].style.display = (i<playerCount)?'':'none';
-      }
-      persistScoresMeta();
-      renderScores();
-    };
-
-    nameEls.forEach((inp,idx)=>{
-      inp.addEventListener('input', ()=>{
-        headEls[idx].textContent = inp.value || `P${idx+1}`;
-        persistScoresMeta();
-      });
-    });
+    scoreToggle.onclick=()=>{ scorecard.classList.toggle('show'); highlightCurrentRow(); };
+    scClose.onclick=()=>scorecard.classList.remove('show');
+    scClear.onclick=()=>{ if(!confirm('Clear all scores for this course?')) return; scores=Array.from({length:4},()=>Array(holes.length).fill(null)); persistScores(); renderScores(); };
+    scCount.onchange=()=>{ playerCount=Number(scCount.value); for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; } persistScoresMeta(); renderScores(); };
+    nameEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ headEls[idx].textContent=inp.value||`P${idx+1}`; persistScoresMeta(); }); });
 
     function buildScorecard(){
-      // init players
-      playerCount = Number(scCount.value);
-      for (let i=0;i<4;i++){
-        nameEls[i].style.display = (i<playerCount)?'':'none';
-        headEls[i].style.display = (i<playerCount)?'':'none';
-        headEls[i].textContent = nameEls[i].value || `P${i+1}`;
-      }
-
-      // rows
-      scBody.innerHTML = '';
+      playerCount=Number(scCount.value);
+      for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].textContent=nameEls[i].value||`P${i+1}`; }
+      scBody.innerHTML='';
       holes.forEach((h,idx)=>{
-        const row = document.createElement('div');
-        row.className = 'sc-row';
-        row.dataset.hole = h.number;
-
-        const cellHole = document.createElement('div'); cellHole.className='sc-hole'; cellHole.textContent=h.number;
-        const cellPar  = document.createElement('div'); cellPar.className='sc-par';  cellPar.textContent=h.par ?? '-';
+        const row=document.createElement('div'); row.className='sc-row'; row.dataset.hole=h.number;
+        const cellHole=document.createElement('div'); cellHole.className='sc-hole'; cellHole.textContent=h.number;
+        const cellPar=document.createElement('div'); cellPar.className='sc-par'; cellPar.textContent=h.par??'-';
         row.appendChild(cellHole); row.appendChild(cellPar);
-
-        for (let p=0;p<4;p++){
-          const wrap = document.createElement('div'); wrap.className='sc-cell'; wrap.style.display=(p<playerCount)?'flex':'none';
-          const input = document.createElement('input'); input.className='sc-score'; input.type='number'; input.min='1';
-          input.placeholder='–'; input.dataset.p=String(p); input.dataset.i=String(idx);
-          input.addEventListener('input', ()=>{ onScoreChange(p,idx,input.value?Number(input.value):null); });
-          // Optional: Enter to step through (kept simple—auto-advance patch can be added later)
-          input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              onScoreChange(p, idx, input.value ? Number(input.value) : null);
-            }
-          });
-          const chip = document.createElement('span'); chip.className='sc-chip even'; chip.textContent='E';
-          wrap.appendChild(input); wrap.appendChild(chip);
-          row.appendChild(wrap);
+        for(let p=0;p<4;p++){
+          const wrap=document.createElement('div'); wrap.className='sc-cell'; wrap.style.display=(p<playerCount)?'flex':'none';
+          const input=document.createElement('input'); input.className='sc-score'; input.type='number'; input.min='1'; input.placeholder='–';
+          input.addEventListener('input',()=>{ onScoreChange(p,idx,input.value?Number(input.value):null); });
+          const chip=document.createElement('span'); chip.className='sc-chip even'; chip.textContent='E';
+          wrap.appendChild(input); wrap.appendChild(chip); row.appendChild(wrap);
         }
         scBody.appendChild(row);
       });
-
-      if (!scores.length || scores[0].length !== holes.length){
-        scores = Array.from({length:4},()=>Array(holes.length).fill(null));
-      }
+      if(!scores.length||scores[0].length!==holes.length) scores=Array.from({length:4},()=>Array(holes.length).fill(null));
       renderScores();
     }
-
-    function relationToPar(score, par){
-      if (score==null || par==null) return {cls:'even', txt:'–'};
-      const d = score - par;
-      if (d === 0) return {cls:'even', txt:'E'};
-      if (d < 0)   return {cls:'under', txt:(d===-1?'−1':`−${Math.abs(d)}`)};
-      return {cls:'over', txt:(d===1?'+1':`+${d}`)};
-    }
-
+    function relationToPar(score,par){ if(score==null||par==null) return {cls:'even',txt:'–'}; const d=score-par; if(d===0) return {cls:'even',txt:'E'}; if(d<0) return {cls:'under',txt:(d===-1?'−1':`−${Math.abs(d)}`)}; return {cls:'over',txt:(d===1?'+1':`+${d}`)}; }
     function renderScores(){
-      const rows = scBody.querySelectorAll('.sc-row');
-      rows.forEach((row,idx)=>{
-        const par = holes[idx]?.par ?? null;
-        const cells = row.querySelectorAll('.sc-cell');
-        cells.forEach((cell,p)=>{
-          if (p>=playerCount){ cell.style.display='none'; return; }
-          cell.style.display='flex';
-          const input = cell.querySelector('.sc-score');
-          const chip = cell.querySelector('.sc-chip');
-          const v = scores[p][idx];
-          input.value = v ?? '';
-          const rel = relationToPar(v, par);
-          chip.className = `sc-chip ${rel.cls}`;
-          chip.textContent = rel.txt;
-        });
-      });
+      scBody.querySelectorAll('.sc-row').forEach((row,idx)=>{ const par=holes[idx]?.par??null; row.querySelectorAll('.sc-cell').forEach((cell,p)=>{ if(p>=playerCount){cell.style.display='none';return;} cell.style.display='flex'; const input=cell.querySelector('.sc-score'); const chip=cell.querySelector('.sc-chip'); const v=scores[p][idx]; input.value=v??''; const rel=relationToPar(v,par); chip.className=`sc-chip ${rel.cls}`; chip.textContent=rel.txt; }); });
+      const parts=[]; for(let p=0;p<playerCount;p++){ let t=0,d=0; for(let i=0;i<holes.length;i++){ const v=scores[p][i]; const par=holes[i]?.par??null; if(v!=null){ t+=v; if(par!=null) d+=(v-par); } } const nm=(nameEls[p].value||`P${p+1}`); const tag=d===0?'E':(d>0?`+${d}`:`${d}`); parts.push(`${nm}: ${t||0} (${tag})`); } scTotals.textContent=parts.join('   •   ');
+    }
+    function onScoreChange(p,i,val){ scores[p][i]=(typeof val==='number'&&!Number.isNaN(val))?val:null; persistScores(); renderScores(); }
+    function highlightCurrentRow(){ const rows=scBody.querySelectorAll('.sc-row'); rows.forEach(r=>r.style.outline='none'); const row=rows[currentIndex]; if(row){ row.style.outline='2px solid var(--accent)'; row.scrollIntoView({block:'nearest'}); } }
+    function persistScoresMeta(){ if(!courseIdForScores) return; const meta={count:playerCount, names:nameEls.map((el,i)=> i<playerCount?(el.value||`P${i+1}`):null)}; localStorage.setItem(`dd_scores_meta_${courseIdForScores}`, JSON.stringify(meta)); }
+    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`dd_scores_${courseIdForScores}`, JSON.stringify(scores)); persistScoresMeta(); }
+    function loadSavedScores(id){ courseIdForScores=id; try{ const meta=JSON.parse(localStorage.getItem(`dd_scores_meta_${id}`)||'null'); if(meta){ scCount.value=String(meta.count||1); playerCount=Number(scCount.value); meta.names?.forEach((nm,i)=>{ if(nm!=null){ nameEls[i].value=nm; headEls[i].textContent=nm; }}); for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; } } }catch{} try{ const saved=JSON.parse(localStorage.getItem(`dd_scores_${id}`)||'null'); if(saved&&Array.isArray(saved)&&saved.length===4&&saved[0].length===holes.length){ scores=saved; } else { scores=Array.from({length:4},()=>Array(holes.length).fill(null)); } }catch{ scores=Array.from({length:4},()=>Array(holes.length).fill(null)); } renderScores(); }
 
-      // totals
-      const totals = [];
-      const toPars = [];
-      for (let p=0;p<playerCount;p++){
-        let t=0, d=0;
-        for (let i=0;i<holes.length;i++){
-          const v=scores[p][i]; const par=holes[i]?.par??null;
-          if (v!=null){ t+=v; if(par!=null) d += (v-par); }
-        }
-        totals.push(t || 0);
-        toPars.push(d || 0);
-      }
-      const parts = [];
-      for (let p=0;p<playerCount;p++){
-        const nm = (nameEls[p].value || `P${p+1}`);
-        const dp = toPars[p];
-        const tag = dp===0?'E':(dp>0?`+${dp}`:`${dp}`);
-        parts.push(`${nm}: ${totals[p]||0} (${tag})`);
-      }
-      scTotals.textContent = parts.join('   •   ');
-    }
-
-    function onScoreChange(p,i,val){
-      scores[p][i] = (typeof val==='number' && !Number.isNaN(val)) ? val : null;
-      persistScores();
-      renderScores();
-    }
-
-    function highlightCurrentRow(){
-      const rows = scBody.querySelectorAll('.sc-row');
-      rows.forEach(r=>r.style.outline='none');
-      const idx = currentIndex;
-      const row = rows[idx];
-      if (row){ row.style.outline='2px solid var(--accent)'; row.scrollIntoView({block:'nearest'}); }
-    }
-
-    function persistScoresMeta(){
-      if (!courseIdForScores) return;
-      const meta = {
-        count: playerCount,
-        names: nameEls.map((el,i)=> i<playerCount ? (el.value || `P${i+1}`) : null)
-      };
-      localStorage.setItem(`dd_scores_meta_${courseIdForScores}`, JSON.stringify(meta));
-    }
-    function persistScores(){
-      if (!courseIdForScores) return;
-      localStorage.setItem(`dd_scores_${courseIdForScores}`, JSON.stringify(scores));
-      persistScoresMeta();
-    }
-    function loadSavedScores(id){
-      courseIdForScores = id;
-      try {
-        const meta = JSON.parse(localStorage.getItem(`dd_scores_meta_${id}`) || 'null');
-        if (meta){
-          scCount.value = String(meta.count || 1);
-          playerCount = Number(scCount.value);
-          meta.names?.forEach((nm,i)=>{ if(nm!=null){ nameEls[i].value = nm; headEls[i].textContent = nm; }});
-          for (let i=0;i<4;i++){
-            nameEls[i].style.display = (i<playerCount)?'':'none';
-            headEls[i].style.display = (i<playerCount)?'':'none';
-          }
-        }
-      } catch {}
-      try {
-        const saved = JSON.parse(localStorage.getItem(`dd_scores_${id}`) || 'null');
-        if (saved && Array.isArray(saved) && saved.length===4 && saved[0].length===holes.length){
-          scores = saved;
-        } else {
-          scores = Array.from({length:4},()=>Array(holes.length).fill(null));
-        }
-      } catch {
-        scores = Array.from({length:4},()=>Array(holes.length).fill(null));
-      }
-      renderScores();
-    }
-    /* =================== /SCORECARD =================== */
-
-    // Init
+    // init
     loadCourseList();
-    const urlParams=new URLSearchParams(location.search);
-    const cid=urlParams.get('course');
+    const cid=new URLSearchParams(location.search).get('course');
     if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
   </script>
 </body>
