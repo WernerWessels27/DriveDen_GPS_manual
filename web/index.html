@@ -606,9 +606,6 @@
     function saveElevCache(courseId, cache){
       try { cache.ts = Date.now(); localStorage.setItem('dd_elev_' + courseId, JSON.stringify(cache)); } catch {}
     }
-    <script>
-// … keep everything else the same …
-
 // Replace the old fetchElevPoint with this:
 async function fetchElevPoint(lat, lng){
   // Use our own proxy to avoid CORS
@@ -625,8 +622,6 @@ async function fetchElevPoint(lat, lng){
   return null;
 }
 
-// … keep the rest of index.html exactly as you have it …
-</script>
 
     async function autofillElevationsForCourse(courseId){
       if (!holes.length) return;
