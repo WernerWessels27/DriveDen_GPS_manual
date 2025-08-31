@@ -46,7 +46,6 @@
   </div>
 
   <div class="grid3">
-    <div id="btnTee"   class="pill">Set Tee</div>
     <div id="btnFront" class="pill">Set Front</div>
     <div id="btnMid"   class="pill">Set Mid</div>
     <div id="btnBack"  class="pill">Set Back</div>
@@ -76,7 +75,6 @@
 
   <!-- Distance HUD -->
   <div class="row" style="margin-top:10px;"><strong>Distances (m)</strong></div>
-  <div class="row">You → Tee: <span id="dTee">–</span></div>
   <div class="row">You → Front: <span id="dFront">–</span></div>
   <div class="row">You → Mid: <span id="dMid">–</span></div>
   <div class="row">You → Back: <span id="dBack">–</span></div>
@@ -93,12 +91,12 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
 <script>
-  // Map (OSM for visibility)
+  // Map (OSM)
   const map = L.map('map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
   map.setView([-25.7542,28.2322],15);
 
-  // Live location
+  // Live location (cart icon)
   const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
   const cartIcon = L.icon({iconUrl:`data:image/svg+xml;utf8,${cartSvg}`,iconSize:[28,22],iconAnchor:[14,11]});
   let you = L.marker([0,0],{icon:cartIcon}).addTo(map);
@@ -114,17 +112,17 @@
   const status=document.getElementById('status'), gpsAcc=document.getElementById('gpsAcc');
   const draftTag=document.getElementById('draftTag'), progress=document.getElementById('progress'), panel=document.querySelector('.panel'), toggleBtn=document.getElementById('panelToggle');
   const fieldCourseName=document.getElementById('courseName'), fieldCourseId=document.getElementById('courseId'), fieldHole=document.getElementById('holeNumber'), fieldPar=document.getElementById('holePar'), fieldSI=document.getElementById('strokeIndex');
-  const btns={tee:document.getElementById('btnTee'),front:document.getElementById('btnFront'),mid:document.getElementById('btnMid'),back:document.getElementById('btnBack')};
+  const btns={front:document.getElementById('btnFront'),mid:document.getElementById('btnMid'),back:document.getElementById('btnBack')};
   const btnClear=document.getElementById('btnClear'), btnSaveHole=document.getElementById('btnSaveHole'), btnLoadHole=document.getElementById('btnLoadHole'), btnDeleteHole=document.getElementById('btnDeleteHole'), btnExport=document.getElementById('btnExport'), fileImport=document.getElementById('fileImport'), btnNewCourse=document.getElementById('btnNewCourse'), btnClearDraft=document.getElementById('btnClearDraft'), savedList=document.getElementById('savedList');
 
   // Panel toggle
   let panelHidden=false; toggleBtn.onclick=()=>{panelHidden=!panelHidden;panel.style.display=panelHidden?'none':'block';toggleBtn.textContent=panelHidden?'☰':'✕';toggleBtn.title=panelHidden?'Show panel':'Hide panel';};
 
   // Styles & markers
-  function colorFor(name){const p={tee:{stroke:'#2563eb',fill:'#3b82f6'},front:{stroke:'#059669',fill:'#10b981'},mid:{stroke:'#b45309',fill:'#f59e0b'},back:{stroke:'#b91c1c',fill:'#ef4444'}};return p[name]||{stroke:'#111827',fill:'#374151'};}
+  function colorFor(name){const p={front:{stroke:'#059669',fill:'#10b981'},mid:{stroke:'#b45309',fill:'#f59e0b'},back:{stroke:'#b91c1c',fill:'#ef4444'}};return p[name]||{stroke:'#111827',fill:'#374151'};}
   let awaiting=null; const markers={}; const holes=[];
   function setAwait(which){awaiting=which;Object.keys(btns).forEach(k=>btns[k].classList.toggle('active',k===which));status.textContent=which?`Tap map to set ${which}`:'Ready';}
-  btns.tee.onclick=()=>setAwait('tee'); btns.front.onclick=()=>setAwait('front'); btns.mid.onclick=()=>setAwait('mid'); btns.back.onclick=()=>setAwait('back');
+  btns.front.onclick=()=>setAwait('front'); btns.mid.onclick=()=>setAwait('mid'); btns.back.onclick=()=>setAwait('back');
 
   function setMarker(name,pos,label){
     const colors=colorFor(name);
@@ -135,18 +133,17 @@
     m.on('dragend',()=>updateDistances());
     markers[name]=m; updateDistances();
   }
-  function clearHoleMarkers(){['tee','front','mid','back'].forEach(n=>{if(markers[n]){map.removeLayer(markers[n]);delete markers[n];}}); updateDistances();}
+  function clearHoleMarkers(){['front','mid','back'].forEach(n=>{if(markers[n]){map.removeLayer(markers[n]);delete markers[n];}}); updateDistances();}
 
   // Distances HUD
-  const dTee=document.getElementById('dTee'), dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
+  const dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
   function meters(a,b){const R=6371000,toRad=d=>d*Math.PI/180;const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2);const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;return 2*R*Math.asin(Math.sqrt(q));}
   function updateDistances(){
-    if(!lastPos){dTee.textContent=dFront.textContent=dMid.textContent=dBack.textContent='–';return;}
-    const get=n=>markers[n]?markers[n].getLatLng():null; const tee=get('tee'), fr=get('front'), mi=get('mid'), ba=get('back');
-    dTee.textContent=tee?Math.round(meters(lastPos,{lat:tee.lat,lng:tee.lng})): '–';
+    if(!lastPos){dFront.textContent=dMid.textContent=dBack.textContent='–';return;}
+    const get=n=>markers[n]?markers[n].getLatLng():null; const fr=get('front'), mi=get('mid'), ba=get('back');
     dFront.textContent=fr?Math.round(meters(lastPos,{lat:fr.lat,lng:fr.lng})): '–';
-    dMid.textContent=mi?Math.round(meters(lastPos,{lat:mi.lat,lng:mi.lng})): '–';
-    dBack.textContent=ba?Math.round(meters(lastPos,{lat:ba.lat,lng:ba.lng})): '–';
+    dMid.textContent  =mi?Math.round(meters(lastPos,{lat:mi.lat,lng:mi.lng})): '–';
+    dBack.textContent =ba?Math.round(meters(lastPos,{lat:ba.lat,lng:ba.lng})): '–';
   }
 
   // AUTOSAVE
@@ -157,15 +154,14 @@
   const lastId=localStorage.getItem(LS_LAST_ID); if(lastId)loadDraft(lastId);
   fieldCourseId.addEventListener('change',()=>{const id=(fieldCourseId.value||'').trim(); if(!id)return; loadDraft(id)||(holes.length=0,refreshSavedList(),showProgress()); localStorage.setItem(LS_LAST_ID,id);});
 
-  // Build hole object (now with elevation field; filled on save)
+  // Build hole object (greens only + elevation)
   function toHoleObject(){
     const n=Number(fieldHole.value), par=Number(fieldPar.value), si=Number(fieldSI.value);
     if(!n||!par||!si){alert('Enter Hole #, Par, and Stroke Index');return null;}
     const get=n=>markers[n]?markers[n].getLatLng():null;
     const hole={ number:n, par, strokeIndex:si,
-      tee: get('tee') && {lat:get('tee').lat,lng:get('tee').lng},
       green:{ center:null, front:get('front')&&{lat:get('front').lat,lng:get('front').lng}, mid:get('mid')&&{lat:get('mid').lat,lng:get('mid').lng}, back:get('back')&&{lat:get('back').lat,lng:get('back').lng} },
-      elevation:{ tee:null, front:null, mid:null, back:null }
+      elevation:{ front:null, mid:null, back:null }
     };
     if(hole.green.mid && !hole.green.center) hole.green.center={...hole.green.mid};
     return hole;
@@ -184,12 +180,9 @@
     }catch{ return null; }
   }
   async function sampleHoleElevations(hole){
-    // Only green points per your preference
     if(hole.green.front){ hole.elevation.front = await fetchElevation(hole.green.front.lat, hole.green.front.lng); }
     if(hole.green.mid){   hole.elevation.mid   = await fetchElevation(hole.green.mid.lat,   hole.green.mid.lng); }
     if(hole.green.back){  hole.elevation.back  = await fetchElevation(hole.green.back.lat,  hole.green.back.lng); }
-    // Tee optional
-    if(hole.tee){ hole.elevation.tee = await fetchElevation(hole.tee.lat, hole.tee.lng); }
   }
 
   btnSaveHole.onclick = async () => {
@@ -202,13 +195,13 @@
     refreshSavedList(); saveDraft(); status.textContent=`Saved hole ${h.number} (elev ok)`;
   };
 
-  btnLoadHole.onclick=()=>{const i=Number(savedList.value);const h=holes.slice().sort((a,b)=>a.number-b.number)[i];if(!h)return; clearHoleMarkers(); if(h.tee)setMarker('tee',h.tee,'Tee'); if(h.green.front)setMarker('front',h.green.front,'Front'); if(h.green.mid)setMarker('mid',h.green.mid,'Mid'); if(h.green.back)setMarker('back',h.green.back,'Back'); fieldHole.value=h.number; fieldPar.value=h.par; fieldSI.value=h.strokeIndex; status.textContent=`Loaded hole ${h.number}`;};
+  btnLoadHole.onclick=()=>{const i=Number(savedList.value);const h=holes.slice().sort((a,b)=>a.number-b.number)[i];if(!h)return; clearHoleMarkers(); if(h.green.front)setMarker('front',h.green.front,'Front'); if(h.green.mid)setMarker('mid',h.green.mid,'Mid'); if(h.green.back)setMarker('back',h.green.back,'Back'); fieldHole.value=h.number; fieldPar.value=h.par; fieldSI.value=h.strokeIndex; status.textContent=`Loaded hole ${h.number}`;};
   btnDeleteHole.onclick=()=>{const i=Number(savedList.value);const s=holes.slice().sort((a,b)=>a.number-b.number);const h=s[i];if(!h)return; if(!confirm(`Delete hole ${h.number}?`))return; const idx=holes.findIndex(x=>x.number===h.number); holes.splice(idx,1); refreshSavedList(); saveDraft(); clearHoleMarkers(); status.textContent=`Deleted hole ${h.number}`;};
 
   btnExport.onclick=()=>{const name=(fieldCourseName.value||'').trim(); const id=(fieldCourseId.value||'').trim(); if(!name||!id){alert('Enter Course Name and Course ID');return;} if(holes.length===0){alert('No holes saved');return;}
-    const course={ name, courseId:id, holes: holes.slice().sort((a,b)=>a.number-b.number).map(h=>({ number:h.number, par:h.par, strokeIndex:h.strokeIndex, tee:h.tee||null,
+    const course={ name, courseId:id, holes: holes.slice().sort((a,b)=>a.number-b.number).map(h=>({ number:h.number, par:h.par, strokeIndex:h.strokeIndex,
       green:{ center:h.green.center||h.green.mid||null, front:h.green.front||null, mid:h.green.mid||null, back:h.green.back||null },
-      elevation:{ tee:h.elevation.tee??null, front:h.elevation.front??null, mid:h.elevation.mid??null, back:h.elevation.back??null }
+      elevation:{ front:h.elevation.front??null, mid:h.elevation.mid??null, back:h.elevation.back??null }
     }))};
     const blob=new Blob([JSON.stringify(course,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`course-${id}.json`; a.click(); URL.revokeObjectURL(a.href); status.textContent=`Exported course-${id}.json`; };
 
@@ -225,7 +218,8 @@
   } else { gpsAcc.textContent='GPS not supported'; gpsAcc.className='err'; }
 
   // Map click to place
-  map.on('click',e=>{ if(!awaiting) return; const pos={lat:e.latlng.lat,lng:e.latlng.lng}; setMarker(awaiting,pos, awaiting[0].toUpperCase()+awaiting.slice(1)); if(awaiting==='mid'&&!markers.center)markers.center=markers.mid; setAwait(null);});
+  map.on('click',e=>{ if(!awaiting) return; const pos={lat:e.latlng.lat,lng:e.latlng.lng}; setMarker(awaiting,pos, awaiting[0].toUpperCase()+awaiting.slice(1)); setAwait(null);});
+
 </script>
 </body>
 </html>
