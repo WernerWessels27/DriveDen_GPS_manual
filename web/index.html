@@ -172,10 +172,9 @@
       width: 44px; text-align:center; padding:6px 6px; border:1px solid #e5e7eb; border-radius:8px; font-weight:700; background:#fff;
     }
     .sc-chip { font-size:11px; padding:2px 6px; border-radius:999px; }
-    /* PGA-like coloring: birdie = under par (green), bogey = over par (red) */
     .even   { background:#e5e7eb; color:#111827; }
-    .under  { background:#dcfce7; color:#166534; border:1px solid #86efac; }  /* birdie+ */
-    .over   { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }  /* bogey+ */
+    .under  { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+    .over   { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }
 
     .sc-players { display:flex; gap:8px; align-items:center; margin: 6px 0 10px; }
     .sc-players input { width: 120px; }
@@ -551,14 +550,21 @@
     async function loadCourse(id){
       clearMarkers(); holes=[]; currentIndex=0; holesSel.innerHTML=''; holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
       try{
-        const r=await fetch(`/courses/${encodeURIComponent(id)}.json`); const course=await r.json();
-        holes=(course.holes||[]).map(h=>({ number:h.number, par:h.par, strokeIndex:h.strokeIndex,
+        const r=await fetch(`/courses/${encodeURIComponent(id)}.json`); const raw=await r.json();
+        const root = raw.course || raw;
+        holes=(root.holes||[]).map(h=>({ number: (h.number ?? h.hole ?? h.holeNumber ?? null)*1, par: (h.par!=null?Number(h.par):null), strokeIndex: (h.strokeIndex ?? h.stroke ?? h.si ?? null)*1 || null,
           green:{ center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null },
           elevation:{ front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null }
-        })).sort((a,b)=>a.number-b.number);
+        })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
+
+        holesSel.innerHTML='';
         holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
         if(holes.length){ currentIndex=0; updateHoleUI(true); }
-        status.textContent=`Loaded course: ${course.name||id}`;
+        status.textContent=`Loaded course: ${root.name||id}`;
+
+        // Auto-fill any missing elevations, then refresh UI (no recenter)
+        await autofillElevationsForCourse(id);
+
         buildScorecard();
         loadSavedScores(id);
       }catch{ status.textContent=`Failed to load course ${id}`; }
@@ -580,12 +586,83 @@
       if (on && !contoursOn) { contours.addTo(map); tgContours.classList.add('active'); tgContours.textContent='Contours: On'; contoursOn = true; }
       else if (!on && contoursOn) { map.removeLayer(contours); tgContours.classList.remove('active'); tgContours.textContent='Contours: Off'; contoursOn = false; }
     }
+    setBase('imagery'); setContours(false);
     tgBase.onclick = () => setBase(currentBase === 'imagery' ? 'voyager' : 'imagery');
     tgContours.onclick = () => setContours(!contoursOn);
-    setBase('imagery'); setContours(false);
 
     // SW
     if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
+
+    /* ===================== ELEVATION AUTOFILL ===================== */
+    const ELEV_CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days
+    function loadElevCache(courseId){
+      try {
+        const raw = localStorage.getItem('dd_elev_' + courseId);
+        const obj = raw ? JSON.parse(raw) : null;
+        if (!obj || !obj.ts || (Date.now() - obj.ts) > ELEV_CACHE_TTL) return { ts: Date.now(), holes:{} };
+        return obj;
+      } catch { return { ts: Date.now(), holes:{} }; }
+    }
+    function saveElevCache(courseId, cache){
+      try { cache.ts = Date.now(); localStorage.setItem('dd_elev_' + courseId, JSON.stringify(cache)); } catch {}
+    }
+    async function fetchElevPoint(lat,lng){
+      try{
+        const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat},${lng}`);
+        const j = await r.json();
+        const v = j?.results?.[0]?.elevation;
+        return (typeof v === 'number') ? v : null;
+      }catch{return null;}
+    }
+    async function autofillElevationsForCourse(courseId){
+      if (!holes.length) return;
+
+      // 1) apply cache first
+      const cache = loadElevCache(courseId);
+      holes.forEach(h=>{
+        const ch = cache.holes?.[h.number];
+        if (ch){
+          h.elevation = h.elevation || {};
+          if (ch.front!=null && (h.elevation.front==null)) h.elevation.front = ch.front;
+          if (ch.mid  !=null && (h.elevation.mid  ==null)) h.elevation.mid   = ch.mid;
+          if (ch.back !=null && (h.elevation.back ==null)) h.elevation.back  = ch.back;
+        }
+      });
+
+      // 2) collect missing jobs
+      const jobs = [];
+      for (const h of holes){
+        const pts = [
+          ['front', h.green.front],
+          ['mid',   h.green.mid   || h.green.center],
+          ['back',  h.green.back]
+        ];
+        for (const [key,pt] of pts){
+          if (!pt) continue;
+          if (h.elevation?.[key] == null){
+            jobs.push({ hole: h, key, lat: pt.lat, lng: pt.lng });
+          }
+        }
+      }
+      if (!jobs.length){ updateHoleUI(false); return; }
+
+      // 3) fetch sequentially (polite)
+      for (const job of jobs){
+        const v = await fetchElevPoint(job.lat, job.lng);
+        if (!job.hole.elevation) job.hole.elevation = {};
+        if (v != null) job.hole.elevation[job.key] = v;
+
+        const entry = cache.holes[job.hole.number] || {};
+        if (v != null) entry[job.key] = v;
+        cache.holes[job.hole.number] = entry;
+
+        // refresh UI gradually for feedback
+        if (job.hole === holes[currentIndex]) updateDistancesAndDeltas();
+      }
+      saveElevCache(courseId, cache);
+      updateHoleUI(false);
+    }
+    /* =================== /ELEVATION AUTOFILL =================== */
 
     /* ===================== SCORECARD ===================== */
     const scoreToggle = document.getElementById('scoreToggle');
@@ -599,11 +676,10 @@
     const scClear = document.getElementById('scClear');
 
     let playerCount = 1;
-    let scores = []; // [player][holeIndex] -> number or null
+    let scores = []; // [player][holeIndex]
     let courseIdForScores = null;
 
     scoreToggle.onclick = () => { scorecard.classList.toggle('show'); highlightCurrentRow(); };
-
     scClose.onclick = () => scorecard.classList.remove('show');
     scClear.onclick = () => {
       if (!confirm('Clear all scores for this course?')) return;
@@ -638,7 +714,7 @@
         headEls[i].textContent = nameEls[i].value || `P${i+1}`;
       }
 
-      // rows 1..18 (or however many holes exist)
+      // rows
       scBody.innerHTML = '';
       holes.forEach((h,idx)=>{
         const row = document.createElement('div');
@@ -654,6 +730,13 @@
           const input = document.createElement('input'); input.className='sc-score'; input.type='number'; input.min='1';
           input.placeholder='–'; input.dataset.p=String(p); input.dataset.i=String(idx);
           input.addEventListener('input', ()=>{ onScoreChange(p,idx,input.value?Number(input.value):null); });
+          // Optional: Enter to step through (kept simple—auto-advance patch can be added later)
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onScoreChange(p, idx, input.value ? Number(input.value) : null);
+            }
+          });
           const chip = document.createElement('span'); chip.className='sc-chip even'; chip.textContent='E';
           wrap.appendChild(input); wrap.appendChild(chip);
           row.appendChild(wrap);
@@ -661,7 +744,6 @@
         scBody.appendChild(row);
       });
 
-      // init score array
       if (!scores.length || scores[0].length !== holes.length){
         scores = Array.from({length:4},()=>Array(holes.length).fill(null));
       }
@@ -677,7 +759,6 @@
     }
 
     function renderScores(){
-      // fill inputs + chips
       const rows = scBody.querySelectorAll('.sc-row');
       rows.forEach((row,idx)=>{
         const par = holes[idx]?.par ?? null;
@@ -746,7 +827,6 @@
     }
     function loadSavedScores(id){
       courseIdForScores = id;
-      // meta
       try {
         const meta = JSON.parse(localStorage.getItem(`dd_scores_meta_${id}`) || 'null');
         if (meta){
@@ -759,7 +839,6 @@
           }
         }
       } catch {}
-      // scores
       try {
         const saved = JSON.parse(localStorage.getItem(`dd_scores_${id}`) || 'null');
         if (saved && Array.isArray(saved) && saved.length===4 && saved[0].length===holes.length){
