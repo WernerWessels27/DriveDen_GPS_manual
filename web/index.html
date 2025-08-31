@@ -9,127 +9,74 @@
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; position: relative; }
-
-    /* Top-left brand: logo only */
-    .brand {
-      position: fixed; top: 10px; left: 10px; z-index: 10000;
-      background: rgba(255,255,255,.9); padding: 6px 10px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      display:flex; align-items:center; gap:8px;
-    }
+    .brand { position: fixed; top: 10px; left: 10px; z-index: 10000; background: rgba(255,255,255,.9); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; }
     .brand img { height: 34px; }
-
-    /* Top-center hole nav */
-    .holeNav {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 6px 10px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center;
-    }
-    .holeNav button {
-      border: 0; background: #06b6d4; color: #fff; border-radius: 8px; padding: 4px 10px; font-size:16px; cursor:pointer;
-    }
+    .holeNav { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000; background: rgba(255,255,255,.95); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center; }
+    .holeNav button { border:0; background:#06b6d4; color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; }
-
-    /* Left distances box */
-    .distBox {
-      position: fixed; top: 60px; left: 10px; z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 10px 12px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      width: 150px;
-    }
-    .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; }
+    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: rgba(255,255,255,.95); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 170px; }
+    .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
+    .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { opacity:.75; }
     .value { font-weight:600; }
-
-    /* Bottom info bar */
-    .footer {
-      position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000;
-      background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display:flex; justify-content:center; gap:18px; font-size:14px;
-    }
+    .delta { font-size:12px; opacity:.8; }
+    .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; justify-content:center; gap:18px; font-size:14px; }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:600; }
-
-    /* Control panel (course select etc.) */
-    .panel {
-      position: fixed; top: 80px; right: 10px; z-index: 10000;
-      background: rgba(255,255,255,.97); padding: 10px 12px; border-radius: 10px;
-      box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease;
-    }
+    .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: rgba(255,255,255,.97); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
     .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
     select, button, input { width: 100%; padding: 8px; font-size: 14px; }
     .muted { font-size: 12px; opacity: .7; margin-top: 4px; }
-
-    /* Floating buttons */
-    .fab {
-      position: fixed; right: 12px; bottom: 12px; z-index: 10001;
-      width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px;
-      background: #06b6d4; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer;
-    }
-    .fab-left {
-      position: fixed; left: 12px; bottom: 12px; z-index: 10001;
-      width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px;
-      background: #111827; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2);
-      cursor: pointer; display: none;
-    }
+    .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #06b6d4; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
+    .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #111827; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
   </style>
 </head>
 <body>
-  <!-- logo only -->
-  <div class="brand">
-    <img src="driveden-logo.svg" alt="DriveDen">
-  </div>
-
-  <!-- hole nav -->
+  <div class="brand"><img src="driveden-logo.svg" alt="DriveDen"></div>
   <div class="holeNav">
-    <button id="prevHole" title="Previous hole">◀</button>
+    <button id="prevHole">◀</button>
     <div class="holeTitle" id="holeTitle">Hole –</div>
-    <button id="nextHole" title="Next hole">▶</button>
+    <button id="nextHole">▶</button>
   </div>
 
-  <!-- distances -->
   <div class="distBox">
-    <div class="row"><span class="label">Front</span><span class="value" id="dFront">–</span></div>
-    <div class="row"><span class="label">Mid</span><span class="value" id="dMid">–</span></div>
-    <div class="row"><span class="label">Back</span><span class="value" id="dBack">–</span></div>
+    <div class="row">
+      <span class="label">Front</span>
+      <span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span>
+    </div>
+    <div class="row">
+      <span class="label">Mid</span>
+      <span class="col"><span class="value" id="dMid">–</span><span class="delta" id="eMid">–</span></span>
+    </div>
+    <div class="row">
+      <span class="label">Back</span>
+      <span class="col"><span class="value" id="dBack">–</span><span class="delta" id="eBack">–</span></span>
+    </div>
     <div class="muted" id="status">Getting GPS…</div>
   </div>
 
-  <!-- bottom bar -->
   <div class="footer">
     <div>Par <span class="badge" id="par">–</span></div>
     <div>Stroke <span class="badge" id="stroke">–</span></div>
   </div>
 
-  <!-- map -->
   <div id="map"></div>
 
-  <!-- control panel (course picker, manual helpers) -->
   <div class="panel hidden" id="panel">
     <div><strong>Select course</strong></div>
     <div class="grid" style="margin-top:6px;">
       <select id="courseSelect"></select>
       <button id="btnLoadCourse">Load</button>
     </div>
-    <div class="muted">Tip: You can also open with <code>?course=&lt;id&gt;</code>.</div>
-
+    <div class="muted">Open with <code>?course=&lt;id&gt;</code> as well.</div>
     <div style="margin-top:10px;"><strong>Hole</strong></div>
     <div class="grid" style="margin-top:6px;">
-      <select id="holes"></select>
-      <button id="btnGoHole">Go</button>
+      <select id="holes"></select><button id="btnGoHole">Go</button>
     </div>
   </div>
 
-  <!-- toggles -->
-  <button id="panelToggle" class="fab" title="Show controls">☰</button>
-  <button id="recenterBtn" class="fab-left" title="Recenter">🎯</button>
+  <button id="panelToggle" class="fab">☰</button>
+  <button id="recenterBtn" class="fab-left">🎯</button>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
@@ -139,198 +86,140 @@
       { maxZoom: 19, attribution: '&copy; OpenStreetMap & CARTO' }).addTo(map);
 
     // Cart icon
-    const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32">
-      <rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/>
-      <polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/>
-      <circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/>
-      <circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/>
-      <rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/>
-      <circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
+    const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
     const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
     const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
 
     // State
     let lastPos = null, follow = true, movedOnce = false;
-    let holes = []; // loaded course holes
-    let currentIndex = 0; // index into holes[]
-    let courseList = [];
+    let holes = []; let currentIndex = 0; let courseList = [];
+    const markers = {};
 
     // UI refs
     const status = document.getElementById('status');
-    const dFront = document.getElementById('dFront');
-    const dMid   = document.getElementById('dMid');
-    const dBack  = document.getElementById('dBack');
+    const dFront = document.getElementById('dFront'), dMid = document.getElementById('dMid'), dBack = document.getElementById('dBack');
+    const eFront = document.getElementById('eFront'), eMid = document.getElementById('eMid'), eBack = document.getElementById('eBack');
+    const parEl = document.getElementById('par'), strokeEl = document.getElementById('stroke');
     const holeTitle = document.getElementById('holeTitle');
-    const parEl = document.getElementById('par');
-    const strokeEl = document.getElementById('stroke');
     const recenterBtn = document.getElementById('recenterBtn');
-    const panel = document.getElementById('panel');
-    const toggleBtn = document.getElementById('panelToggle');
-    const courseSel = document.getElementById('courseSelect');
-    const holesSel = document.getElementById('holes');
-
-    // Markers
-    const markers = {};
-    function mstyle(name) {
-      const p = { tee:['#2563eb','#3b82f6'], front:['#059669','#10b981'], mid:['#b45309','#f59e0b'], back:['#b91c1c','#ef4444'] }[name] || ['#111827','#374151'];
-      return { radius: 7, weight: 2, opacity: 1, fillOpacity: 0.9, color: p[0], fillColor: p[1] };
-    }
-    function setMarker(name, pos, label){
-      if (!pos) return;
-      if (markers[name]) { markers[name].setLatLng([pos.lat, pos.lng]); return; }
-      markers[name] = L.circleMarker([pos.lat, pos.lng], mstyle(name)).addTo(map);
-      if (label) markers[name].bindTooltip(label);
-    }
-    function clearMarkers(){ ['tee','front','mid','back'].forEach(n => { if (markers[n]) { map.removeLayer(markers[n]); delete markers[n]; } }); }
-
-    // Distances
-    function meters(a, b){
-      const toRad = d => d * Math.PI / 180, R = 6371000;
-      const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
-      const s1 = Math.sin(dLat/2), s2 = Math.sin(dLng/2);
-      const q = s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
-      return 2*R*Math.asin(Math.sqrt(q));
-    }
-    function updateDistances(){
-      if (!lastPos || !holes.length) return;
-      const h = holes[currentIndex];
-      const f = h.green.front || h.green.center;
-      const m = h.green.mid   || h.green.center;
-      const b = h.green.back  || h.green.center;
-      dFront.textContent = Math.round(meters(lastPos, f));
-      dMid.textContent   = Math.round(meters(lastPos, m));
-      dBack.textContent  = Math.round(meters(lastPos, b));
-    }
-
-    // GPS
-    if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition(pos => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        lastPos = p;
-        you.setLatLng([p.lat, p.lng]);
-        if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display = 'none'; }
-        if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
-        status.textContent = `Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
-        updateDistances();
-      }, err => { status.textContent = err.message; },
-      { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
-    } else {
-      status.textContent = 'Geolocation not supported';
-    }
-    map.on('dragstart', () => { follow=false; recenterBtn.style.display='block'; });
-    map.on('zoomstart', () => { follow=false; recenterBtn.style.display='block'; });
-    recenterBtn.onclick = () => { if (!lastPos) return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); recenterBtn.style.display='none'; };
+    const panel = document.getElementById('panel'), toggleBtn = document.getElementById('panelToggle');
+    const courseSel = document.getElementById('courseSelect'), holesSel = document.getElementById('holes');
 
     // Panel toggle
     function setPanelHidden(h){ panel.classList.toggle('hidden', h); toggleBtn.textContent = h ? '☰' : '✕'; }
-    setPanelHidden(true);
-    toggleBtn.onclick = () => setPanelHidden(!panel.classList.contains('hidden'));
+    setPanelHidden(true); toggleBtn.onclick = () => setPanelHidden(!panel.classList.contains('hidden'));
 
-    // Load course list
-    async function loadCourseList(){
-      try {
-        const r = await fetch('/courses/index.json');
-        const js = await r.json(); courseList = js.courses || [];
-        courseSel.innerHTML = '';
-        courseList.forEach(c => {
-          const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name || c.id;
-          courseSel.appendChild(opt);
-        });
-      } catch { courseSel.innerHTML = ''; }
+    // Helpers
+    function mstyle(name){ const p={tee:['#2563eb','#3b82f6'],front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[name]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:0.9,color:p[0],fillColor:p[1]}; }
+    function setMarker(n,pos,label){ if(!pos)return; if(markers[n]){markers[n].setLatLng([pos.lat,pos.lng]);return;} markers[n]=L.circleMarker([pos.lat,pos.lng],mstyle(n)).addTo(map); if(label)markers[n].bindTooltip(label); }
+    function clearMarkers(){ ['tee','front','mid','back'].forEach(n=>{ if(markers[n]){ map.removeLayer(markers[n]); delete markers[n]; }}); }
+
+    function meters(a,b){ const R=6371000,toRad=d=>d*Math.PI/180; const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2); const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.asin(Math.sqrt(q)); }
+
+    // Elevation (current position) — throttle & cache
+    let lastElev = null, lastElevAt = 0;
+    async function fetchCurrentElevation(p){
+      const now = Date.now();
+      if (lastElev !== null && (now - lastElevAt) < 30000) return lastElev; // 30s throttle
+      try{
+        const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${p.lat},${p.lng}`);
+        const js = await r.json();
+        const v = js?.results?.[0]?.elevation;
+        if (typeof v === 'number') { lastElev = v; lastElevAt = now; return v; }
+      }catch{}
+      return null;
     }
+    function fmtDelta(d){ if (d == null) return '–'; if (Math.abs(d) < 0.5) return '±0 m'; return d>0 ? `↑ ${Math.round(d)} m` : `↓ ${Math.round(Math.abs(d))} m`; }
 
-    // Render selected hole
-    function renderHole(center = true){
-      if (!holes.length) return;
+    function updateHoleUI(center=true){
+      if(!holes.length) return;
       const h = holes[currentIndex];
       clearMarkers();
       setMarker('tee', h.tee, 'Tee');
       setMarker('front', h.green.front || h.green.center, 'Front');
-      setMarker('mid', h.green.mid || h.green.center, 'Mid');
-      setMarker('back', h.green.back || h.green.center, 'Back');
+      setMarker('mid',   h.green.mid   || h.green.center, 'Mid');
+      setMarker('back',  h.green.back  || h.green.center, 'Back');
 
       holeTitle.textContent = `Hole ${h.number}`;
       parEl.textContent = h.par ?? '–';
       strokeEl.textContent = h.strokeIndex ?? '–';
-
-      // holes dropdown sync
       holesSel.value = String(h.number);
 
       if (center) {
         const pts = [h.tee, h.green.front, h.green.mid, h.green.back, h.green.center].filter(Boolean);
-        if (pts.length) map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lng])));
+        if (pts.length) map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])));
       }
-      updateDistances();
+      if (lastPos) updateDistancesAndDeltas();
     }
 
-    // Load course by id
+    async function updateDistancesAndDeltas(){
+      if (!lastPos || !holes.length) return;
+      const h = holes[currentIndex];
+      const f = h.green.front || h.green.center, m = h.green.mid || h.green.center, b = h.green.back || h.green.center;
+      dFront.textContent = Math.round(meters(lastPos, f));
+      dMid.textContent   = Math.round(meters(lastPos, m));
+      dBack.textContent  = Math.round(meters(lastPos, b));
+
+      // deltas: target_elev − current_elev
+      let curElev = await fetchCurrentElevation(lastPos);
+      const df = (h.elevation?.front ?? null);
+      const dm = (h.elevation?.mid   ?? null);
+      const db = (h.elevation?.back  ?? null);
+      eFront.textContent = (curElev!=null && df!=null) ? fmtDelta(df - curElev) : '–';
+      eMid.textContent   = (curElev!=null && dm!=null) ? fmtDelta(dm - curElev) : '–';
+      eBack.textContent  = (curElev!=null && db!=null) ? fmtDelta(db - curElev) : '–';
+    }
+
+    // GPS
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(async pos => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        lastPos = p;
+        you.setLatLng([p.lat, p.lng]);
+        if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display='none'; }
+        if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
+        status.textContent = `Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
+        await updateDistancesAndDeltas();
+      }, err => { status.textContent = err.message; }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
+    } else {
+      status.textContent = 'Geolocation not supported';
+    }
+    map.on('dragstart',()=>{follow=false;recenterBtn.style.display='block';});
+    map.on('zoomstart',()=>{follow=false;recenterBtn.style.display='block';});
+    recenterBtn.onclick=()=>{ if(!lastPos)return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); recenterBtn.style.display='none'; };
+
+    // Courses list
+    async function loadCourseList(){
+      try{ const r=await fetch('/courses/index.json'); const js=await r.json(); courseList=js.courses||[]; courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);}); }catch{ courseSel.innerHTML=''; }
+    }
+
     async function loadCourse(id){
-      clearMarkers(); holes = []; currentIndex = 0;
-      holesSel.innerHTML = ''; holeTitle.textContent = 'Hole –'; parEl.textContent = '–'; strokeEl.textContent = '–';
-      try {
-        const r = await fetch(`/courses/${encodeURIComponent(id)}.json`);
-        const course = await r.json();
-        holes = (course.holes||[]).map(h => ({
-          number: h.number, par: h.par, strokeIndex: h.strokeIndex,
-          tee: h.tee || null,
-          green: {
-            center: h.green?.center || h.green?.mid || null,
-            front:  h.green?.front  || null,
-            mid:    h.green?.mid    || null,
-            back:   h.green?.back   || null
-          }
+      clearMarkers(); holes=[]; currentIndex=0; holesSel.innerHTML=''; holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
+      try{
+        const r=await fetch(`/courses/${encodeURIComponent(id)}.json`); const course=await r.json();
+        holes=(course.holes||[]).map(h=>({ number:h.number, par:h.par, strokeIndex:h.strokeIndex, tee:h.tee||null,
+          green:{ center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null },
+          elevation:{ tee:h.elevation?.tee??null, front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null }
         })).sort((a,b)=>a.number-b.number);
-
-        holes.forEach(h => {
-          const opt = document.createElement('option'); opt.value = h.number; opt.textContent = `Hole ${h.number}`;
-          holesSel.appendChild(opt);
-        });
-
-        if (holes.length) { currentIndex = 0; renderHole(true); }
-        status.textContent = `Loaded course: ${course.name || id}`;
-      } catch {
-        status.textContent = `Failed to load course ${id}`;
-      }
+        holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
+        if(holes.length){ currentIndex=0; updateHoleUI(true); }
+        status.textContent=`Loaded course: ${course.name||id}`;
+      }catch{ status.textContent=`Failed to load course ${id}`; }
     }
 
-    // UI handlers
-    document.getElementById('btnLoadCourse').onclick = () => {
-      const id = courseSel.value; if (!id) return; loadCourse(id);
-    };
-    document.getElementById('btnGoHole').onclick = () => {
-      const n = Number(holesSel.value);
-      const idx = holes.findIndex(h => h.number === n);
-      if (idx >= 0) { currentIndex = idx; renderHole(true); }
-    };
-
-    document.getElementById('prevHole').onclick = () => {
-      if (!holes.length) return;
-      currentIndex = (currentIndex - 1 + holes.length) % holes.length;
-      renderHole(true);
-    };
-    document.getElementById('nextHole').onclick = () => {
-      if (!holes.length) return;
-      currentIndex = (currentIndex + 1) % holes.length;
-      renderHole(true);
-    };
+    // UI
+    document.getElementById('btnLoadCourse').onclick=()=>{const id=courseSel.value; if(!id)return; loadCourse(id);};
+    document.getElementById('btnGoHole').onclick=()=>{const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true);} };
+    document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); };
+    document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); };
 
     // Init
     map.setView([-25.7542, 28.2322], 15);
     loadCourseList();
+    const urlParams=new URLSearchParams(location.search); const cid=urlParams.get('course'); if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
 
-    // Load via ?course=id
-    const urlParams = new URLSearchParams(location.search);
-    const cid = urlParams.get('course');
-    if (cid) {
-      loadCourse(cid).then(() => {
-        setTimeout(()=>{ const f = courseList.find(c=>c.id===cid); if (f) courseSel.value = cid; }, 300);
-      });
-    }
-
-    // Service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(()=>{});
-    }
+    // SW
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
   </script>
 </body>
 </html>
