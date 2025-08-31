@@ -5,6 +5,8 @@
   <title>DriveDen GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#06b6d4" />
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <style>
     html, body { height: 100%; margin: 0; }
@@ -89,7 +91,21 @@
     .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #06b6d4; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
     .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #111827; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
 
-    /* Measure label bubble */
+    /* --- Measure marker UX fixes --- */
+    .dd-measure { pointer-events: auto; } /* allow clicks */
+    .dd-measure .anchor-dot {
+      position: absolute;
+      left: -6px; top: -6px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #111827;              /* dark dot marks exact point */
+      border: 2px solid #ffffff;        /* white ring */
+      box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+    }
+    .dd-measure .bubble {
+      position: absolute;
+      transform: translate(8px, -28px); /* nudge so pin isn’t hidden */
+    }
     .measure-bubble {
       background: rgba(17,24,39,.95);
       color: #fff;
@@ -98,14 +114,15 @@
       font-size: 12px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       box-shadow: 0 6px 12px rgba(0,0,0,.25);
       user-select: none;
     }
     .measure-close {
+      width: 24px; height: 24px;       /* bigger tap target */
+      display: inline-flex; align-items: center; justify-content: center;
       background: rgba(255,255,255,.15);
       border-radius: 6px;
-      padding: 0 6px;
       cursor: pointer;
       font-weight: 700;
     }
@@ -205,24 +222,25 @@
     // CARTO Voyager (clean labels/roads)
     const cartoVoyager = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      { maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO' }
+      { maxZoom: 19, attribution: '&copy; OpenStreetMap & CARTO' }
     );
-    // OpenTopoMap contours overlay (we keep opacity low)
+    // OpenTopoMap contours overlay (low opacity)
     const contours = L.tileLayer(
       'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      { maxZoom: 17, opacity: 0.35, attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)' }
+      { maxZoom: 17, opacity: 0.35, attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Style: &copy; OpenTopoMap (CC-BY-SA)' }
     );
 
-    // Map & default layers
+    // Map & defaults
     const map = L.map('map', { zoomControl: true, layers: [esriImagery] });
     let currentBase = 'imagery'; // 'imagery' or 'voyager'
     let contoursOn = false;
 
-    // ------- Existing UI/state -------
+    // Cart icon
     const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
     const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
     const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
 
+    // State
     let lastPos = null, follow = true, movedOnce = false;
     let holes = []; let currentIndex = 0; let courseList = [];
     const markers = {}; // front/mid/back
@@ -357,24 +375,46 @@
     function setMeasure(latlng){
       measureTarget = latlng;
 
+      // Line from you -> target
       if (measureLine) map.removeLayer(measureLine);
       if (lastPos) {
         measureLine = L.polyline([[lastPos.lat,lastPos.lng],[latlng.lat,latlng.lng]], {weight:3,opacity:0.9}).addTo(map);
       }
 
+      // Marker with visible anchor dot + offset bubble + big close button
       const txt = measureDistanceText() || '– m';
       const icon = L.divIcon({
         className: 'dd-measure',
-        html: `<div class="measure-bubble"><span class="measure-text">${txt}</span><span class="measure-close">×</span></div>`,
-        iconSize: [10,10], iconAnchor: [5,5]
+        html: `
+          <div class="anchor-dot"></div>
+          <div class="bubble">
+            <div class="measure-bubble">
+              <span class="measure-text">${txt}</span>
+              <span class="measure-close" aria-label="Clear">×</span>
+            </div>
+          </div>
+        `,
+        iconSize: [0,0],
+        iconAnchor: [0,0]
       });
+
       if (measureMarker) map.removeLayer(measureMarker);
-      measureMarker = L.marker([latlng.lat,latlng.lng], { icon }).addTo(map);
+      measureMarker = L.marker([latlng.lat,latlng.lng], { icon, zIndexOffset: 10000 }).addTo(map);
+
+      // Prevent clicks on the bubble from triggering map clicks underneath
       measureMarker.on('add', () => {
         const el = measureMarker.getElement();
         if (!el) return;
+        if (L && L.DomEvent) { L.DomEvent.disableClickPropagation(el); }
+
         const btn = el.querySelector('.measure-close');
-        if (btn) btn.addEventListener('click', (ev) => { ev.stopPropagation(); clearMeasure(); });
+        if (btn) {
+          btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            clearMeasure();
+          });
+        }
       });
     }
     function updateMeasure(){
