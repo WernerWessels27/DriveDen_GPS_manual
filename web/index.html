@@ -64,6 +64,62 @@
     .dd-measure .bubble { position: absolute; transform: translate(8px, -28px); }
     .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
     .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
+ 
+  /* ===== Scorecard styles (ADD THIS) ===== */
+.scorecard{
+  position: fixed;
+  left: 50%;
+  bottom: 76px;              /* sits above the FABs/footer */
+  transform: translateX(-50%);
+  width: min(940px, calc(100% - 20px));
+  max-height: 70vh;          /* never cover the whole screen */
+  overflow: auto;
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  box-shadow: 0 14px 30px rgba(0,0,0,.25);
+  padding: 12px;
+  z-index: 10002;
+  display: none;             /* hidden by default */
+}
+.scorecard.show{ display: block; }
+
+.sc-players{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.sc-tools{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 10px; }
+.sc-button{
+  background: var(--brand-2); color:#fff; border:0; border-radius:8px; padding:6px 10px;
+  cursor:pointer;
+}
+.sc-muted{ font-size:12px; color:var(--muted); }
+
+.sc-row{
+  display:grid;
+  grid-template-columns: 38px 46px repeat(4, minmax(82px, 1fr));
+  gap:8px;
+  align-items:center;
+  padding: 4px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.sc-head{ font-weight:700; background: #f9fafb; border-radius:8px; padding:6px 8px; }
+.sc-hole{ text-align:center; }
+.sc-par{ text-align:center; }
+
+.sc-cell{ display:flex; align-items:center; gap:8px; }
+.sc-score{
+  width: 64px; padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;
+}
+.sc-chip{
+  min-width: 34px; text-align:center; border-radius:999px; padding:3px 8px; font-weight:700; font-size:12px;
+  background:#e5e7eb; color:#111827;
+}
+.sc-chip.under{ background:#dcfce7; color:#065f46; }  /* under par = green */
+.sc-chip.over{  background:#fee2e2; color:#7f1d1d; }  /* over par = red */
+.sc-chip.even{  background:#e5e7eb; color:#111827; }  /* par = neutral */
+
+.sc-totals{
+  margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px;
+}
+
   </style>
 </head>
 <body>
