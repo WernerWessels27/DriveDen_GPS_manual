@@ -606,14 +606,28 @@
     function saveElevCache(courseId, cache){
       try { cache.ts = Date.now(); localStorage.setItem('dd_elev_' + courseId, JSON.stringify(cache)); } catch {}
     }
-    async function fetchElevPoint(lat,lng){
-      try{
-        const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat},${lng}`);
-        const j = await r.json();
-        const v = j?.results?.[0]?.elevation;
-        return (typeof v === 'number') ? v : null;
-      }catch{return null;}
+    <script>
+// … keep everything else the same …
+
+// Replace the old fetchElevPoint with this:
+async function fetchElevPoint(lat, lng){
+  // Use our own proxy to avoid CORS
+  try{
+    const r = await fetch(`/elevation?lat=${lat}&lng=${lng}`);
+    if (r.ok) {
+      const j = await r.json();
+      const v = j?.results?.[0]?.elevation;
+      if (typeof v === 'number') return v;
     }
+  }catch{}
+
+  // If the proxy ever fails, return null (UI will show "–")
+  return null;
+}
+
+// … keep the rest of index.html exactly as you have it …
+</script>
+
     async function autofillElevationsForCourse(courseId){
       if (!holes.length) return;
 
