@@ -1,1 +1,8 @@
-
+{
+  "courses": [
+    {
+      "id": "waterkloof-golf-club",
+      "name": "Waterkloof Golf Club"
+    }
+  ]
+}
