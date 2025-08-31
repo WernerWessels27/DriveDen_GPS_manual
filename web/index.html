@@ -9,36 +9,112 @@
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; position: relative; }
-    .brand { position: fixed; top: 10px; left: 10px; z-index: 10000; background: rgba(255,255,255,.9); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; }
+
+    /* Logo only */
+    .brand {
+      position: fixed; top: 10px; left: 10px; z-index: 10000;
+      background: rgba(255,255,255,.9); padding: 6px 10px; border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      display:flex; align-items:center; gap:8px;
+    }
     .brand img { height: 34px; }
-    .holeNav { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000; background: rgba(255,255,255,.95); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center; }
+
+    /* Hole nav (top center) */
+    .holeNav {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000;
+      background: rgba(255,255,255,.95); padding: 6px 10px; border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center;
+    }
     .holeNav button { border:0; background:#06b6d4; color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; }
-    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: rgba(255,255,255,.95); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 170px; }
+
+    /* WIND (top-right) */
+    .windBox{
+      position: fixed; top: 10px; right: 10px; z-index: 10000;
+      background: rgba(255,255,255,.95); padding: 8px 10px; border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      display:flex; align-items:center; gap:10px;
+      min-width: 140px; justify-content: space-between;
+    }
+    .windLeft { display:flex; align-items:center; gap:8px; }
+    .windSock { width:26px; height:26px; }
+    .windData { display:flex; flex-direction:column; line-height:1.1; }
+    .windSpeed { font-weight:600; }
+    .windDirTxt { font-size:12px; opacity:.8; }
+    .windArrow { width:20px; height:20px; transform-origin:50% 50%; opacity:.85; }
+
+    /* Distances (left) */
+    .distBox {
+      position: fixed; top: 60px; left: 10px; z-index: 10000;
+      background: rgba(255,255,255,.95); padding: 10px 12px; border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 170px;
+    }
     .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
     .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { opacity:.75; }
     .value { font-weight:600; }
     .delta { font-size:12px; opacity:.8; }
-    .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; justify-content:center; gap:18px; font-size:14px; }
+    .muted { font-size: 12px; opacity: .7; margin-top: 4px; }
+
+    /* Bottom info bar */
+    .footer {
+      position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000;
+      background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      display:flex; justify-content:center; gap:18px; font-size:14px;
+    }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:600; }
+
+    /* Right-side control panel */
     .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: rgba(255,255,255,.97); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
     .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
     select, button, input { width: 100%; padding: 8px; font-size: 14px; }
-    .muted { font-size: 12px; opacity: .7; margin-top: 4px; }
+
+    /* Floating buttons */
     .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #06b6d4; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
     .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: #111827; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
   </style>
 </head>
 <body>
+  <!-- logo -->
   <div class="brand"><img src="driveden-logo.svg" alt="DriveDen"></div>
+
+  <!-- hole nav -->
   <div class="holeNav">
     <button id="prevHole">◀</button>
     <div class="holeTitle" id="holeTitle">Hole –</div>
     <button id="nextHole">▶</button>
   </div>
 
+  <!-- WIND widget -->
+  <div class="windBox" id="windBox" title="10 m wind at 10 m height">
+    <div class="windLeft">
+      <!-- windsock icon -->
+      <svg class="windSock" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="8" y="8" width="6" height="48" rx="3" fill="#1f2937"></rect>
+        <polygon points="14,14 54,20 54,28 14,34" fill="#e11d48"></polygon>
+        <line x1="14" y1="14" x2="14" y2="34" stroke="#111827" stroke-width="2"></line>
+        <line x1="24" y1="16" x2="24" y2="32" stroke="#fff" stroke-width="3" opacity="0.7"></line>
+        <line x1="36" y1="18" x2="36" y2="30" stroke="#fff" stroke-width="3" opacity="0.7"></line>
+      </svg>
+      <div class="windData">
+        <div class="windSpeed" id="windSpeed">– m/s</div>
+        <div class="windDirTxt" id="windDirTxt">–</div>
+      </div>
+    </div>
+    <!-- direction arrow (shows where wind COMES FROM) -->
+    <svg class="windArrow" id="windArrow" viewBox="0 0 24 24" aria-hidden="true">
+      <polygon points="12,3 6,12 10,12 10,21 14,21 14,12 18,12" fill="#111827"></polygon>
+    </svg>
+  </div>
+
+  <!-- distances -->
   <div class="distBox">
     <div class="row">
       <span class="label">Front</span>
@@ -55,13 +131,16 @@
     <div class="muted" id="status">Getting GPS…</div>
   </div>
 
+  <!-- bottom bar -->
   <div class="footer">
     <div>Par <span class="badge" id="par">–</span></div>
     <div>Stroke <span class="badge" id="stroke">–</span></div>
   </div>
 
+  <!-- map -->
   <div id="map"></div>
 
+  <!-- control panel -->
   <div class="panel hidden" id="panel">
     <div><strong>Select course</strong></div>
     <div class="grid" style="margin-top:6px;">
@@ -75,6 +154,7 @@
     </div>
   </div>
 
+  <!-- toggles -->
   <button id="panelToggle" class="fab">☰</button>
   <button id="recenterBtn" class="fab-left">🎯</button>
 
@@ -104,6 +184,55 @@
     const recenterBtn = document.getElementById('recenterBtn');
     const panel = document.getElementById('panel'), toggleBtn = document.getElementById('panelToggle');
     const courseSel = document.getElementById('courseSelect'), holesSel = document.getElementById('holes');
+
+    /* ---------- WIND (Open-Meteo) ---------- */
+    const windSpeedEl = document.getElementById('windSpeed');
+    const windDirTxtEl = document.getElementById('windDirTxt');
+    const windArrowEl = document.getElementById('windArrow');
+
+    let windCache = { ts: 0, lat: null, lng: null, speed: null, dir: null };
+    const WIND_TTL = 10 * 60 * 1000; // 10 minutes
+
+    function degToCompass(d){
+      const dirs = ['N','NE','E','SE','S','SW','W','NW','N']; // 8-way
+      const i = Math.round(((d % 360) / 45));
+      return dirs[i];
+    }
+
+    async function fetchWind(lat, lng){
+      try {
+        // Wind at 10m height, current weather, speed in m/s
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&windspeed_unit=ms`;
+        const r = await fetch(url);
+        const j = await r.json();
+        const cw = j && j.current_weather;
+        if (cw && typeof cw.windspeed === 'number' && typeof cw.winddirection === 'number') {
+          return { speed: cw.windspeed, dir: cw.winddirection }; // dir: degrees FROM which wind blows
+        }
+      } catch {}
+      return { speed: null, dir: null };
+    }
+
+    async function ensureWind(){
+      if (!lastPos) return;
+      const now = Date.now();
+      // Refresh if stale
+      if (now - windCache.ts > WIND_TTL) {
+        const { speed, dir } = await fetchWind(lastPos.lat, lastPos.lng);
+        windCache = { ts: now, lat: lastPos.lat, lng: lastPos.lng, speed, dir };
+      }
+      renderWind();
+    }
+
+    function renderWind(){
+      const { speed, dir } = windCache;
+      windSpeedEl.textContent = (typeof speed === 'number') ? `${speed.toFixed(1)} m/s` : '– m/s';
+      windDirTxtEl.textContent = (typeof dir === 'number') ? `${degToCompass(dir)} (${Math.round(dir)}°)` : '–';
+      // Rotate arrow to the "from" direction (0° = N). Arrow points UP by default; rotate to show FROM.
+      const rot = (typeof dir === 'number') ? dir : 0;
+      windArrowEl.style.transform = `rotate(${rot}deg)`;
+    }
+    /* -------------------------------------- */
 
     // Panel toggle
     function setPanelHidden(h){ panel.classList.toggle('hidden', h); toggleBtn.textContent = h ? '☰' : '✕'; }
@@ -160,7 +289,7 @@
       dMid.textContent   = Math.round(meters(lastPos, m));
       dBack.textContent  = Math.round(meters(lastPos, b));
 
-      // deltas: target_elev − current_elev
+      // Elevation deltas
       let curElev = await fetchCurrentElevation(lastPos);
       const df = (h.elevation?.front ?? null);
       const dm = (h.elevation?.mid   ?? null);
@@ -176,14 +305,21 @@
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastPos = p;
         you.setLatLng([p.lat, p.lng]);
+
         if (follow) { map.setView([p.lat, p.lng], map.getZoom() || 17); recenterBtn.style.display='none'; }
         if (!movedOnce) { map.setView([p.lat, p.lng], 17); movedOnce = true; }
+
         status.textContent = `Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
+
+        // refresh distances/elevation + wind (throttled)
         await updateDistancesAndDeltas();
+        ensureWind();
       }, err => { status.textContent = err.message; }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
     } else {
       status.textContent = 'Geolocation not supported';
     }
+
+    // Follow/recenter
     map.on('dragstart',()=>{follow=false;recenterBtn.style.display='block';});
     map.on('zoomstart',()=>{follow=false;recenterBtn.style.display='block';});
     recenterBtn.onclick=()=>{ if(!lastPos)return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); recenterBtn.style.display='none'; };
@@ -207,7 +343,7 @@
       }catch{ status.textContent=`Failed to load course ${id}`; }
     }
 
-    // UI
+    // UI handlers
     document.getElementById('btnLoadCourse').onclick=()=>{const id=courseSel.value; if(!id)return; loadCourse(id);};
     document.getElementById('btnGoHole').onclick=()=>{const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true);} };
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); };
