@@ -27,6 +27,10 @@ app.get('/elevation', async (req, res) => {
   }
 });
 
+//ADD 404 ROLLBACK WERNER
+// Small noop endpoint used by SW to warm cache safely
+app.get('/webmanifest-fallback', (_req, res) => res.type('text/plain').send('ok'));
+
 // Static site
 app.use(
   express.static(path.join(__dirname, 'web'), {
