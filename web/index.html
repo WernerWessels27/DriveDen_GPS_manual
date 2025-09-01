@@ -8,6 +8,10 @@
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 
+  //ADD PWA THEME WERNER
+  <link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#14532d">
+
   <style>
     :root{
       --brand:#14532d; --brand-2:#166534; --accent:#15803d;
@@ -488,5 +492,15 @@
     const cid=new URLSearchParams(location.search).get('course');
     if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
   </script>
+  
+  //PWA THEME WERNER
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    });
+  }
+</script>
+
 </body>
 </html>
