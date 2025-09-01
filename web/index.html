@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#14532d" />
   <link rel="icon" href="/icons/icon-192.png">
+  <!-- PWA manifest (added) -->
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 
   <style>
@@ -54,7 +56,7 @@
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
     select, button, input { width: 100%; padding: 8px; font-size: 14px; }
 
-    .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
+    .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border:  0; font-size: 22px; background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
     .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--brand); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
     .fab-left svg { width:22px; height:22px; }
 
@@ -64,15 +66,15 @@
     .dd-measure .bubble { position: absolute; transform: translate(8px, -28px); }
     .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
     .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
- 
+
   /* ===== Scorecard styles (ADD THIS) ===== */
 .scorecard{
   position: fixed;
   left: 50%;
-  bottom: 76px;              /* sits above the FABs/footer */
+  bottom: 76px;
   transform: translateX(-50%);
   width: min(940px, calc(100% - 20px));
-  max-height: 70vh;          /* never cover the whole screen */
+  max-height: 70vh;
   overflow: auto;
   background: var(--panel);
   color: var(--text);
@@ -80,7 +82,7 @@
   box-shadow: 0 14px 30px rgba(0,0,0,.25);
   padding: 12px;
   z-index: 10002;
-  display: none;             /* hidden by default */
+  display: none;
 }
 .scorecard.show{ display: block; }
 
@@ -112,9 +114,9 @@
   min-width: 34px; text-align:center; border-radius:999px; padding:3px 8px; font-weight:700; font-size:12px;
   background:#e5e7eb; color:#111827;
 }
-.sc-chip.under{ background:#dcfce7; color:#065f46; }  /* under par = green */
-.sc-chip.over{  background:#fee2e2; color:#7f1d1d; }  /* over par = red */
-.sc-chip.even{  background:#e5e7eb; color:#111827; }  /* par = neutral */
+.sc-chip.under{ background:#dcfce7; color:#065f46; }
+.sc-chip.over{  background:#fee2e2; color:#7f1d1d; }
+.sc-chip.even{  background:#e5e7eb; color:#111827; }
 
 .sc-totals{
   margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px;
@@ -331,14 +333,13 @@
       measureMarker=L.marker([latlng.lat,latlng.lng],{icon,zIndexOffset:10000,interactive:true}).addTo(map);
       measureMarker.on('add',()=>{
         const el=measureMarker.getElement(); if(!el) return;
-        // stop all clicks inside from reaching the map
         L.DomEvent.disableClickPropagation(el);
         el.querySelectorAll('*').forEach(n=>L.DomEvent.on(n,'click',L.DomEvent.stopPropagation));
         const btn=el.querySelector('.measure-close');
         if(btn){
           btn.addEventListener('click',(ev)=>{
             ev.preventDefault(); ev.stopPropagation();
-            suppressClickUntil=Date.now()+250; // ignore next map click
+            suppressClickUntil=Date.now()+250;
             clearMeasure();
           });
         }
@@ -487,6 +488,15 @@
     loadCourseList();
     const cid=new URLSearchParams(location.search).get('course');
     if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
+  </script>
+
+  <!-- Service worker registration (added) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(()=>{});
+      });
+    }
   </script>
 </body>
 </html>
