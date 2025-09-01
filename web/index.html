@@ -5,7 +5,7 @@
   <title>DriveDen GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#14532d" />
-  <!-- PWA hooks (keep) -->
+  <!-- PWA hooks -->
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
 
@@ -197,7 +197,9 @@
     let lastPos=null, follow=true, movedOnce=false;
     let holes=[], currentIndex=0, courseList=[];
     const markers={};
-    let measureTarget=null, measureMarker=null, measureLine=null;
+
+    // measure state (two-leg)
+    let measureTarget=null, measureLineA=null, measureLineB=null, bubbleMarkerA=null, bubbleMarkerB=null;
     let suppressClickUntil=0;
 
     /* UI refs */
@@ -237,6 +239,8 @@
     function setMarker(n,pos,label){ if(!pos)return; if(markers[n]){markers[n].setLatLng([pos.lat,pos.lng]);return;} markers[n]=L.circleMarker([pos.lat,pos.lng],mstyle(n)).addTo(map); if(label)markers[n].bindTooltip(label); }
     function clearMarkers(){ ['front','mid','back'].forEach(n=>{ if(markers[n]){ map.removeLayer(markers[n]); delete markers[n]; }}); }
     function meters(a,b){ const R=6371000,toRad=d=>d*Math.PI/180; const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2); const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.asin(Math.sqrt(q)); }
+    function midpoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
+    function bubbleIcon(html){ return L.divIcon({ className:'dd-measure', html:`<div class="bubble"><div class="measure-bubble">${html}</div></div>`, iconSize:[0,0], iconAnchor:[0,0] }); }
 
     /* Elevation fetch via server proxy + sanity */
     let lastElev=null,lastElevAt=0;
@@ -249,7 +253,6 @@
           const js=await r.json();
           let v=js?.results?.[0]?.elevation;
           if(typeof v==='number'){
-            // basic sanity for outliers (reject absurd spikes)
             if(v < -200 || v > 4000) v=null;
             if(v!=null){ lastElev=v; lastElevAt=now; return v; }
           }
@@ -292,52 +295,124 @@
       const dm=(h.elevation?.mid  !=null ? h.elevation.mid   : null);
       const db=(h.elevation?.back !=null ? h.elevation.back  : null);
 
-      // show deltas only when both numbers exist and are sane
       const safe = (v)=> (v!=null && v>-200 && v<4000) ? v : null;
       eFront.textContent=(safe(curElev)!=null&&safe(df)!=null)?fmtDelta(df-curElev):'–';
       eMid.textContent  =(safe(curElev)!=null&&safe(dm)!=null)?fmtDelta(dm-curElev):'–';
       eBack.textContent =(safe(curElev)!=null&&safe(db)!=null)?fmtDelta(db-curElev):'–';
     }
 
-    /* Measure tool */
-    function measureDistanceText(){ if(!measureTarget || !lastPos) return null; const d=meters(lastPos,measureTarget); return `${Math.round(d)} m`; }
+    /* ---------- Measure tool (two-leg: You→Layup and Layup→Mid) ---------- */
+    function textA(){ // You → Layup
+      if(!lastPos || !measureTarget) return null;
+      return `${Math.round(meters(lastPos, measureTarget))} m`;
+    }
+    function textB(){ // Layup → Mid
+      if(!measureTarget || !holes.length) return null;
+      const h=holes[currentIndex];
+      const mid = h?.green?.mid || h?.green?.center;
+      if(!mid) return null;
+      return `${Math.round(meters(measureTarget, mid))} m`;
+    }
     function setMeasure(latlng){
-      measureTarget=latlng;
-      if(measureLine) map.removeLayer(measureLine);
-      if(lastPos){ measureLine=L.polyline([[lastPos.lat,lastPos.lng],[latlng.lat,latlng.lng]],{weight:3,opacity:.9}).addTo(map); }
-      const txt=measureDistanceText()||'– m';
-      const icon=L.divIcon({
-        className:'dd-measure',
-        html:`<div class="anchor-dot"></div><div class="bubble"><div class="measure-bubble"><span class="measure-text">${txt}</span><span class="measure-close" aria-label="Clear">×</span></div></div>`,
-        iconSize:[0,0], iconAnchor:[0,0]
-      });
-      if(measureMarker) map.removeLayer(measureMarker);
-      measureMarker=L.marker([latlng.lat,latlng.lng],{icon,zIndexOffset:10000,interactive:true}).addTo(map);
-      measureMarker.on('add',()=>{
-        const el=measureMarker.getElement(); if(!el) return;
-        L.DomEvent.disableClickPropagation(el);
-        el.querySelectorAll('*').forEach(n=>L.DomEvent.on(n,'click',L.DomEvent.stopPropagation));
-        const btn=el.querySelector('.measure-close');
-        if(btn){
-          btn.addEventListener('click',(ev)=>{
-            ev.preventDefault(); ev.stopPropagation();
-            suppressClickUntil=Date.now()+250;
-            clearMeasure();
-          });
-        }
-      });
+      measureTarget = { lat: latlng.lat, lng: latlng.lng };
+      // clear previous
+      if(measureLineA) { map.removeLayer(measureLineA); measureLineA=null; }
+      if(measureLineB) { map.removeLayer(measureLineB); measureLineB=null; }
+      if(bubbleMarkerA){ map.removeLayer(bubbleMarkerA); bubbleMarkerA=null; }
+      if(bubbleMarkerB){ map.removeLayer(bubbleMarkerB); bubbleMarkerB=null; }
+
+      // Leg A: You → Layup
+      if(lastPos){
+        measureLineA = L.polyline(
+          [[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]],
+          {weight:3,opacity:.95,color:'#111827'}
+        ).addTo(map);
+        const midA = midpoint(lastPos, measureTarget);
+        bubbleMarkerA = L.marker([midA.lat, midA.lng], {
+          icon: bubbleIcon(`<span class="measure-text">${textA()||'– m'}</span>
+            <span class="measure-close" aria-label="Clear">×</span>`)
+        }).addTo(map);
+        bubbleMarkerA.on('add', () => {
+          const el = bubbleMarkerA.getElement(); if(!el) return;
+          L.DomEvent.disableClickPropagation(el);
+          el.querySelectorAll('*').forEach(n=>L.DomEvent.on(n,'click',L.DomEvent.stopPropagation));
+          const btn = el.querySelector('.measure-close');
+          if(btn){
+            btn.addEventListener('click',(ev)=>{
+              ev.preventDefault(); ev.stopPropagation();
+              suppressClickUntil=Date.now()+250;
+              clearMeasure();
+            });
+          }
+        });
+      }
+
+      // Leg B: Layup → Mid
+      const h=holes[currentIndex];
+      const mid = h?.green?.mid || h?.green?.center;
+      if(mid){
+        measureLineB = L.polyline(
+          [[measureTarget.lat,measureTarget.lng],[mid.lat,mid.lng]],
+          {weight:3,opacity:.9,color:'#374151',dashArray:'6 6'}
+        ).addTo(map);
+        const midB = midpoint(measureTarget, mid);
+        bubbleMarkerB = L.marker([midB.lat, midB.lng], {
+          icon: bubbleIcon(`<span class="measure-text-b">${textB()||'– m'}</span>`)
+        }).addTo(map);
+      }
     }
     function updateMeasure(){
       if(!measureTarget) return;
-      if(measureLine && lastPos) measureLine.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
-      if(measureMarker){
-        const el=measureMarker.getElement();
-        if(el){ const span=el.querySelector('.measure-text'); if(span) span.textContent=measureDistanceText()||'– m'; }
+
+      // Update Leg A
+      if(measureLineA && lastPos){
+        measureLineA.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
+        if(bubbleMarkerA){
+          const midA = midpoint(lastPos, measureTarget);
+          bubbleMarkerA.setLatLng([midA.lat, midA.lng]);
+          const el = bubbleMarkerA.getElement();
+          if(el){ const span = el.querySelector('.measure-text'); if(span) span.textContent = textA() || '– m'; }
+        }
+      }
+
+      // Update Leg B (depends on current hole mid/center)
+      const h=holes[currentIndex];
+      const mid = h?.green?.mid || h?.green?.center;
+      if(mid){
+        if(!measureLineB){
+          measureLineB = L.polyline(
+            [[measureTarget.lat,measureTarget.lng],[mid.lat,mid.lng]],
+            {weight:3,opacity:.9,color:'#374151',dashArray:'6 6'}
+          ).addTo(map);
+        } else {
+          measureLineB.setLatLngs([[measureTarget.lat,measureTarget.lng],[mid.lat,mid.lng]]);
+        }
+        const midB = midpoint(measureTarget, mid);
+        if(!bubbleMarkerB){
+          bubbleMarkerB = L.marker([midB.lat, midB.lng], {
+            icon: bubbleIcon(`<span class="measure-text-b">${textB()||'– m'}</span>`)
+          }).addTo(map);
+        } else {
+          bubbleMarkerB.setLatLng([midB.lat, midB.lng]);
+          const el = bubbleMarkerB.getElement();
+          if(el){ const span = el.querySelector('.measure-text-b'); if(span) span.textContent = textB() || '– m'; }
+        }
+      } else {
+        if(measureLineB){ map.removeLayer(measureLineB); measureLineB=null; }
+        if(bubbleMarkerB){ map.removeLayer(bubbleMarkerB); bubbleMarkerB=null; }
       }
     }
-    function clearMeasure(){ measureTarget=null; if(measureLine){map.removeLayer(measureLine);measureLine=null;} if(measureMarker){map.removeLayer(measureMarker);measureMarker=null;} }
-
-    function onMapClick(e){ if(Date.now()<suppressClickUntil) return; setMeasure({lat:e.latlng.lat,lng:e.latlng.lng}); }
+    function clearMeasure(){
+      measureTarget=null;
+      if(measureLineA){ map.removeLayer(measureLineA); measureLineA=null; }
+      if(measureLineB){ map.removeLayer(measureLineB); measureLineB=null; }
+      if(bubbleMarkerA){ map.removeLayer(bubbleMarkerA); bubbleMarkerA=null; }
+      if(bubbleMarkerB){ map.removeLayer(bubbleMarkerB); bubbleMarkerB=null; }
+    }
+    function onMapClick(e){
+      if(Date.now()<suppressClickUntil) return; // ignore synthetic click after [×]
+      setMeasure(e.latlng);
+    }
     map.on('click', onMapClick);
 
     /* GPS */
@@ -493,7 +568,6 @@
     function loadSavedScores(id){ courseIdForScores=id; try{ const meta=JSON.parse(localStorage.getItem(`dd_scores_meta_${id}`)||'null'); if(meta){ scCount.value=String(meta.count||1); playerCount=Number(scCount.value); meta.names?.forEach((nm,i)=>{ if(nm!=null){ nameEls[i].value=nm; headEls[i].textContent=nm; }}); for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; } } }catch{} try{ const saved=JSON.parse(localStorage.getItem(`dd_scores_${id}`)||'null'); if(saved&&Array.isArray(saved)&&saved.length===4&&saved[0].length===holes.length){ scores=saved; } else { scores=Array.from({length:4},()=>Array(holes.length).fill(null)); } }catch{ scores=Array.from({length:4},()=>Array(holes.length).fill(null)); } renderScores(); }
 
     /* Init */
-    function setPanelHidden(h){ panel.classList.toggle('hidden',h); toggleBtn.textContent=h?'☰':'✕'; }
     loadCourseList();
     const cid=new URLSearchParams(location.search).get('course');
     if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
