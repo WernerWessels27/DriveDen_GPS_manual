@@ -4,489 +4,160 @@
   <meta charset="utf-8" />
   <title>DriveDen GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#14532d" />
-  <link rel="icon" href="/icons/icon-192.png">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin />
 
   <style>
-    :root{
-      --brand:#14532d; --brand-2:#166534; --accent:#15803d;
-      --panel:#ffffffee; --text:#111827; --muted:#6b7280;
-      --chip:#e6f6ea; --chipText:#14532d;
+    html, body, #map { height:100%; margin:0; }
+    body{ font-family: system-ui, sans-serif; }
+
+    .topbar{
+      position:fixed; top:10px; left:10px; right:10px;
+      display:flex; justify-content:space-between; gap:10px;
+      z-index:1001;
     }
-    html, body { height: 100%; margin: 0; }
-    #map { height: 100%; position: relative; }
+    .chip{
+      background:#ffffffee; padding:8px 12px; border-radius:10px;
+      box-shadow:0 4px 12px rgba(0,0,0,.15);
+    }
+    .distPanel{ display:flex; gap:12px; }
+    .distBox{ min-width:70px; }
+    .label{ font-size:12px; color:#555; }
+    .big{ font-size:18px; font-weight:700; }
 
-    .brand { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; }
-    .brand img { height: 34px; }
+    .fab{
+      position:fixed; right:12px; bottom:12px;
+      display:flex; flex-direction:column; gap:10px;
+      z-index:1001;
+    }
+    .fab button{
+      width:52px; height:52px; border-radius:50%;
+      border:0; background:#14532d; color:#fff; font-size:20px;
+    }
+    .fab-left{
+      position:fixed; left:12px; bottom:12px; display:none;
+      width:52px; height:52px; border-radius:50%;
+      background:#333; color:#fff; border:0;
+    }
 
-    .holeWrap{ position: fixed; z-index:10000; left:50%; transform:translateX(-50%); top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-    .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center; }
-    .holeNav button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
-    .holeTitle { font-weight:600; }
-    .scoreBtn { border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; box-shadow: 0 6px 12px rgba(0,0,0,.15); }
+    .measureInfo{
+      position:fixed; left:50%; transform:translateX(-50%);
+      bottom:80px; display:none;
+      background:#ffffffee; padding:6px 10px; border-radius:8px;
+      box-shadow:0 4px 12px rgba(0,0,0,.15); z-index:1001;
+    }
 
-    .windBox{ position: fixed; top: 10px; right: 10px; z-index: 10000; background: var(--panel); padding: 8px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; flex-direction:column; gap:8px; min-width: 160px; }
-    .windRow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .windLeft { display:flex; align-items:center; gap:8px; }
-    .windSock { width:26px; height:26px; }
-    .windData { display:flex; flex-direction:column; line-height:1.1; }
-    .windSpeed { font-weight:600; }
-    .windDirTxt { font-size:12px; color:var(--muted); }
-    .windArrow { width:20px; height:20px; transform-origin:50% 50%; opacity:.85; }
-    .toggles { display:flex; gap:8px; flex-wrap:wrap; }
-    .toggle { background:#f3f4f6; border:1px solid #e5e7eb; color:var(--text); padding:6px 10px; border-radius:999px; font-size:12px; cursor:pointer; user-select:none; }
-    .toggle.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-
-    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 190px; }
-    .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
-    .col { display:flex; flex-direction:column; align-items:flex-end; }
-    .label { color:var(--muted); }
-    .value { font-weight:700; }
-    .delta { font-size:12px; color:var(--muted); }
-    .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
-
-    .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: var(--panel); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; justify-content:center; gap:18px; font-size:14px; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--chipText); font-weight:700; }
-
-    .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
-    .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
-    .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-    select, button, input { width: 100%; padding: 8px; font-size: 14px; }
-
-    .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
-    .fab-left { position: fixed; left: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--brand); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; display: none; }
-    .fab-left svg { width:22px; height:22px; }
-
-    /* Measure tool (fixed close behavior) */
-    .dd-measure { pointer-events: auto; }
-    .dd-measure .anchor-dot { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #111827; border: 2px solid #ffffff; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
-    .dd-measure .bubble { position: absolute; transform: translate(8px, -28px); }
-    .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
-    .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
- 
-  /* ===== Scorecard styles (ADD THIS) ===== */
-.scorecard{
-  position: fixed;
-  left: 50%;
-  bottom: 76px;              /* sits above the FABs/footer */
-  transform: translateX(-50%);
-  width: min(940px, calc(100% - 20px));
-  max-height: 70vh;          /* never cover the whole screen */
-  overflow: auto;
-  background: var(--panel);
-  color: var(--text);
-  border-radius: 12px;
-  box-shadow: 0 14px 30px rgba(0,0,0,.25);
-  padding: 12px;
-  z-index: 10002;
-  display: none;             /* hidden by default */
-}
-.scorecard.show{ display: block; }
-
-.sc-players{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
-.sc-tools{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 10px; }
-.sc-button{
-  background: var(--brand-2); color:#fff; border:0; border-radius:8px; padding:6px 10px;
-  cursor:pointer;
-}
-.sc-muted{ font-size:12px; color:var(--muted); }
-
-.sc-row{
-  display:grid;
-  grid-template-columns: 38px 46px repeat(4, minmax(82px, 1fr));
-  gap:8px;
-  align-items:center;
-  padding: 4px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-.sc-head{ font-weight:700; background: #f9fafb; border-radius:8px; padding:6px 8px; }
-.sc-hole{ text-align:center; }
-.sc-par{ text-align:center; }
-
-.sc-cell{ display:flex; align-items:center; gap:8px; }
-.sc-score{
-  width: 64px; padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;
-}
-.sc-chip{
-  min-width: 34px; text-align:center; border-radius:999px; padding:3px 8px; font-weight:700; font-size:12px;
-  background:#e5e7eb; color:#111827;
-}
-.sc-chip.under{ background:#dcfce7; color:#065f46; }  /* under par = green */
-.sc-chip.over{  background:#fee2e2; color:#7f1d1d; }  /* over par = red */
-.sc-chip.even{  background:#e5e7eb; color:#111827; }  /* par = neutral */
-
-.sc-totals{
-  margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px;
-}
-
+    .scorecard{
+      position:fixed; left:50%; bottom:80px; transform:translateX(-50%);
+      width:min(940px,calc(100% - 20px));
+      max-height:70vh; overflow:auto;
+      background:#ffffffee; border-radius:12px;
+      box-shadow:0 14px 30px rgba(0,0,0,.25);
+      padding:12px; z-index:1001; display:none;
+    }
+    .scorecard.show{ display:block; }
+    .sc-row{ display:grid; grid-template-columns: 38px 46px repeat(4, 1fr); gap:8px; align-items:center; padding:4px 0; border-bottom:1px solid #e5e7eb; }
+    .sc-head{ font-weight:700; margin-bottom:8px; }
   </style>
 </head>
 <body>
-  <div class="brand"><img src="driveden-logo.svg" alt="DriveDen"></div>
-
-  <div class="holeWrap">
-    <div class="holeNav">
-      <button id="prevHole">◀</button>
-      <div class="holeTitle" id="holeTitle">Hole –</div>
-      <button id="nextHole">▶</button>
-    </div>
-    <button id="scoreToggle" class="scoreBtn">Scorecard</button>
-  </div>
-
-  <div class="windBox" id="windBox" title="10 m wind at 10 m height">
-    <div class="windRow">
-      <div class="windLeft">
-        <svg class="windSock" viewBox="0 0 64 64" aria-hidden="true">
-          <rect x="8" y="8" width="6" height="48" rx="3" fill="#1f2937"></rect>
-          <polygon points="14,14 54,20 54,28 14,34" fill="#e11d48"></polygon>
-          <line x1="14" y1="14" x2="14" y2="34" stroke="#111827" stroke-width="2"></line>
-          <line x1="24" y1="16" x2="24" y2="32" stroke="#fff" stroke-width="3" opacity="0.7"></line>
-          <line x1="36" y1="18" x2="36" y2="30" stroke="#fff" stroke-width="3" opacity="0.7"></line>
-        </svg>
-        <div class="windData">
-          <div class="windSpeed" id="windSpeed">– m/s</div>
-          <div class="windDirTxt" id="windDirTxt">–</div>
-        </div>
-      </div>
-      <svg class="windArrow" id="windArrow" viewBox="0 0 24 24" aria-hidden="true">
-        <polygon points="12,3 6,12 10,12 10,21 14,21 14,12 18,12" fill="#111827"></polygon>
-      </svg>
-    </div>
-    <div class="toggles">
-      <span id="tgBase" class="toggle">Map: Imagery</span>
-      <span id="tgContours" class="toggle">Contours: Off</span>
-    </div>
-  </div>
-
-  <div class="distBox">
-    <div class="row"><span class="label">Front</span><span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span></div>
-    <div class="row"><span class="label">Mid</span><span class="col"><span class="value" id="dMid">–</span><span class="delta" id="eMid">–</span></span></div>
-    <div class="row"><span class="label">Back</span><span class="col"><span class="value" id="dBack">–</span><span class="delta" id="eBack">–</span></span></div>
-    <div class="muted" id="status">Getting GPS…</div>
-  </div>
-
-  <div class="footer">
-    <div>Par <span class="badge" id="par">–</span></div>
-    <div>Stroke <span class="badge" id="stroke">–</span></div>
-  </div>
-
   <div id="map"></div>
 
-  <div class="panel hidden" id="panel">
-    <div><strong>Select course</strong></div>
-    <div class="grid" style="margin-top:6px;">
-      <select id="courseSelect"></select>
-      <button id="btnLoadCourse">Load</button>
+  <!-- TOP -->
+  <div class="topbar">
+    <div class="chip">
+      <div id="holeTitle">Hole –</div>
+      <div id="holeMeta">Par – • Stroke –</div>
     </div>
-    <div class="muted">Open with <code>?course=&lt;id&gt;</code> as well.</div>
-    <div style="margin-top:10px;"><strong>Hole</strong></div>
-    <div class="grid" style="margin-top:6px;">
-      <select id="holes"></select><button id="btnGoHole">Go</button>
+    <div class="chip distPanel">
+      <div class="distBox"><div class="label">Front</div><div class="big" id="dFront">–</div></div>
+      <div class="distBox"><div class="label">Mid</div><div class="big" id="dMid">–</div></div>
+      <div class="distBox"><div class="label">Back</div><div class="big" id="dBack">–</div></div>
     </div>
+    <div class="chip"><div id="gpsStat">GPS: …</div></div>
   </div>
 
-  <button id="panelToggle" class="fab">☰</button>
-  <button id="recenterBtn" class="fab-left" title="Recenter">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="2" fill="#ffffff"/>
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="12" cy="12" r="7" fill="none" stroke="#ffffff" stroke-width="1.5" opacity=".7"/>
-    </svg>
-  </button>
+  <!-- FAB buttons -->
+  <div class="fab">
+    <button id="btnScore">🗒️</button>
+    <button id="btnMeasure">📏</button>
+  </div>
+  <button id="recenterBtn" class="fab-left">✚</button>
 
-  <!-- SCORECARD -->
-  <div id="scorecard" class="scorecard" aria-live="polite">
-    <div class="sc-players">
-      <strong>Players:</strong>
-      <select id="scCount" style="width:80px"><option>1</option><option>2</option><option>3</option><option>4</option></select>
-      <input id="p1" placeholder="Player 1" />
-      <input id="p2" placeholder="Player 2" style="display:none"/>
-      <input id="p3" placeholder="Player 3" style="display:none"/>
-      <input id="p4" placeholder="Player 4" style="display:none"/>
+  <!-- Measure info -->
+  <div class="measureInfo" id="measureInfo">
+    <span id="measureText">0 m</span>
+    <button id="measureClose">✕</button>
+  </div>
+
+  <!-- Scorecard -->
+  <div class="scorecard" id="scorecard">
+    <div class="sc-head">Scorecard <button id="scClose" style="float:right;">Close</button></div>
+    <div class="sc-row" style="font-weight:700;">
+      <div>#</div><div>Par</div><div>P1</div><div>P2</div><div>P3</div><div>P4</div>
     </div>
-    <div class="sc-tools">
-      <button id="scClear" class="sc-button" style="background:#b91c1c">Clear</button>
-      <button id="scClose" class="sc-button">Close</button>
-      <div class="sc-muted">Tap a score to edit. Colors: green = under par, grey = par, red = over.</div>
-    </div>
-    <div class="sc-row sc-head">
-      <div class="sc-hole">H</div><div class="sc-par">Par</div>
-      <div class="sc-hole" id="hP1">P1</div><div class="sc-hole" id="hP2" style="display:none">P2</div>
-      <div class="sc-hole" id="hP3" style="display:none">P3</div><div class="sc-hole" id="hP4" style="display:none">P4</div>
-    </div>
-    <div id="scBody"></div>
-    <div class="sc-totals" id="scTotals">Totals…</div>
+    <div id="scRows"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
-    // ---- base layers ----
-    const esriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' });
-    const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap & CARTO' });
-    const contours = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, opacity: .35, attribution: '© OpenStreetMap, SRTM · OpenTopoMap (CC-BY-SA)' });
+    // ===== Map =====
+    const imagery = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom:19, attribution:'© Esri, Maxar' }
+    );
+    const map = L.map('map',{layers:[imagery]}).setView([-25.7542,28.2322],16);
 
-    const map = L.map('map', { zoomControl: true, layers: [esriImagery] });
-    let currentBase='imagery', contoursOn=false;
+    // Cart marker
+    const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><circle cx="13" cy="24" r="4" fill="#111"/><circle cx="27" cy="24" r="4" fill="#111"/></svg>`);
+    const you = L.marker([0,0], {icon:L.icon({iconUrl:`data:image/svg+xml;utf8,${cartSvg}`,iconSize:[28,22],iconAnchor:[14,11]})}).addTo(map);
 
-    // cart icon
-    const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
-    const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
-    const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
-
-    // state
-    let lastPos=null, follow=true, movedOnce=false;
-    let holes=[], currentIndex=0, courseList=[];
-    const markers={};
-    let measureTarget=null, measureMarker=null, measureLine=null;
-    let suppressClickUntil=0; // prevent map click after pressing [×]
-
-    // ui refs
-    const status=document.getElementById('status');
-    const dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
-    const eFront=document.getElementById('eFront'), eMid=document.getElementById('eMid'), eBack=document.getElementById('eBack');
-    const parEl=document.getElementById('par'), strokeEl=document.getElementById('stroke');
-    const holeTitle=document.getElementById('holeTitle');
-    const recenterBtn=document.getElementById('recenterBtn');
-    const panel=document.getElementById('panel'), toggleBtn=document.getElementById('panelToggle');
-    const courseSel=document.getElementById('courseSelect'), holesSel=document.getElementById('holes');
-    const tgBase=document.getElementById('tgBase'), tgContours=document.getElementById('tgContours');
-
-    // wind
-    const windSpeedEl=document.getElementById('windSpeed'), windDirTxtEl=document.getElementById('windDirTxt'), windArrowEl=document.getElementById('windArrow');
-    let windCache={ts:0,lat:null,lng:null,speed:null,dir:null}; const WIND_TTL=10*60*1000;
-
-    function degToCompass(d){ const dirs=['N','NE','E','SE','S','SW','W','NW','N']; return dirs[Math.round(((d%360)/45))]; }
-    async function fetchWind(lat,lng){ try{ const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&windspeed_unit=ms`); const j=await r.json(); const cw=j?.current_weather; if(typeof cw?.windspeed==='number'&&typeof cw?.winddirection==='number') return {speed:cw.windspeed,dir:cw.winddirection}; }catch{} return {speed:null,dir:null}; }
-    async function ensureWind(){ if(!lastPos)return; const now=Date.now(); if(now-windCache.ts>WIND_TTL){ const {speed,dir}=await fetchWind(lastPos.lat,lastPos.lng); windCache={ts:now,lat:lastPos.lat,lng:lastPos.lng,speed,dir}; } renderWind(); }
-    function renderWind(){ const {speed,dir}=windCache; windSpeedEl.textContent=(typeof speed==='number')?`${speed.toFixed(1)} m/s`:'– m/s'; windDirTxtEl.textContent=(typeof dir==='number')?`${degToCompass(dir)} (${Math.round(dir)}°)`:'–'; windArrowEl.style.transform=`rotate(${(typeof dir==='number'?dir:0)}deg)`; }
-
-    // panel toggle
-    function setPanelHidden(h){ panel.classList.toggle('hidden',h); toggleBtn.textContent=h?'☰':'✕'; }
-    setPanelHidden(true); toggleBtn.onclick=()=>setPanelHidden(!panel.classList.contains('hidden'));
-
-    // map start
-    map.setView([-25.7542, 28.2322], 15);
-
-    // helpers
-    function mstyle(n){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[n]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:.9,color:p[0],fillColor:p[1]}; }
-    function setMarker(n,pos,label){ if(!pos)return; if(markers[n]){markers[n].setLatLng([pos.lat,pos.lng]);return;} markers[n]=L.circleMarker([pos.lat,pos.lng],mstyle(n)).addTo(map); if(label)markers[n].bindTooltip(label); }
-    function clearMarkers(){ ['front','mid','back'].forEach(n=>{ if(markers[n]){ map.removeLayer(markers[n]); delete markers[n]; }}); }
-    function meters(a,b){ const R=6371000,toRad=d=>d*Math.PI/180; const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2); const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.asin(Math.sqrt(q)); }
-
-    // current elevation cache
-    let lastElev=null,lastElevAt=0;
-    async function fetchCurrentElevation(p){
-      const now=Date.now();
-      if(lastElev!==null && (now-lastElevAt)<30000) return lastElev;
-      try{ const r=await fetch(`/elevation?lat=${p.lat}&lng=${p.lng}`); const js=await r.json(); const v=js?.results?.[0]?.elevation; if(typeof v==='number'){ lastElev=v; lastElevAt=now; return v; } }catch{} return null;
-    }
-    function fmtDelta(d){ if(d==null) return '–'; if(Math.abs(d)<0.5) return '±0 m'; return d>0?`↑ ${Math.round(d)} m`:`↓ ${Math.round(Math.abs(d))} m`; }
-
-    function updateHoleUI(center=true){
-      if(!holes.length) return;
-      const h=holes[currentIndex];
-      clearMarkers();
-      setMarker('front',h.green.front||h.green.center,'Front');
-      setMarker('mid',  h.green.mid  ||h.green.center,'Mid');
-      setMarker('back', h.green.back ||h.green.center,'Back');
-
-      holeTitle.textContent=`Hole ${h.number}`;
-      parEl.textContent=h.par??'–'; strokeEl.textContent=h.strokeIndex??'–';
-      holesSel.value=String(h.number);
-
-      if(center){ const pts=[h.green.front,h.green.mid,h.green.back,h.green.center].filter(Boolean); if(pts.length) map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng]))); }
-      if(lastPos) updateDistancesAndDeltas();
-      updateMeasure();
-      highlightCurrentRow();
-    }
-
-    async function updateDistancesAndDeltas(){
-      if(!lastPos || !holes.length) return;
-      const h=holes[currentIndex]; const f=h.green.front||h.green.center, m=h.green.mid||h.green.center, b=h.green.back||h.green.center;
-      dFront.textContent=Math.round(meters(lastPos,f));
-      dMid.textContent  =Math.round(meters(lastPos,m));
-      dBack.textContent =Math.round(meters(lastPos,b));
-
-      const curElev=await fetchCurrentElevation(lastPos);
-      const df=h.elevation?.front??null, dm=h.elevation?.mid??null, db=h.elevation?.back??null;
-      eFront.textContent=(curElev!=null&&df!=null)?fmtDelta(df-curElev):'–';
-      eMid.textContent  =(curElev!=null&&dm!=null)?fmtDelta(dm-curElev):'–';
-      eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
-    }
-
-    // ---------- Measure tool (fixed close) ----------
-    function measureDistanceText(){ if(!measureTarget || !lastPos) return null; const d=meters(lastPos,measureTarget); return `${Math.round(d)} m`; }
-    function setMeasure(latlng){
-      measureTarget=latlng;
-      if(measureLine) map.removeLayer(measureLine);
-      if(lastPos){ measureLine=L.polyline([[lastPos.lat,lastPos.lng],[latlng.lat,latlng.lng]],{weight:3,opacity:.9}).addTo(map); }
-      const txt=measureDistanceText()||'– m';
-      const icon=L.divIcon({
-        className:'dd-measure',
-        html:`<div class="anchor-dot"></div><div class="bubble"><div class="measure-bubble"><span class="measure-text">${txt}</span><span class="measure-close" aria-label="Clear">×</span></div></div>`,
-        iconSize:[0,0], iconAnchor:[0,0]
-      });
-      if(measureMarker) map.removeLayer(measureMarker);
-      measureMarker=L.marker([latlng.lat,latlng.lng],{icon,zIndexOffset:10000,interactive:true}).addTo(map);
-      measureMarker.on('add',()=>{
-        const el=measureMarker.getElement(); if(!el) return;
-        // stop all clicks inside from reaching the map
-        L.DomEvent.disableClickPropagation(el);
-        el.querySelectorAll('*').forEach(n=>L.DomEvent.on(n,'click',L.DomEvent.stopPropagation));
-        const btn=el.querySelector('.measure-close');
-        if(btn){
-          btn.addEventListener('click',(ev)=>{
-            ev.preventDefault(); ev.stopPropagation();
-            suppressClickUntil=Date.now()+250; // ignore next map click
-            clearMeasure();
-          });
-        }
-      });
-    }
-    function updateMeasure(){
-      if(!measureTarget) return;
-      if(measureLine && lastPos) measureLine.setLatLngs([[lastPos.lat,lastPos.lng],[measureTarget.lat,measureTarget.lng]]);
-      if(measureMarker){
-        const el=measureMarker.getElement();
-        if(el){ const span=el.querySelector('.measure-text'); if(span) span.textContent=measureDistanceText()||'– m'; }
-      }
-    }
-    function clearMeasure(){ measureTarget=null; if(measureLine){map.removeLayer(measureLine);measureLine=null;} if(measureMarker){map.removeLayer(measureMarker);measureMarker=null;} }
-
-    function onMapClick(e){
-      if(Date.now()<suppressClickUntil) return; // clicked [×]
-      setMeasure({lat:e.latlng.lat,lng:e.latlng.lng});
-    }
-    map.on('click', onMapClick);
+    // Recenter handling
+    let follow=true,lastPos=null;
+    map.on('dragstart',()=>{follow=false; document.getElementById('recenterBtn').style.display='block';});
+    document.getElementById('recenterBtn').onclick=()=>{ if(!lastPos) return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); document.getElementById('recenterBtn').style.display='none'; };
 
     // GPS
     if('geolocation' in navigator){
-      navigator.geolocation.watchPosition(async pos=>{
-        const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
-        lastPos=p; you.setLatLng([p.lat,p.lng]);
-        if(follow){ map.setView([p.lat,p.lng], map.getZoom()||17); recenterBtn.style.display='none'; }
-        if(!movedOnce){ map.setView([p.lat,p.lng],17); movedOnce=true; }
-        status.textContent=`Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
-        await updateDistancesAndDeltas(); ensureWind(); updateMeasure();
-      }, err=>{ status.textContent=err.message; }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
-    } else { status.textContent='Geolocation not supported'; }
-
-    map.on('dragstart',()=>{follow=false;recenterBtn.style.display='block';});
-    map.on('zoomstart',()=>{follow=false;recenterBtn.style.display='block';});
-    recenterBtn.onclick=()=>{ if(!lastPos)return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); recenterBtn.style.display='none'; };
-
-    // course list + load
-    async function loadCourseList(){ try{ const r=await fetch('/courses/index.json'); const js=await r.json(); courseList=js.courses||[]; courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);}); }catch{ courseSel.innerHTML=''; } }
-    async function loadCourse(id){
-      holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
-      try{
-        const r=await fetch(`/courses/${encodeURIComponent(id)}.json`); const raw=await r.json();
-        const root=raw.course||raw;
-        holes=(root.holes||[]).map(h=>({ number:(h.number??h.hole??h.holeNumber??null)*1, par:(h.par!=null?Number(h.par):null), strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null, green:{center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null}, elevation:{front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null} })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
-
-        holesSel.innerHTML=''; holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
-        if(holes.length){ currentIndex=0; updateHoleUI(true); }
-        status.textContent=`Loaded course: ${root.name||id}`;
-
-        await autofillElevationsForCourse(id); // fills missing F/M/B
-        buildScorecard(); loadSavedScores(id);
-      }catch{ status.textContent=`Failed to load course ${id}`; }
+      navigator.geolocation.watchPosition(pos=>{
+        lastPos={lat:pos.coords.latitude,lng:pos.coords.longitude};
+        you.setLatLng([lastPos.lat,lastPos.lng]);
+        if(follow) map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17);
+        document.getElementById('gpsStat').textContent=`GPS: ±${Math.round(pos.coords.accuracy)} m`;
+      },err=>{ document.getElementById('gpsStat').textContent=err.message; },{enableHighAccuracy:true});
     }
-    document.getElementById('btnLoadCourse').onclick=()=>{ const id=courseSel.value; if(!id)return; loadCourse(id); };
-    document.getElementById('btnGoHole').onclick=()=>{ const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true);} };
-    document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); };
-    document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); };
 
-    // base & contours toggles
-    function setBase(which){ if(which===currentBase) return; if(which==='imagery'){ map.removeLayer(cartoVoyager); esriImagery.addTo(map); tgBase.textContent='Map: Imagery'; } else { map.removeLayer(esriImagery); cartoVoyager.addTo(map); tgBase.textContent='Map: Voyager'; } currentBase=which; }
-    function setContours(on){ if(on && !contoursOn){ contours.addTo(map); tgContours.classList.add('active'); tgContours.textContent='Contours: On'; contoursOn=true; } else if(!on && contoursOn){ map.removeLayer(contours); tgContours.classList.remove('active'); tgContours.textContent='Contours: Off'; contoursOn=false; } }
-    setBase('imagery'); setContours(false);
-    tgBase.onclick=()=>setBase(currentBase==='imagery'?'voyager':'imagery');
-    tgContours.onclick=()=>setContours(!contoursOn);
+    // Measure tool
+    const measureInfo=document.getElementById('measureInfo'),
+          measureText=document.getElementById('measureText');
+    function haversine(a,b){const R=6371000;const toRad=d=>d*Math.PI/180;const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const s1=Math.sin(dLat/2),s2=Math.sin(dLng/2);const q=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;return 2*R*Math.asin(Math.sqrt(q));}
+    document.getElementById('btnMeasure').onclick=()=>{
+      const once=(e)=>{ if(!lastPos) return; const d=haversine(lastPos,e.latlng); measureText.textContent=`${Math.round(d)} m`; measureInfo.style.display='block'; map.off('click',once); };
+      map.on('click',once);
+    };
+    document.getElementById('measureClose').onclick=()=>{measureInfo.style.display='none';};
 
-    /* ===== Elevation autofill via /elevation proxy ===== */
-    const ELEV_CACHE_TTL=1000*60*60*24*30;
-    function loadElevCache(courseId){ try{ const raw=localStorage.getItem('dd_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
-    function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('dd_elev_'+courseId, JSON.stringify(cache)); }catch{} }
-    async function fetchElevPoint(lat,lng){
-      try{
-        const r=await fetch(`/elevation?lat=${lat}&lng=${lng}`);
-        if(r.ok){ const j=await r.json(); const v=j?.results?.[0]?.elevation; if(typeof v==='number') return v; }
-      }catch{}
-      return null;
-    }
-    async function autofillElevationsForCourse(courseId){
-      if(!holes.length) return;
-      const cache=loadElevCache(courseId);
-      holes.forEach(h=>{ const ch=cache.holes?.[h.number]; if(ch){ h.elevation=h.elevation||{}; if(ch.front!=null && h.elevation.front==null) h.elevation.front=ch.front; if(ch.mid!=null && h.elevation.mid==null) h.elevation.mid=ch.mid; if(ch.back!=null && h.elevation.back==null) h.elevation.back=ch.back; } });
-      const jobs=[];
-      for(const h of holes){
-        const pts=[['front',h.green.front],['mid',h.green.mid||h.green.center],['back',h.green.back]];
-        for(const [key,pt] of pts){ if(!pt) continue; if(h.elevation?.[key]==null) jobs.push({hole:h,key,lat:pt.lat,lng:pt.lng}); }
+    // Scorecard
+    const scEl=document.getElementById('scorecard');
+    document.getElementById('btnScore').onclick=()=>scEl.classList.add('show');
+    document.getElementById('scClose').onclick=()=>scEl.classList.remove('show');
+    function buildScorecardRows(){
+      const box=document.getElementById('scRows'); box.innerHTML='';
+      for(let i=1;i<=18;i++){
+        const row=document.createElement('div'); row.className='sc-row';
+        row.innerHTML=`<div>${i}</div><div>-</div><div><input type="number"/></div><div><input type="number"/></div><div><input type="number"/></div><div><input type="number"/></div>`;
+        box.appendChild(row);
       }
-      if(!jobs.length){ updateHoleUI(false); return; }
-      for(const job of jobs){
-        const v=await fetchElevPoint(job.lat,job.lng);
-        if(!job.hole.elevation) job.hole.elevation={};
-        if(v!=null) job.hole.elevation[job.key]=v;
-        const entry=cache.holes[job.hole.number]||{}; if(v!=null) entry[job.key]=v; cache.holes[job.hole.number]=entry;
-        if(job.hole===holes[currentIndex]) updateDistancesAndDeltas();
-      }
-      saveElevCache(courseId,cache); updateHoleUI(false);
     }
-    /* =================== /elevation =================== */
+    buildScorecardRows();
 
-    /* ===================== SCORECARD ===================== */
-    const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
-    const scBody=document.getElementById('scBody'), scTotals=document.getElementById('scTotals'), scCount=document.getElementById('scCount');
-    const nameEls=[document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
-    const headEls=[document.getElementById('hP1'),document.getElementById('hP2'),document.getElementById('hP3'),document.getElementById('hP4')];
-    const scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear');
-    let playerCount=1, scores=[], courseIdForScores=null;
-
-    scoreToggle.onclick=()=>{ scorecard.classList.toggle('show'); highlightCurrentRow(); };
-    scClose.onclick=()=>scorecard.classList.remove('show');
-    scClear.onclick=()=>{ if(!confirm('Clear all scores for this course?')) return; scores=Array.from({length:4},()=>Array(holes.length).fill(null)); persistScores(); renderScores(); };
-    scCount.onchange=()=>{ playerCount=Number(scCount.value); for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; } persistScoresMeta(); renderScores(); };
-    nameEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ headEls[idx].textContent=inp.value||`P${idx+1}`; persistScoresMeta(); }); });
-
-    function buildScorecard(){
-      playerCount=Number(scCount.value);
-      for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].textContent=nameEls[i].value||`P${i+1}`; }
-      scBody.innerHTML='';
-      holes.forEach((h,idx)=>{
-        const row=document.createElement('div'); row.className='sc-row'; row.dataset.hole=h.number;
-        const cellHole=document.createElement('div'); cellHole.className='sc-hole'; cellHole.textContent=h.number;
-        const cellPar=document.createElement('div'); cellPar.className='sc-par'; cellPar.textContent=h.par??'-';
-        row.appendChild(cellHole); row.appendChild(cellPar);
-        for(let p=0;p<4;p++){
-          const wrap=document.createElement('div'); wrap.className='sc-cell'; wrap.style.display=(p<playerCount)?'flex':'none';
-          const input=document.createElement('input'); input.className='sc-score'; input.type='number'; input.min='1'; input.placeholder='–';
-          input.addEventListener('input',()=>{ onScoreChange(p,idx,input.value?Number(input.value):null); });
-          const chip=document.createElement('span'); chip.className='sc-chip even'; chip.textContent='E';
-          wrap.appendChild(input); wrap.appendChild(chip); row.appendChild(wrap);
-        }
-        scBody.appendChild(row);
-      });
-      if(!scores.length||scores[0].length!==holes.length) scores=Array.from({length:4},()=>Array(holes.length).fill(null));
-      renderScores();
-    }
-    function relationToPar(score,par){ if(score==null||par==null) return {cls:'even',txt:'–'}; const d=score-par; if(d===0) return {cls:'even',txt:'E'}; if(d<0) return {cls:'under',txt:(d===-1?'−1':`−${Math.abs(d)}`)}; return {cls:'over',txt:(d===1?'+1':`+${d}`)}; }
-    function renderScores(){
-      scBody.querySelectorAll('.sc-row').forEach((row,idx)=>{ const par=holes[idx]?.par??null; row.querySelectorAll('.sc-cell').forEach((cell,p)=>{ if(p>=playerCount){cell.style.display='none';return;} cell.style.display='flex'; const input=cell.querySelector('.sc-score'); const chip=cell.querySelector('.sc-chip'); const v=scores[p][idx]; input.value=v??''; const rel=relationToPar(v,par); chip.className=`sc-chip ${rel.cls}`; chip.textContent=rel.txt; }); });
-      const parts=[]; for(let p=0;p<playerCount;p++){ let t=0,d=0; for(let i=0;i<holes.length;i++){ const v=scores[p][i]; const par=holes[i]?.par??null; if(v!=null){ t+=v; if(par!=null) d+=(v-par); } } const nm=(nameEls[p].value||`P${p+1}`); const tag=d===0?'E':(d>0?`+${d}`:`${d}`); parts.push(`${nm}: ${t||0} (${tag})`); } scTotals.textContent=parts.join('   •   ');
-    }
-    function onScoreChange(p,i,val){ scores[p][i]=(typeof val==='number'&&!Number.isNaN(val))?val:null; persistScores(); renderScores(); }
-    function highlightCurrentRow(){ const rows=scBody.querySelectorAll('.sc-row'); rows.forEach(r=>r.style.outline='none'); const row=rows[currentIndex]; if(row){ row.style.outline='2px solid var(--accent)'; row.scrollIntoView({block:'nearest'}); } }
-    function persistScoresMeta(){ if(!courseIdForScores) return; const meta={count:playerCount, names:nameEls.map((el,i)=> i<playerCount?(el.value||`P${i+1}`):null)}; localStorage.setItem(`dd_scores_meta_${courseIdForScores}`, JSON.stringify(meta)); }
-    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`dd_scores_${courseIdForScores}`, JSON.stringify(scores)); persistScoresMeta(); }
-    function loadSavedScores(id){ courseIdForScores=id; try{ const meta=JSON.parse(localStorage.getItem(`dd_scores_meta_${id}`)||'null'); if(meta){ scCount.value=String(meta.count||1); playerCount=Number(scCount.value); meta.names?.forEach((nm,i)=>{ if(nm!=null){ nameEls[i].value=nm; headEls[i].textContent=nm; }}); for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; } } }catch{} try{ const saved=JSON.parse(localStorage.getItem(`dd_scores_${id}`)||'null'); if(saved&&Array.isArray(saved)&&saved.length===4&&saved[0].length===holes.length){ scores=saved; } else { scores=Array.from({length:4},()=>Array(holes.length).fill(null)); } }catch{ scores=Array.from({length:4},()=>Array(holes.length).fill(null)); } renderScores(); }
-
-    // init
-    loadCourseList();
-    const cid=new URLSearchParams(location.search).get('course');
-    if(cid){ loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); }); }
+    // PWA service worker
+    if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js')); }
   </script>
 </body>
 </html>
