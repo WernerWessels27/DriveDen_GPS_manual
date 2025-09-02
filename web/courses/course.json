@@ -1,0 +1,87 @@
+{
+  "name": "Unnamed Course",
+  "id": "course",
+  "holes": [
+    {
+      "number": 1,
+      "par": 4,
+      "strokeIndex": 7,
+      "tee": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "mid": null,
+        "back": null
+      },
+      "elevation": {
+        "front": null,
+        "mid": null,
+        "back": null
+      }
+    },
+    {
+      "number": 2,
+      "par": null,
+      "strokeIndex": null,
+      "tee": {
+        "lat": -25.787303798935753,
+        "lng": 28.217517438778312
+      },
+      "green": {
+        "center": {
+          "lat": -25.786761483814455,
+          "lng": 28.21275421707161
+        },
+        "front": {
+          "lat": -25.78677115557737,
+          "lng": 28.212877631642776
+        },
+        "mid": {
+          "lat": -25.786761483814455,
+          "lng": 28.21275421707161
+        },
+        "back": {
+          "lat": -25.78672763263802,
+          "lng": 28.212620070798565
+        }
+      },
+      "elevation": {
+        "front": null,
+        "mid": null,
+        "back": null
+      }
+    },
+    {
+      "number": 3,
+      "par": null,
+      "strokeIndex": null,
+      "tee": {
+        "lat": -25.786942813110606,
+        "lng": 28.21227561053613
+      },
+      "green": {
+        "center": {
+          "lat": -25.789440779748155,
+          "lng": 28.215397725290693
+        },
+        "front": {
+          "lat": -25.789346482148904,
+          "lng": 28.21533065215417
+        },
+        "mid": {
+          "lat": -25.789440779748155,
+          "lng": 28.215397725290693
+        },
+        "back": {
+          "lat": -25.789513316311947,
+          "lng": 28.215459432576296
+        }
+      },
+      "elevation": {
+        "front": null,
+        "mid": null,
+        "back": null
+      }
+    }
+  ]
+}
