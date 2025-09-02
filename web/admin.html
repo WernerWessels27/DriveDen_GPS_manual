@@ -1,411 +1,468 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>DriveDen – Course Admin (3×3 Elevation + Nudge)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<style>
-  :root{ --brand:#14532d; --panel:#ffffffee; --muted:#6b7280; --accent:#15803d; }
-  html, body, #map { height:100%; margin:0; }
-  .hud{ position:fixed; top:10px; left:10px; z-index:9999; background:var(--panel); padding:10px 12px; border-radius:10px; box-shadow:0 6px 16px rgba(0,0,0,.15); font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; width:360px; max-width:calc(100% - 20px);}
-  .hud h3{ margin:0 0 8px; }
-  .row{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin:6px 0; }
-  .row-3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin:6px 0; }
-  .row-full{ display:block; margin:8px 0; }
-  input, select, button{ padding:8px; font-size:14px; }
-  button.primary{ background:var(--accent); color:#fff; border:0; border-radius:8px; cursor:pointer; }
-  button{ border:1px solid #e5e7eb; border-radius:8px; background:#f9fafb; cursor:pointer; }
-  .muted{ color:var(--muted); font-size:12px; }
-  .status{ margin-top:6px; font-size:12px; }
-  .section{ margin-top:10px; padding-top:8px; border-top:1px dashed #e5e7eb; }
-  .nudgeRow{ display:grid; grid-template-columns: 1fr auto; align-items:center; gap:8px; }
-  .nudges{ display:grid; grid-template-columns: repeat(3,36px); grid-template-rows: repeat(2,36px); gap:6px; align-items:center; justify-items:center; }
-  .nudges .spacer{ visibility:hidden; }
-  .chip{ display:inline-block; padding:2px 8px; border-radius:999px; background:#eef7f0; color:#14532d; font-weight:700; font-size:12px; }
-  .fab-left{ position:fixed; left:12px; bottom:12px; z-index:10001; width:52px; height:52px; border-radius:50%; border:0; font-size:22px; background:#14532d; color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.2); cursor:pointer; display:none; }
-  .tiny{ font-size:12px; color:#374151; }
-  code.small{ font-size:11px; }
-</style>
+  <meta charset="utf-8" />
+  <title>DriveDen • Course Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <style>
+    :root{
+      --brand:#14532d; --brand2:#166534; --accent:#15803d;
+      --panel:#ffffffee; --text:#111827; --muted:#6b7280;
+    }
+    html, body { height:100%; margin:0; }
+    #map { height:100%; }
+
+    .hud {
+      position: fixed; top: 10px; left: 10px; z-index: 10000;
+      background: var(--panel); padding: 10px 12px; border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      width: min(380px, calc(100% - 20px));
+      max-height: 86vh; overflow:auto;
+    }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin: 6px 0; }
+    .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin:6px 0; }
+    .row4 { display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; margin:6px 0; }
+    label { font-size:12px; color:var(--muted); }
+    input[type="text"], input[type="number"], select, button {
+      width:100%; padding:8px; border-radius:8px; border:1px solid #e5e7eb; font-size:14px;
+    }
+    button.primary { background: var(--accent); color:#fff; border:0; }
+    button.warn { background:#b91c1c; color:#fff; border:0; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#e6f6ea; color:#14532d; font-weight:700; }
+    .muted { color: var(--muted); font-size:12px; }
+    .sep { height:1px; background:#e5e7eb; margin:10px 0; }
+
+    .stat { display:flex; justify-content:space-between; font-size:13px; margin:4px 0; }
+    .stat strong { font-variant-numeric: tabular-nums; }
+
+    .footer {
+      position: fixed; bottom:10px; left:10px; z-index:10000;
+      background: var(--panel); padding:8px 10px; border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0,0,0,.15);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display:flex; gap:8px; align-items:center;
+    }
+
+    .nudge { display:grid; grid-template-columns:repeat(3,34px); gap:6px; justify-content:start; }
+    .nudge button { height:34px; border-radius:8px; border:1px solid #d1d5db; background:#fff; }
+    .caps { text-transform: uppercase; font-size:11px; letter-spacing:.04em; color:var(--muted); }
+
+    .legend { font-size:12px; color:#374151; background:#fff; padding:4px 6px; border-radius:6px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  </style>
 </head>
 <body>
-<div id="map"></div>
+  <div id="map"></div>
 
-<div class="hud">
-  <h3>Course Admin</h3>
-
-  <div class="row">
-    <input id="courseName" placeholder="Course name (e.g., Waterkloof Golf Club)" />
-    <input id="courseId" placeholder="course-id (e.g., waterkloof-golf-club)" />
-  </div>
-
-  <div class="row">
-    <select id="holeSelect"></select>
-    <input id="par" type="number" placeholder="Par" />
-  </div>
-  <div class="row">
-    <input id="stroke" type="number" placeholder="Stroke index" />
-    <button id="saveHole" class="primary">Save/Update Hole</button>
-  </div>
-
-  <div class="section">
-    <div class="row-3">
-      <button id="setFront">Set Front (GPS)</button>
-      <button id="setMid">Set Mid (GPS)</button>
-      <button id="setBack">Set Back (GPS)</button>
-    </div>
+  <div class="hud">
     <div class="row">
-      <select id="placeMode">
-        <option value="">Click-to-place: Off</option>
-        <option value="front">Click to place: Front</option>
-        <option value="mid">Click to place: Mid</option>
-        <option value="back">Click to place: Back</option>
-      </select>
-      <button id="clearPoint">Clear F/M/B for hole</button>
-    </div>
-    <div class="muted">Tip: Select a click-to-place mode and click imagery to drop Front/Mid/Back. Elevation bakes automatically (3×3 median).</div>
-  </div>
-
-  <!-- NUDGE CONTROLS -->
-  <div class="section">
-    <div class="nudgeRow">
-      <div><strong>Front</strong> <span id="frontMeta" class="tiny"></span></div>
-      <div class="nudges">
-        <button data-nudge="front:0:-1">↑</button>
-        <span class="spacer"></span>
-        <button data-nudge="front:0:1">↓</button>
-        <button data-nudge="front:-1:0">←</button>
-        <span class="chip">1 m</span>
-        <button data-nudge="front:1:0">→</button>
+      <div>
+        <label>Course name</label>
+        <input id="courseName" type="text" placeholder="e.g. Waterkloof Golf Club">
+      </div>
+      <div>
+        <label>Course ID (file name)</label>
+        <input id="courseId" type="text" placeholder="waterkloof-golf-club">
       </div>
     </div>
-    <div class="nudgeRow">
-      <div><strong>Mid</strong> <span id="midMeta" class="tiny"></span></div>
-      <div class="nudges">
-        <button data-nudge="mid:0:-1">↑</button>
-        <span class="spacer"></span>
-        <button data-nudge="mid:0:1">↓</button>
-        <button data-nudge="mid:-1:0">←</button>
-        <span class="chip">1 m</span>
-        <button data-nudge="mid:1:0">→</button>
+
+    <div class="row">
+      <div>
+        <label>Hole</label>
+        <select id="holeSelect"></select>
+      </div>
+      <div>
+        <label>Par • Stroke</label>
+        <div class="row" style="grid-template-columns:1fr 1fr; margin:0;">
+          <input id="par" type="number" min="3" max="6" placeholder="Par">
+          <input id="stroke" type="number" min="1" max="18" placeholder="SI">
+        </div>
       </div>
     </div>
-    <div class="nudgeRow">
-      <div><strong>Back</strong> <span id="backMeta" class="tiny"></span></div>
-      <div class="nudges">
-        <button data-nudge="back:0:-1">↑</button>
-        <span class="spacer"></span>
-        <button data-nudge="back:0:1">↓</button>
-        <button data-nudge="back:-1:0">←</button>
-        <span class="chip">1 m</span>
-        <button data-nudge="back:1:0">→</button>
+
+    <div class="row3">
+      <button id="btnSetTee" class="primary">Set Tee</button>
+      <button id="btnSetFront">Set Front</button>
+      <button id="btnSetMid">Set Mid</button>
+    </div>
+    <div class="row3">
+      <button id="btnSetBack">Set Back</button>
+      <button id="btnClearHole" class="warn">Clear Hole</button>
+      <button id="btnDeleteHole" class="warn">Delete Hole</button>
+    </div>
+
+    <div class="row" style="align-items:center;">
+      <div>
+        <label class="caps">Selected point</label>
+        <div id="activePoint" class="pill">None</div>
+      </div>
+      <div>
+        <label class="caps">Nudge (±0.5 m)</label>
+        <div class="nudge">
+          <button data-dy="0.5">▲</button>
+          <button data-dx="0" data-dy="0" id="btnSnapGPS" title="Snap to current GPS">◎</button>
+          <button data-dy="-0.5">▼</button>
+          <button data-dx="-0.5">◀</button>
+          <div></div>
+          <button data-dx="0.5">▶</button>
+        </div>
       </div>
     </div>
-    <div class="muted">Nudges move a point by 1 m (N/S/E/W) and re-bake its elevation. Hold to repeat on mobile.</div>
+
+    <div class="sep"></div>
+
+    <div class="row3">
+      <button id="btnPrevHole">◀ Prev</button>
+      <button id="btnSaveHole" class="primary">Save Hole</button>
+      <button id="btnNextHole">Next ▶</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="row3">
+      <button id="btnNewCourse">New Course</button>
+      <button id="btnImport">Import JSON</button>
+      <button id="btnExport" class="primary">Export JSON</button>
+    </div>
+    <input id="fileInput" type="file" accept="application/json" style="display:none" />
+
+    <div class="sep"></div>
+
+    <div class="stat"><span>GPS</span><strong id="gpsStat">–</strong></div>
+    <div class="stat"><span>→ Tee</span><strong id="dTee">–</strong></div>
+    <div class="stat"><span>→ Front</span><strong id="dFront">–</strong></div>
+    <div class="stat"><span>→ Mid</span><strong id="dMid">–</strong></div>
+    <div class="stat"><span>→ Back</span><strong id="dBack">–</strong></div>
+    <div class="muted">Tip: tap the map to set whichever point is “active”. Use the nudge arrows to fine-tune.</div>
   </div>
 
-  <div class="section">
-    <div class="row">
-      <button id="recomputeElev" title="Re-sample 3×3 and re-bake all holes' elevations">Recompute Elevations</button>
-      <button id="clearCourse">Clear ALL holes</button>
-    </div>
-    <div class="row">
-      <button id="prevHole">◀ Prev Hole</button>
-      <button id="nextHole">Next Hole ▶</button>
-    </div>
-    <div class="row">
-      <button id="exportJson" class="primary">Export JSON</button>
-      <button id="importJson">Import JSON</button>
-    </div>
+  <div class="footer">
+    <span class="legend">● Tee</span>
+    <span class="legend" style="color:#059669">● Front</span>
+    <span class="legend" style="color:#b45309">● Mid</span>
+    <span class="legend" style="color:#b91c1c">● Back</span>
+    <span class="legend">— — Tee → Back preview</span>
   </div>
 
-  <div class="status" id="status">Ready</div>
-</div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+  <script>
+  // ---------- Map & helpers ----------
+  const map = L.map('map', {zoomControl:true});
+  const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'&copy; Esri, Maxar'});
+  esri.addTo(map);
+  map.setView([-25.7542, 28.2322], 16);
 
-<button id="recenterBtn" class="fab-left" title="Recenter">＋</button>
+  function meters(a,b){
+    const R=6371000, toRad=d=>d*Math.PI/180;
+    const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+    const s1=Math.sin(dLat/2), s2=Math.sin(dLng/2);
+    const q=s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
+    return 2*R*Math.asin(Math.sqrt(q));
+  }
+  function fmtm(v){ return (v==null||Number.isNaN(v))?'–':`${Math.round(v)} m`; }
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
-<script>
-  // ==== Map & layers ====
-  const esriImagery = L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {maxZoom:19, attribution:'© Esri, Maxar'}
-  );
-  const map = L.map('map',{layers:[esriImagery]});
-  map.setView([-25.7542,28.2322], 16);
+  // ---------- State ----------
+  let course = { name:'', id:'', holes:[] };
+  let currentIndex = 0;
+  let activeKey = null; // 'tee' | 'front' | 'mid' | 'back'
+  let lastPos = null;
 
-  // Cart icon (same as player app)
-  const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
-  const cartIcon = L.icon({ iconUrl:`data:image/svg+xml;utf8,${cartSvg}`, iconSize:[28,22], iconAnchor:[14,11] });
-  const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
+  // ---------- UI refs ----------
+  const courseName = document.getElementById('courseName');
+  const courseId   = document.getElementById('courseId');
+  const holeSel    = document.getElementById('holeSelect');
+  const parInp     = document.getElementById('par');
+  const strokeInp  = document.getElementById('stroke');
+  const gpsStat    = document.getElementById('gpsStat');
+  const dTee       = document.getElementById('dTee');
+  const dFront     = document.getElementById('dFront');
+  const dMid       = document.getElementById('dMid');
+  const dBack      = document.getElementById('dBack');
+  const activePoint= document.getElementById('activePoint');
 
-  let follow=true, movedOnce=false, lastPos=null;
-  map.on('dragstart',()=>{follow=false; document.getElementById('recenterBtn').style.display='block';});
-  map.on('zoomstart',()=>{follow=false; document.getElementById('recenterBtn').style.display='block';});
-  document.getElementById('recenterBtn').onclick=()=>{ if(!lastPos) return; follow=true; map.setView([lastPos.lat,lastPos.lng], map.getZoom()||17); document.getElementById('recenterBtn').style.display='none'; };
-
-  if('geolocation' in navigator){
-    navigator.geolocation.watchPosition(pos=>{
-      const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      lastPos=p; you.setLatLng([p.lat,p.lng]);
-      if(follow){ map.setView([p.lat,p.lng], map.getZoom()||17); document.getElementById('recenterBtn').style.display='none'; }
-      if(!movedOnce){ map.setView([p.lat,p.lng],17); movedOnce=true; }
-      setStatus(`GPS: ±${Math.round(pos.coords.accuracy||0)} m`);
-    },err=>setStatus(err.message),{enableHighAccuracy:true, maximumAge:1000, timeout:10000});
-  } else setStatus('Geolocation not supported');
-
-  // ==== Course data model ====
-  const statusEl=document.getElementById('status');
-  function setStatus(txt){ statusEl.textContent=txt; }
-
-  const course = {
-    id:'', name:'',
-    holes: Array.from({length:18}, (_,i)=>({
-      number:i+1, par:null, strokeIndex:null,
-      green:{ front:null, mid:null, back:null },
-      elevation:{ front:null, mid:null, back:null }
-    }))
+  // ---------- Markers & preview ----------
+  function mstyle(color){ return {radius:7, weight:2, color:color, fillColor:color, opacity:1, fillOpacity:.9}; }
+  const mk = {
+    tee:  null,
+    front:null,
+    mid:  null,
+    back: null
   };
+  let previewLine = null;
 
-  const holeSel = document.getElementById('holeSelect');
-  for(let i=1;i<=18;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent='Hole '+i; holeSel.appendChild(o); }
-  const parEl=document.getElementById('par');
-  const strokeEl=document.getElementById('stroke');
-  const placeModeSel=document.getElementById('placeMode');
-
-  function syncHeader(){
-    document.getElementById('courseId').value=course.id||'';
-    document.getElementById('courseName').value=course.name||'';
-  }
-  function loadHoleUI(idx){
-    const h=course.holes[idx];
-    holeSel.value=String(h.number);
-    parEl.value=h.par??'';
-    strokeEl.value=h.strokeIndex??'';
-    renderMarkers(h);
-    updateMetaLabels();
-  }
-
-  // ==== Markers ====
-  const markers={};
-  function mstyle(n){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[n]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:.9,color:p[0],fillColor:p[1]}; }
-  function setMarker(name, pos, label){
+  function setMarker(which, pos){
     if(!pos) return;
-    if(markers[name]){ markers[name].setLatLng([pos.lat,pos.lng]); return; }
-    markers[name]=L.circleMarker([pos.lat,pos.lng], mstyle(name)).addTo(map).bindTooltip(label||name);
+    const colorMap = { tee:'#111827', front:'#059669', mid:'#b45309', back:'#b91c1c' };
+    if(mk[which]) mk[which].setLatLng([pos.lat,pos.lng]);
+    else mk[which] = L.circleMarker([pos.lat,pos.lng], mstyle(colorMap[which])).addTo(map).bindTooltip(which.toUpperCase());
   }
-  function clearMarkers(){ ['front','mid','back'].forEach(k=>{ if(markers[k]){ map.removeLayer(markers[k]); delete markers[k]; } }); }
-  function renderMarkers(h){
+  function clearMarkers(){
+    Object.keys(mk).forEach(k=>{ if(mk[k]){ map.removeLayer(mk[k]); mk[k]=null; }});
+    if(previewLine){ map.removeLayer(previewLine); previewLine=null; }
+  }
+  function renderPreview(){
+    if(previewLine){ map.removeLayer(previewLine); previewLine=null; }
+    const h = course.holes[currentIndex]; if(!h) return;
+    if(h.tee && (h.green?.back || h.green?.mid || h.green?.center)){
+      const g = h.green.back || h.green.mid || h.green.center;
+      previewLine = L.polyline([[h.tee.lat,h.tee.lng],[g.lat,g.lng]], {weight:3, dashArray:'6,8', color:'#111827', opacity:.8}).addTo(map);
+      // Fit view gently when tee/back are first set
+      // (only if we just added tee or back and no prior fit)
+    }
+  }
+
+  // ---------- Hole management ----------
+  function ensureHole(idx){
+    while(course.holes.length <= idx) course.holes.push({ number:course.holes.length+1, par:null, strokeIndex:null, tee:null, green:{front:null, mid:null, back:null, center:null}, elevation:{front:null, mid:null, back:null} });
+  }
+  function refreshHoleSelect(){
+    holeSel.innerHTML='';
+    course.holes.forEach(h=>{
+      const o=document.createElement('option');
+      o.value=h.number; o.textContent=`Hole ${h.number}`;
+      holeSel.appendChild(o);
+    });
+    holeSel.value = String(course.holes[currentIndex]?.number || 1);
+  }
+  function loadHoleToUI(){
+    const h = course.holes[currentIndex]; if(!h) return;
+    parInp.value = h.par ?? '';
+    strokeInp.value = h.strokeIndex ?? '';
     clearMarkers();
-    if(h.green.front) setMarker('front',h.green.front,'Front');
-    if(h.green.mid)   setMarker('mid',  h.green.mid,  'Mid');
-    if(h.green.back)  setMarker('back', h.green.back, 'Back');
-    fitIfAny(h);
-  }
-  function fitIfAny(h){
-    const pts=[h.green.front,h.green.mid,h.green.back].filter(Boolean);
-    if(pts.length){ map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng]))); }
-  }
-
-  let currentIdx=0;
-  syncHeader(); loadHoleUI(currentIdx);
-
-  document.getElementById('prevHole').onclick=()=>{ currentIdx=(currentIdx+17)%18; loadHoleUI(currentIdx); };
-  document.getElementById('nextHole').onclick=()=>{ currentIdx=(currentIdx+1)%18;  loadHoleUI(currentIdx); };
-
-  document.getElementById('courseId').addEventListener('input',e=>course.id=(e.target.value||'').trim());
-  document.getElementById('courseName').addEventListener('input',e=>course.name=(e.target.value||'').trim());
-
-  document.getElementById('saveHole').onclick=()=>{
-    const h=course.holes[currentIdx];
-    h.par = parEl.value?Number(parEl.value):null;
-    h.strokeIndex = strokeEl.value?Number(strokeEl.value):null;
-    setStatus(`Saved Hole ${h.number}`);
-  };
-  document.getElementById('clearPoint').onclick=()=>{
-    const h=course.holes[currentIdx];
-    h.green={front:null,mid:null,back:null};
-    h.elevation={front:null,mid:null,back:null};
-    renderMarkers(h);
-    setStatus(`Cleared F/M/B for Hole ${h.number}`);
-  };
-  document.getElementById('clearCourse').onclick=()=>{
-    if(!confirm('Clear ALL holes?')) return;
-    course.holes = Array.from({length:18}, (_,i)=>({
-      number:i+1, par:null, strokeIndex:null,
-      green:{ front:null, mid:null, back:null },
-      elevation:{ front:null, mid:null, back:null }
-    }));
-    loadHoleUI(currentIdx);
-    setStatus('Cleared course');
-  };
-
-  // ==== Elevation sampling via /elevation proxy (3×3 median) ====
-  async function elevAt(lat,lng){
-    try{
-      const r=await fetch(`/elevation?lat=${lat}&lng=${lng}`);
-      if(r.ok){ const j=await r.json(); const v=j?.results?.[0]?.elevation; if(typeof v==='number') return v; }
-    }catch{}
-    return null;
-  }
-  function offsetMeters(lat,lng,dx,dy){
-    // approximate: dx east-west (m), dy north-south (m)
-    const dLat = dy / 111320; // m per deg latitude
-    const dLng = dx / (111320 * Math.cos(lat * Math.PI/180));
-    return { lat: lat + dLat, lng: lng + dLng };
-  }
-  async function sampleMedian(lat,lng){
-    // 3x3 grid around point, spacing 10 m
-    const spacing=10;
-    const pts=[];
-    for(const oy of [-spacing,0,spacing]){
-      for(const ox of [-spacing,0,spacing]){
-        pts.push(offsetMeters(lat,lng,ox,oy));
-      }
+    if(h.tee) setMarker('tee', h.tee);
+    if(h.green?.front) setMarker('front', h.green.front);
+    if(h.green?.mid)   setMarker('mid',   h.green.mid);
+    if(h.green?.back)  setMarker('back',  h.green.back);
+    renderPreview();
+    // Fit view to visible points
+    const pts = [h.tee, h.green?.front, h.green?.mid, h.green?.back].filter(Boolean);
+    if(pts.length){
+      const b = L.latLngBounds(pts.map(p=>[p.lat,p.lng]));
+      map.fitBounds(b.pad(0.25));
     }
-    const vals=[];
-    for(const p of pts){
-      const v=await elevAt(p.lat,p.lng);
-      if(typeof v==='number') vals.push(v);
+    updateDistances();
+  }
+  function saveUItoHole(){
+    const h = course.holes[currentIndex]; if(!h) return;
+    h.par = parInp.value ? Number(parInp.value) : null;
+    h.strokeIndex = strokeInp.value ? Number(strokeInp.value) : null;
+  }
+
+  // ---------- Active point selection ----------
+  function setActive(which){
+    activeKey = which;
+    activePoint.textContent = which ? which.toUpperCase() : 'None';
+  }
+
+  // ---------- Map click to set active point ----------
+  map.on('click', e=>{
+    if(!activeKey) return;
+    const p = {lat:e.latlng.lat, lng:e.latlng.lng};
+    const h = course.holes[currentIndex]; if(!h) return;
+    if(activeKey==='tee'){
+      h.tee = p; setMarker('tee', p);
+    } else {
+      if(!h.green) h.green={};
+      h.green[activeKey] = p; setMarker(activeKey, p);
+      if(activeKey==='mid' && !h.green.center) h.green.center = p; // convenience
     }
-    if(!vals.length) return null;
-    vals.sort((a,b)=>a-b);
-    const mid = Math.floor(vals.length/2);
-    return (vals.length%2)? vals[mid] : Math.round((vals[mid-1]+vals[mid])/2);
-  }
-
-  // ==== Set point helpers (GPS or click) ====
-  async function setPoint(which, posOpt){
-    const h=course.holes[currentIdx];
-    let pos = posOpt || lastPos;
-    if(!pos){ setStatus('No position (GPS or click)'); return; }
-
-    // Save point + marker
-    h.green[which] = {lat:pos.lat, lng:pos.lng};
-    renderMarkers(h);
-    updateMetaLabels();
-    setStatus(`Saved ${which} @ ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}. Sampling elevation…`);
-
-    // Bake elevation (median 3x3)
-    const z = await sampleMedian(pos.lat, pos.lng);
-    h.elevation[which] = (typeof z==='number')? z : null;
-    updateMetaLabels();
-    setStatus(`Saved ${which} elevation: ${z!=null?z+' m':'–'}`);
-  }
-
-  // Buttons: set from GPS
-  document.getElementById('setFront').onclick=()=>setPoint('front');
-  document.getElementById('setMid').onclick=()=>setPoint('mid');
-  document.getElementById('setBack').onclick=()=>setPoint('back');
-
-  // Click-to-place mode
-  let placeMode = '';
-  placeModeSel.addEventListener('change', ()=>{ placeMode = placeModeSel.value; });
-  map.on('click', (e)=>{
-    if(!placeMode) return;
-    setPoint(placeMode, {lat:e.latlng.lat, lng:e.latlng.lng});
+    renderPreview();
+    updateDistances();
   });
 
-  // Nudge controls (1 m)
-  document.querySelectorAll('[data-nudge]').forEach(btn=>{
-    btn.addEventListener('click', async (ev)=>{
-      const [which, dxmStr, dymStr] = ev.currentTarget.getAttribute('data-nudge').split(':');
-      const dxm = Number(dxmStr), dym = Number(dymStr);
-      const h=course.holes[currentIdx];
-      const p=h.green[which];
-      if(!p){ setStatus(`No ${which} point set yet`); return; }
-      const moved = offsetMeters(p.lat, p.lng, dxm, dym);
-      h.green[which] = moved;
-      renderMarkers(h);
-      updateMetaLabels();
-      setStatus(`Nudged ${which} by (${dxm}m, ${dym}m). Re-baking elevation…`);
-      const z = await sampleMedian(moved.lat, moved.lng);
-      h.elevation[which] = (typeof z==='number')? z : null;
-      updateMetaLabels();
-      setStatus(`Saved ${which} elevation: ${z!=null?z+' m':'–'}`);
+  // ---------- Nudge (approx 0.5 m) ----------
+  function metersToDegLat(m){ return m / 111320; }
+  function metersToDegLng(m, atLat){ return m / (111320 * Math.cos(atLat * Math.PI/180)); }
+
+  document.querySelectorAll('.nudge button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!activeKey) return;
+      const h = course.holes[currentIndex]; if(!h) return;
+      const target = activeKey==='tee' ? h.tee : h.green?.[activeKey];
+      if(!target) return;
+      const dy = Number(btn.dataset.dy||0);
+      const dx = Number(btn.dataset.dx||0);
+      if(btn.id === 'btnSnapGPS' && lastPos){
+        target.lat = lastPos.lat; target.lng = lastPos.lng;
+      } else if(dx||dy){
+        target.lat += metersToDegLat(dy);
+        target.lng += metersToDegLng(dx, target.lat);
+      }
+      if(activeKey==='tee') setMarker('tee', target);
+      else setMarker(activeKey, target);
+      renderPreview();
+      updateDistances();
     });
   });
 
-  // Re-bake everything
-  document.getElementById('recomputeElev').onclick=async()=>{
-    setStatus('Recomputing elevations for all holes…');
-    for(const h of course.holes){
-      for(const key of ['front','mid','back']){
-        const p=h.green[key];
-        if(!p) continue;
-        const z=await sampleMedian(p.lat,p.lng);
-        h.elevation[key]=(typeof z==='number')?z:null;
-        updateMetaLabels();
-      }
-    }
-    setStatus('Re-bake complete ✔');
+  // ---------- Buttons ----------
+  document.getElementById('btnSetTee').onclick  = ()=>setActive('tee');
+  document.getElementById('btnSetFront').onclick= ()=>setActive('front');
+  document.getElementById('btnSetMid').onclick  = ()=>setActive('mid');
+  document.getElementById('btnSetBack').onclick = ()=>setActive('back');
+
+  document.getElementById('btnSaveHole').onclick= ()=>{
+    saveUItoHole();
+    persistLocalDraft();
+  };
+  document.getElementById('btnPrevHole').onclick= ()=>{
+    if(currentIndex>0){ currentIndex--; refreshHoleSelect(); loadHoleToUI(); }
+  };
+  document.getElementById('btnNextHole').onclick= ()=>{
+    currentIndex = Math.min(currentIndex+1, course.holes.length); // allow step into new
+    ensureHole(currentIndex);
+    refreshHoleSelect(); loadHoleToUI();
+  };
+  holeSel.onchange = ()=>{
+    const n = Number(holeSel.value);
+    const idx = course.holes.findIndex(h=>h.number===n);
+    if(idx>=0){ currentIndex = idx; loadHoleToUI(); }
   };
 
-  // Meta labels under nudge titles
-  function fmtLatLng(p){ return p? `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}` : '–'; }
-  function fmtElev(v){ return (typeof v==='number')? `${Math.round(v)} m` : '–'; }
-  function updateMetaLabels(){
-    const h=course.holes[currentIdx];
-    document.getElementById('frontMeta').textContent = `(${fmtLatLng(h.green.front)}) • elev ${fmtElev(h.elevation.front)}`;
-    document.getElementById('midMeta').textContent   = `(${fmtLatLng(h.green.mid)}) • elev ${fmtElev(h.elevation.mid)}`;
-    document.getElementById('backMeta').textContent  = `(${fmtLatLng(h.green.back)}) • elev ${fmtElev(h.elevation.back)}`;
-  }
+  document.getElementById('btnClearHole').onclick= ()=>{
+    const h = course.holes[currentIndex]; if(!h) return;
+    h.tee=null; h.green={front:null,mid:null,back:null,center:null};
+    clearMarkers(); renderPreview(); updateDistances();
+  };
+  document.getElementById('btnDeleteHole').onclick= ()=>{
+    if(!confirm('Delete this hole?')) return;
+    course.holes.splice(currentIndex,1);
+    // re-number
+    course.holes.forEach((h,i)=>h.number=i+1);
+    currentIndex=Math.max(0,currentIndex-1);
+    refreshHoleSelect(); loadHoleToUI(); persistLocalDraft();
+  };
 
-  // ==== Export / Import ====
-  document.getElementById('exportJson').onclick=()=>{
-    const data = {
-      name: course.name || '',
-      id: course.id || '',
+  document.getElementById('btnNewCourse').onclick= ()=>{
+    if(!confirm('Start a new blank course?')) return;
+    course = { name:'', id:'', holes:[] };
+    currentIndex = 0;
+    ensureHole(0);
+    courseName.value=''; courseId.value='';
+    refreshHoleSelect(); loadHoleToUI(); persistLocalDraft();
+  };
+
+  document.getElementById('btnExport').onclick= ()=>{
+    saveUItoHole();
+    course.name = courseName.value.trim() || course.name || 'Unnamed Course';
+    course.id   = (courseId.value.trim() || course.id || 'course').toLowerCase();
+    // Build export shape (backwards compatible)
+    const exportObj = {
+      name: course.name,
+      id: course.id,
       holes: course.holes.map(h=>({
-        number:h.number,
-        par:h.par,
-        strokeIndex:h.strokeIndex,
-        green:h.green,
-        elevation:h.elevation
+        number: h.number,
+        par: h.par,
+        strokeIndex: h.strokeIndex,
+        tee: h.tee || null,
+        green: {
+          center: h.green?.center || h.green?.mid || null,
+          front:  h.green?.front  || null,
+          mid:    h.green?.mid    || null,
+          back:   h.green?.back   || null
+        },
+        elevation: {
+          front: h.elevation?.front ?? null,
+          mid:   h.elevation?.mid   ?? null,
+          back:  h.elevation?.back  ?? null
+        }
       }))
     };
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download=(course.id || 'course') + '.json';
+    const blob = new Blob([JSON.stringify(exportObj,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${exportObj.id}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
 
-  document.getElementById('importJson').onclick=()=>{
-    const inp=document.createElement('input');
-    inp.type='file'; inp.accept='application/json';
-    inp.onchange=async ()=>{
-      const f=inp.files[0]; if(!f) return;
-      const txt=await f.text(); const js=JSON.parse(txt);
-      course.id = js.id || course.id;
-      course.name = js.name || course.name;
-      if(Array.isArray(js.holes)){
-        for(const h of js.holes){
-          const idx=(h.number? (h.number-1): null);
-          if(idx==null || idx<0 || idx>17) continue;
-          course.holes[idx] = {
-            number: h.number,
-            par: h.par ?? null,
-            strokeIndex: h.strokeIndex ?? h.stroke ?? null,
-            green: {
-              front: h.green?.front ?? null,
-              mid:   h.green?.mid   ?? h.green?.center ?? null,
-              back:  h.green?.back  ?? null
-            },
-            elevation: {
-              front: h.elevation?.front ?? null,
-              mid:   h.elevation?.mid   ?? null,
-              back:  h.elevation?.back  ?? null
-            }
-          };
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('btnImport').onclick= ()=> fileInput.click();
+  fileInput.onchange = async (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    const txt = await f.text();
+    try{
+      const obj = JSON.parse(txt);
+      // Accept both root {course} and flattened
+      const root = obj.course || obj;
+      const holes = (root.holes||[]).map(h=>({
+        number: (h.number??h.hole??h.holeNumber??null)*1,
+        par:    (h.par!=null)?Number(h.par):null,
+        strokeIndex: (h.strokeIndex??h.stroke??h.si??null)*1 || null,
+        tee:    h.tee || null,
+        green: {
+          center: h.green?.center || h.green?.mid || null,
+          front:  h.green?.front  || null,
+          mid:    h.green?.mid    || null,
+          back:   h.green?.back   || null
+        },
+        elevation: {
+          front: h.elevation?.front ?? null,
+          mid:   h.elevation?.mid   ?? null,
+          back:  h.elevation?.back  ?? null
         }
-      }
-      syncHeader(); loadHoleUI(currentIdx);
-      setStatus('Imported course JSON ✔');
-    };
-    inp.click();
+      })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
+
+      course = { name: root.name||'', id: root.id||'', holes };
+      currentIndex = 0;
+      courseName.value = course.name;
+      courseId.value   = course.id;
+      ensureHole(0);
+      refreshHoleSelect(); loadHoleToUI(); persistLocalDraft();
+      alert('Imported OK');
+    }catch(err){
+      alert('Import failed: '+err.message);
+    }
   };
-</script>
+
+  // ---------- GPS & distances ----------
+  let movedOnce=false;
+  if('geolocation' in navigator){
+    navigator.geolocation.watchPosition(p=>{
+      lastPos = {lat:p.coords.latitude, lng:p.coords.longitude};
+      gpsStat.textContent = `Acc: ${Math.round(p.coords.accuracy||0)} m`;
+      if(!movedOnce){ map.setView([lastPos.lat,lastPos.lng], 17); movedOnce=true; }
+      updateDistances();
+    }, err=>{ gpsStat.textContent = err.message; }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
+  } else {
+    gpsStat.textContent = 'Geolocation not supported';
+  }
+
+  function updateDistances(){
+    const h = course.holes[currentIndex]; if(!h || !lastPos){ dTee.textContent=dFront.textContent=dMid.textContent=dBack.textContent='–'; return; }
+    dTee.textContent   = fmtm(h.tee   ? meters(lastPos, h.tee) : null);
+    dFront.textContent = fmtm(h.green?.front ? meters(lastPos, h.green.front) : null);
+    dMid.textContent   = fmtm(h.green?.mid   ? meters(lastPos, h.green.mid)   : (h.green?.center ? meters(lastPos,h.green.center):null));
+    dBack.textContent  = fmtm(h.green?.back  ? meters(lastPos, h.green.back)  : null);
+  }
+
+  // ---------- Local draft persistence ----------
+  function persistLocalDraft(){
+    try{
+      const draft = { course, currentIndex };
+      localStorage.setItem('dd_admin_draft', JSON.stringify(draft));
+    }catch{}
+  }
+  function loadLocalDraft(){
+    try{
+      const raw = localStorage.getItem('dd_admin_draft');
+      if(!raw) return false;
+      const draft = JSON.parse(raw);
+      if(!draft?.course?.holes) return false;
+      course = draft.course; currentIndex = draft.currentIndex||0;
+      courseName.value = course.name||''; courseId.value = course.id||'';
+      ensureHole(0); refreshHoleSelect(); loadHoleToUI();
+      return true;
+    }catch{ return false; }
+  }
+
+  // ---------- Init ----------
+  if(!loadLocalDraft()){
+    ensureHole(0);
+    refreshHoleSelect();
+    loadHoleToUI();
+  }
+  </script>
 </body>
 </html>
