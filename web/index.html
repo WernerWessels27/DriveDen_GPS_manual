@@ -13,25 +13,26 @@
       --brand:#14532d; --brand-2:#166534; --accent:#15803d;
       --panel:#ffffffee; --text:#111827; --muted:#6b7280;
       --chip:#e6f6ea; --chipText:#14532d;
+      --line:#e5e7eb; --soft:#f3f4f6;
     }
     html, body { height: 100%; margin: 0; overscroll-behavior: none; }
-    body { touch-action: pan-x pan-y; }
+    body { touch-action: pan-x pan-y; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
     #map { height: 100%; position: relative; }
 
-    /* Hide Leaflet attribution (tiny text bottom-right) */
+    /* Hide Leaflet attribution */
     .leaflet-control-attribution { display: none !important; }
 
     .brand { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; }
     .brand img { height: 34px; }
 
     .holeWrap{ position: fixed; z-index:10000; left:50%; transform:translateX(-50%); top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-    .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center; }
+    .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:10px; min-width: 180px; justify-content: center; }
     .holeNav button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; }
     .scoreBtn { border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; box-shadow: 0 6px 12px rgba(0,0,0,.15); }
 
-    /* Compact wind bubble */
-    .windBox{ position: fixed; top: 10px; right: 10px; z-index: 10000; background: var(--panel); padding: 6px 8px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; align-items:center; gap:8px; min-width: 140px; }
+    /* Compact wind bubble (as before) */
+    .windBox{ position: fixed; top: 10px; right: 10px; z-index: 10000; background: var(--panel); padding: 6px 8px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; min-width: 140px; }
     .windLeft { display:flex; align-items:center; gap:6px; }
     .windSock { width:22px; height:22px; }
     .windData { display:flex; flex-direction:column; line-height:1.05; }
@@ -39,7 +40,7 @@
     .windDirTxt { font-size:11px; color:var(--muted); }
     .windArrow { width:18px; height:18px; transform-origin:50% 50%; opacity:.85; }
 
-    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; width: 190px; }
+    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 190px; }
     .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
     .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { color:var(--muted); }
@@ -47,10 +48,10 @@
     .delta { font-size:12px; color:var(--muted); }
     .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
 
-    .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: var(--panel); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; display:flex; justify-content:center; gap:18px; font-size:14px; }
+    .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: var(--panel); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; justify-content:center; gap:18px; font-size:14px; }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--chipText); font-weight:700; }
 
-    .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
+    .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
     .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
     select, button, input { width: 100%; padding: 8px; font-size: 14px; }
@@ -67,13 +68,12 @@
     .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
     .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
 
-    /* ===== Scorecard v2 ===== */
+    /* ===== Scorecard v2 (traditional table) ===== */
     .scorecard{
       position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
       width: min(980px, calc(100% - 20px)); max-height: 70vh; overflow: auto;
       background: var(--panel); color: var(--text); border-radius: 12px;
       box-shadow: 0 14px 30px rgba(0,0,0,.25); padding: 12px; z-index: 10002; display: none;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
     .scorecard.show{ display: block; }
     .sc-header{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
@@ -83,21 +83,31 @@
     .sc-button.danger{ background:#b91c1c; }
     .sc-muted{ font-size:12px; color:var(--muted); }
 
-    .sc-setup{ background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin-bottom:10px; }
+    .sc-setup{ background:#f9fafb; border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
     .sc-row2{ display:grid; grid-template-columns: 1fr 130px; gap:8px; margin-bottom:6px; }
     .sc-row3{ display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; margin-bottom:6px; }
-    .sc-toggle{ display:flex; align-items:center; gap:8px; margin:8px 0; }
-    .sc-grid{ display:grid; grid-template-columns: 44px 48px 48px repeat(4, minmax(86px, 1fr)); gap:8px; align-items:center; }
-    .sc-head{ font-weight:700; background:#f3f4f6; border-radius:8px; padding:6px 8px; }
-    .sc-hole, .sc-par, .sc-si { text-align:center; }
-    .sc-cell{ display:flex; align-items:center; gap:6px; }
-    .sc-score{ width:64px; padding:6px 8px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
-    .sc-chip{ min-width:34px; text-align:center; border-radius:999px; padding:3px 8px; font-weight:700; font-size:12px; background:#e5e7eb; color:#111827; }
-    .sc-chip.under{ background:#dcfce7; color:#065f46; }
-    .sc-chip.over{  background:#fee2e2; color:#7f1d1d; }
-    .sc-chip.even{  background:#e5e7eb; color:#111827; }
-    .sc-points{ min-width:34px; text-align:center; border-radius:6px; padding:3px 6px; font-weight:700; font-size:12px; background:#eef2ff; color:#3730a3; }
-    .sc-totals{ margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px; }
+    .sc-toggle-line{ display:flex; align-items:center; justify-content:space-between; margin:8px 0; }
+    /* Toggle switch */
+    .switch{ position:relative; width:44px; height:24px; background:#d1d5db; border-radius:999px; cursor:pointer; }
+    .switch::after{ content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition: transform .2s ease; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .switch.on{ background:#16a34a; }
+    .switch.on::after{ transform: translateX(20px); }
+
+    .sc-table{ width:100%; border-collapse: separate; border-spacing:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+    .sc-table th, .sc-table td{ border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:6px 8px; text-align:center; vertical-align:middle; }
+    .sc-table th:first-child, .sc-table td:first-child{ text-align:left; white-space:nowrap; position:sticky; left:0; background:#fff; z-index:1; }
+    .sc-table thead th{ background:var(--soft); font-weight:700; }
+    .sc-hole-col{ min-width:52px; }
+    .sc-total-col{ min-width:62px; font-weight:700; background:#fafafa; }
+    .sc-cell{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .sc-score-input{ width:48px; padding:6px 6px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; text-align:center; }
+    .sc-points{ font-size:12px; font-weight:700; background:#eef2ff; color:#3730a3; border-radius:6px; padding:1px 6px; }
+    .chip{ display:inline-block; min-width:30px; border-radius:999px; padding:2px 6px; font-weight:700; font-size:12px; }
+    .chip.under{ background:#dcfce7; color:#065f46; }
+    .chip.over{  background:#fee2e2; color:#7f1d1d; }
+    .chip.even{  background:#e5e7eb; color:#111827; }
+
+    .sc-summary{ margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px; }
   </style>
 </head>
 <body>
@@ -183,7 +193,7 @@
 
   <button id="panelToggle" class="fab">☰</button>
 
-  <!-- ===== SCORECARD v2 ===== -->
+  <!-- ===== SCORECARD v2 (traditional) ===== -->
   <div id="scorecard" class="scorecard" aria-live="polite">
     <div class="sc-header">
       <div class="sc-title">Scorecard</div>
@@ -200,9 +210,9 @@
         <label><strong>Players</strong> (1–4)</label>
         <select id="scCount"><option>1</option><option>2</option><option>3</option><option>4</option></select>
       </div>
-      <div class="sc-toggle">
-        <input type="checkbox" id="scUseHcap" />
-        <label for="scUseHcap">Include handicaps</label>
+      <div class="sc-toggle-line">
+        <span>Include handicaps</span>
+        <div id="scHcapSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"></div>
       </div>
       <div class="sc-row3">
         <input id="p1" placeholder="Player 1" />
@@ -222,24 +232,16 @@
       <div class="sc-muted">Stableford points auto-calc per hole from par, stroke index and handicaps.</div>
     </div>
 
-    <!-- Grid head -->
-    <div class="sc-grid sc-head" id="scHead" style="display:none; margin-top:8px;">
-      <div class="sc-hole">H</div>
-      <div class="sc-par">Par</div>
-      <div class="sc-si">SI</div>
-      <div class="sc-hole" id="hP1">P1</div>
-      <div class="sc-hole" id="hP2">P2</div>
-      <div class="sc-hole" id="hP3">P3</div>
-      <div class="sc-hole" id="hP4">P4</div>
+    <!-- Traditional table -->
+    <div id="scTableWrap" style="display:none; overflow:auto;">
+      <table class="sc-table" id="scTable"></table>
+      <div class="sc-summary" id="scTotals">Totals…</div>
     </div>
-
-    <div id="scBody"></div>
-    <div class="sc-totals" id="scTotals" style="display:none;">Totals…</div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
-    // ------- Prevent pull-to-refresh bounce (extra guard for some browsers) -------
+    // ------- Prevent pull-to-refresh bounce -------
     let _touchStartY = 0;
     window.addEventListener('touchstart', (e)=>{ _touchStartY = e.touches[0].clientY; }, {passive:true});
     window.addEventListener('touchmove', (e)=>{
@@ -343,7 +345,7 @@
       if(center){ if(viewMode==='hole') holeFit(); else cartFit(); }
       if(lastPos) updateDistancesAndDeltas();
       refreshMeasureSecondSegment();
-      highlightCurrentRow(); // for scorecard
+      highlightCurrentRow(); // scorecard row focus
     }
 
     async function updateDistancesAndDeltas(){
@@ -522,84 +524,55 @@
       saveElevCache(courseId,cache); updateHoleUI(false);
     }
 
-    /* ===================== SCORECARD v2 ===================== */
+    /* ===================== SCORECARD v2 (traditional) ===================== */
     const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
-    const scHead=document.getElementById('scHead'), scBody=document.getElementById('scBody'), scTotals=document.getElementById('scTotals');
-    const scCount=document.getElementById('scCount'), scUseHcap=document.getElementById('scUseHcap');
+    const scSetup=document.getElementById('scSetup'), scTableWrap=document.getElementById('scTableWrap'), scTable=document.getElementById('scTable'), scTotals=document.getElementById('scTotals');
+    const scCount=document.getElementById('scCount'), scHcapSwitch=document.getElementById('scHcapSwitch');
     const nameEls=[document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
     const hcapEls=[document.getElementById('h1'),document.getElementById('h2'),document.getElementById('h3'),document.getElementById('h4')];
-    const headEls=[document.getElementById('hP1'),document.getElementById('hP2'),document.getElementById('hP3'),document.getElementById('hP4')];
     const hcapRow=document.getElementById('hcapRow');
     const scCreate=document.getElementById('scCreate'), scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear'), scEndRound=document.getElementById('scEndRound');
 
     let playerCount=1, scores=[], handicaps=[0,0,0,0], useHcap=false, courseIdForScores=null;
 
-    function showSetup(flag){ document.getElementById('scSetup').style.display = flag ? '' : 'none'; }
+    function setSwitch(on){
+      scHcapSwitch.classList.toggle('on', !!on);
+      scHcapSwitch.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+
+    function showSetup(flag){
+      scSetup.style.display = flag ? '' : 'none';
+      scTableWrap.style.display = flag ? 'none' : '';
+    }
     function applySetupVisibility(){
-      for(let i=0;i<4;i++){ nameEls[i].style.display=(i<playerCount)?'':'none'; hcapEls[i].style.display=(i<playerCount && useHcap)?'':'none'; headEls[i].style.display=(i<playerCount)?'':'none'; }
+      for(let i=0;i<4;i++){
+        nameEls[i].style.display=(i<playerCount)?'':'none';
+        hcapEls[i].style.display=(i<playerCount && useHcap)?'':'none';
+      }
       hcapRow.style.display = useHcap ? '' : 'none';
     }
 
     scoreToggle.onclick=()=>{ scorecard.classList.toggle('show'); highlightCurrentRow(); };
-
     scClose.onclick=()=>scorecard.classList.remove('show');
     scClear.onclick=()=>{ if(!confirm('Clear all entered scores?')) return; clearScoresOnly(); };
     scEndRound.onclick=()=>{ if(!confirm('End round? This clears players, handicaps and scores for this course.')) return; endRoundFull(); };
 
-    scCount.onchange=()=>{ playerCount=Number(scCount.value); applySetupVisibility(); persistMeta(); renderScores(); };
-    scUseHcap.onchange=()=>{ useHcap=scUseHcap.checked; applySetupVisibility(); persistMeta(); renderScores(); };
+    scCount.onchange=()=>{ playerCount=Number(scCount.value); applySetupVisibility(); persistMeta(); rebuildAndRender(); };
 
-    nameEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ headEls[idx].textContent=inp.value||`P${idx+1}`; persistMeta(); }); });
+    scHcapSwitch.addEventListener('click', ()=>{ useHcap=!useHcap; setSwitch(useHcap); applySetupVisibility(); persistMeta(); rebuildAndRender(); });
+    scHcapSwitch.addEventListener('keydown', (e)=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); scHcapSwitch.click(); } });
+
+    nameEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ persistMeta(); rebuildAndRender(false); }); });
     hcapEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ handicaps[idx]=Math.max(0, Math.min(54, Number(inp.value)||0)); persistMeta(); renderScores(); }); });
 
-    scCreate.onclick=()=>{ // finalize setup and show grid
-      showSetup(false);
-      scHead.style.display='grid';
-      scTotals.style.display='';
-      buildScoreGrid();
-      renderScores();
-      persistMeta();
-    };
+    scCreate.onclick=()=>{ showSetup(false); rebuildAndRender(true); };
 
     function buildScorecard(){
-      // set default visibility for setup row based on saved meta
       showSetup(true);
-      scHead.style.display='none';
-      scTotals.style.display='none';
+      setSwitch(useHcap);
       applySetupVisibility();
-      scBody.innerHTML=''; // grid will be built on "Create"
-    }
-
-    function buildScoreGrid(){
-      scBody.innerHTML='';
-      // Header labels
-      for(let i=0;i<4;i++){ headEls[i].textContent = (nameEls[i].value || `P${i+1}`); headEls[i].style.display=(i<playerCount)?'':'none'; }
-      // One row per hole (H, Par, SI, then 4 player cells)
-      holes.forEach((h,idx)=>{
-        const row = document.createElement('div');
-        row.className='sc-grid';
-        const cHole=document.createElement('div'); cHole.className='sc-hole sc-head'; cHole.textContent=h.number;
-        const cPar=document.createElement('div'); cPar.className='sc-par sc-head'; cPar.textContent=h.par??'-';
-        const cSi =document.createElement('div'); cSi.className ='sc-si sc-head';  cSi.textContent=h.strokeIndex??'-';
-        row.appendChild(cHole); row.appendChild(cPar); row.appendChild(cSi);
-
-        for(let p=0;p<4;p++){
-          const wrap=document.createElement('div'); wrap.className='sc-cell'; wrap.style.display=(p<playerCount)?'flex':'none';
-
-          const input=document.createElement('input'); input.className='sc-score'; input.type='number'; input.min='1'; input.placeholder='–';
-          input.addEventListener('input',()=>{ onScoreChange(p,idx,input.value?Number(input.value):null); });
-
-          const chip=document.createElement('span'); chip.className='sc-chip even'; chip.textContent='E';
-          const pts =document.createElement('span'); pts.className='sc-points'; pts.textContent='0';
-
-          wrap.appendChild(input); wrap.appendChild(chip); wrap.appendChild(pts);
-          row.appendChild(wrap);
-        }
-        scBody.appendChild(row);
-      });
-
-      // init score matrix
-      if(!scores.length||scores[0].length!==holes.length) scores=Array.from({length:4},()=>Array(holes.length).fill(null));
+      scTable.innerHTML='';
+      scTotals.textContent='Totals…';
     }
 
     function relationToPar(score,par){
@@ -609,64 +582,237 @@
       if(d<0)   return {cls:'under',txt:(d===-1?'−1':`−${Math.abs(d)}`)};
       return {cls:'over',txt:(d===1?'+1':`+${d}`)};
     }
-
     function shotsReceivedForHole(hcap, si){
       if(!useHcap || !Number.isFinite(hcap) || !Number.isFinite(si)) return 0;
       const base = Math.floor(hcap / 18);
       const rem  = hcap % 18;
       return base + (si >= 1 && si <= rem ? 1 : 0);
     }
-
     function stablefordFor(score, par, shots){
       if(score==null || par==null) return 0;
-      const netRelative = (par + shots) - score; // positive means under net par
-      // Standard Stableford: 0,1,2,3,4,5 for DB+, Bogey, Par, Birdie, Eagle, Albatross
-      const points = Math.max(0, 2 + netRelative);
-      return points;
+      const netRelative = (par + shots) - score;
+      return Math.max(0, 2 + netRelative);
+    }
+
+    function rebuildAndRender(resetMissingMatrix=true){
+      // Build table header: Players on left; holes 1..9 + Out; holes 10..18 + In; Total; Net
+      const nHoles = holes.length;
+      scTable.innerHTML='';
+      const thead=document.createElement('thead');
+      const trTop=document.createElement('tr');
+
+      // Corner cell
+      const thCorner=document.createElement('th'); thCorner.textContent='Player'; trTop.appendChild(thCorner);
+
+      const makeHeaderCells=(start,end,labelAfter)=>{
+        for(let i=start;i<=end;i++){
+          const th=document.createElement('th'); th.className='sc-hole-col'; th.textContent=String(i); trTop.appendChild(th);
+        }
+        if(labelAfter){
+          const th=document.createElement('th'); th.className='sc-total-col'; th.textContent=labelAfter; trTop.appendChild(th);
+        }
+      };
+
+      // Decide split (front/back 9) based on hole numbers if available
+      const has18 = nHoles>=18;
+      const frontEnd = Math.min(9, nHoles);
+      makeHeaderCells(1, frontEnd, 'Out');
+      if(nHoles>9){
+        makeHeaderCells(10, nHoles, 'In');
+      } else {
+        const thPad=document.createElement('th'); thPad.className='sc-total-col'; thPad.textContent='In'; trTop.appendChild(thPad);
+      }
+      const thTotal=document.createElement('th'); thTotal.className='sc-total-col'; thTotal.textContent='Total'; trTop.appendChild(thTotal);
+      const thNet=document.createElement('th'); thNet.className='sc-total-col'; thNet.textContent='Net'; trTop.appendChild(thNet);
+
+      thead.appendChild(trTop);
+
+      // Par row
+      const trPar=document.createElement('tr');
+      const thPar=document.createElement('th'); thPar.textContent='Par'; trPar.appendChild(thPar);
+      for(let i=1;i<=frontEnd;i++){
+        const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.par??'–'); trPar.appendChild(td);
+      }
+      const tdParOut=document.createElement('td'); tdParOut.className='sc-total-col';
+      tdParOut.textContent = sumPar(1, frontEnd);
+      trPar.appendChild(tdParOut);
+
+      if(nHoles>9){
+        for(let i=10;i<=nHoles;i++){
+          const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.par??'–'); trPar.appendChild(td);
+        }
+      }
+      const tdParIn=document.createElement('td'); tdParIn.className='sc-total-col';
+      tdParIn.textContent = (nHoles>9? sumPar(10, nHoles) : '–');
+      trPar.appendChild(tdParIn);
+
+      const tdParTotal=document.createElement('td'); tdParTotal.className='sc-total-col';
+      tdParTotal.textContent = sumPar(1, nHoles);
+      trPar.appendChild(tdParTotal);
+
+      const tdParNet=document.createElement('td'); tdParNet.className='sc-total-col'; tdParNet.textContent='–';
+      trPar.appendChild(tdParNet);
+
+      thead.appendChild(trPar);
+
+      // Stroke Index row
+      const trSi=document.createElement('tr');
+      const thSi=document.createElement('th'); thSi.textContent='SI'; trSi.appendChild(thSi);
+      for(let i=1;i<=frontEnd;i++){
+        const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.strokeIndex??'–'); trSi.appendChild(td);
+      }
+      const tdSiOut=document.createElement('td'); tdSiOut.className='sc-total-col'; tdSiOut.textContent=''; trSi.appendChild(tdSiOut);
+
+      if(nHoles>9){
+        for(let i=10;i<=nHoles;i++){
+          const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.strokeIndex??'–'); trSi.appendChild(td);
+        }
+      }
+      const tdSiIn=document.createElement('td'); tdSiIn.className='sc-total-col'; tdSiIn.textContent=''; trSi.appendChild(tdSiIn);
+
+      const tdSiTot=document.createElement('td'); tdSiTot.className='sc-total-col'; tdSiTot.textContent=''; trSi.appendChild(tdSiTot);
+      const tdSiNet=document.createElement('td'); tdSiNet.className='sc-total-col'; tdSiNet.textContent=''; trSi.appendChild(tdSiNet);
+
+      thead.appendChild(trSi);
+      scTable.appendChild(thead);
+
+      // Matrix init
+      if(resetMissingMatrix && (!scores.length || scores[0].length!==nHoles)){
+        scores=Array.from({length:4},()=>Array(nHoles).fill(null));
+      }
+
+      // Body: players
+      const tbody=document.createElement('tbody');
+      for(let p=0;p<playerCount;p++){
+        const tr=document.createElement('tr');
+        const nameCell=document.createElement('th'); nameCell.textContent=nameEls[p].value || `P${p+1}`; tr.appendChild(nameCell);
+
+        // Front 9
+        for(let i=1;i<=frontEnd;i++){
+          const idx=i-1; tr.appendChild(makeHoleCell(p, idx));
+        }
+        // Out total
+        const tdOut=document.createElement('td'); tdOut.className='sc-total-col'; tdOut.id=`out-${p}`; tdOut.textContent='0'; tr.appendChild(tdOut);
+
+        // Back 9
+        if(nHoles>9){
+          for(let i=10;i<=nHoles;i++){
+            const idx=i-1; tr.appendChild(makeHoleCell(p, idx));
+          }
+        }
+        // In total
+        const tdIn=document.createElement('td'); tdIn.className='sc-total-col'; tdIn.id=`in-${p}`; tdIn.textContent=(nHoles>9?'0':'–'); tr.appendChild(tdIn);
+
+        // Total / Net
+        const tdTotal=document.createElement('td'); tdTotal.className='sc-total-col'; tdTotal.id=`tot-${p}`; tdTotal.textContent='0'; tr.appendChild(tdTotal);
+        const tdNet=document.createElement('td'); tdNet.className='sc-total-col'; tdNet.id=`net-${p}`; tdNet.textContent='0'; tr.appendChild(tdNet);
+
+        tbody.appendChild(tr);
+      }
+      scTable.appendChild(tbody);
+
+      renderScores();
+    }
+
+    function sumPar(start, end){
+      let s=0; for(let i=start;i<=end;i++){ const h=holes[i-1]; if(h?.par!=null) s+=Number(h.par)||0; }
+      return s||'–';
+    }
+
+    function makeHoleCell(p, idx){
+      const td=document.createElement('td');
+      td.className='sc-hole-col';
+      const wrap=document.createElement('div'); wrap.className='sc-cell';
+
+      const input=document.createElement('input');
+      input.type='number'; input.min='1'; input.placeholder='–';
+      input.className='sc-score-input';
+      input.value = (scores[p]?.[idx] ?? '');
+
+      const chip=document.createElement('span'); chip.className='chip even'; chip.textContent='E';
+      const pts=document.createElement('span'); pts.className='sc-points'; pts.textContent='0';
+
+      input.addEventListener('input', ()=>{
+        const val=input.value?Number(input.value):null;
+        onScoreChange(p, idx, val);
+      });
+
+      wrap.appendChild(input);
+      wrap.appendChild(chip);
+      wrap.appendChild(pts);
+      td.appendChild(wrap);
+      return td;
     }
 
     function renderScores(){
-      // for each hole row, update chips + points
-      const rows = scBody.querySelectorAll('.sc-grid');
-      rows.forEach((row, idx)=>{
-        const par = holes[idx]?.par ?? null;
-        const si  = holes[idx]?.strokeIndex ?? null;
-        row.querySelectorAll('.sc-cell').forEach((cell,p)=>{
-          if(p>=playerCount){ cell.style.display='none'; return; }
-          cell.style.display='flex';
-          const input = cell.querySelector('.sc-score');
-          const chip  = cell.querySelector('.sc-chip');
+      // Update all cells and totals
+      const nHoles=holes.length;
+      const frontEnd=Math.min(9,nHoles);
+      for(let p=0;p<playerCount;p++){
+        let out=0,inSum=0, total=0, stab=0;
+        for(let i=0;i<nHoles;i++){
+          const v=scores[p][i];
+          const par=holes[i]?.par??null;
+          const si=holes[i]?.strokeIndex??null;
+          // locate cell
+          const row = scTable.tBodies[0].rows[p];
+          // hole cell index offset: first col is name, then holes...
+          const holeCellIndex = 1 + i + (i>=frontEnd ? 1 : 0); // +1 for Out col after front
+          const cell = row.cells[holeCellIndex];
+          const input = cell.querySelector('.sc-score-input');
+          const chip  = cell.querySelector('.chip');
           const ptsEl = cell.querySelector('.sc-points');
-
-          const v = scores[p][idx];
           input.value = v ?? '';
-          const shots = shotsReceivedForHole(handicaps[p]||0, si);
-          const rel   = relationToPar(v, par);
-          chip.className=`sc-chip ${rel.cls}`;
+
+          const rel=relationToPar(v,par);
+          chip.className=`chip ${rel.cls}`;
           chip.textContent=rel.txt;
 
-          const pts = stablefordFor(v, par, shots);
-          ptsEl.textContent = String(pts);
-        });
-      });
+          const shots=shotsReceivedForHole(handicaps[p]||0, si);
+          const pts=stablefordFor(v,par,shots);
+          ptsEl.textContent=String(pts);
 
-      // totals
+          if(v!=null){ total+=v; if(i<frontEnd) out+=v; else inSum+=v; }
+          stab+=pts;
+        }
+        // Totals cells
+        const row = scTable.tBodies[0].rows[p];
+        row.querySelector(`#out-${p}`).textContent = out || 0;
+        row.querySelector(`#in-${p}`).textContent  = (holes.length>9 ? (inSum || 0) : '–');
+        row.querySelector(`#tot-${p}`).textContent = total || 0;
+        const nett = total - (useHcap ? (handicaps[p]||0) : 0);
+        row.querySelector(`#net-${p}`).textContent = nett || 0;
+
+        // Summary line (bottom)
+        const nm=nameEls[p].value||`P${p+1}`;
+        // Compose later after loop
+      }
+
+      // Summary line text
       const parts=[];
       for(let p=0;p<playerCount;p++){
         let gross=0, stab=0;
         for(let i=0;i<holes.length;i++){
           const v=scores[p][i]; const par=holes[i]?.par??null; const si=holes[i]?.strokeIndex??null;
-          if(v!=null){ gross+=v; stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si)); }
+          if(v!=null) gross+=v;
+          stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
         }
         const nett = gross - (useHcap ? (handicaps[p]||0) : 0);
         const nm   = (nameEls[p].value||`P${p+1}`);
-        parts.push(`${nm}: Gross ${gross||0}  •  Nett ${nett||0}  •  Stableford ${stab||0}`);
+        parts.push(`${nm}: Gross ${gross||0}  •  Net ${nett||0}  •  Stableford ${stab||0}`);
       }
       scTotals.textContent = parts.join('   •   ');
     }
 
-    function onScoreChange(p,i,val){ scores[p][i]=(typeof val==='number'&&!Number.isNaN(val))?val:null; persistScores(); renderScores(); }
-    function highlightCurrentRow(){ const rows=scBody.querySelectorAll('.sc-grid'); rows.forEach(r=>r.style.outline='none'); const row=rows[currentIndex]; if(row){ row.style.outline='2px solid var(--accent)'; row.scrollIntoView({block:'nearest'}); } }
+    function onScoreChange(p,i,val){
+      if(!scores[p]) scores[p]=[];
+      scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
+      persistScores(); renderScores();
+    }
+
+    function highlightCurrentRow(){
+      // No per-row highlight in table mode; optional future styling
+    }
 
     function persistMeta(){
       if(!courseIdForScores) return;
@@ -688,13 +834,12 @@
         if(meta){
           scCount.value = String(meta.count||1);
           playerCount = Number(scCount.value);
-          useHcap = !!meta.useHcap;
-          scUseHcap.checked = useHcap;
-          nameEls.forEach((el,i)=>{ const nm=meta.names?.[i]; if(nm!=null){ el.value=nm; headEls[i].textContent=nm; } });
-          hcapEls.forEach((el,i)=>{ const hv=meta.handicaps?.[i]; if(hv!=null){ el.value=hv; handicaps[i]=hv; } });
+          useHcap = !!meta.useHcap; setSwitch(useHcap);
+          nameEls.forEach((el,i)=>{ const nm=meta.names?.[i]; if(nm!=null){ el.value=nm; } else { el.value=''; } });
+          hcapEls.forEach((el,i)=>{ const hv=meta.handicaps?.[i]; if(hv!=null){ el.value=hv; handicaps[i]=hv; } else { el.value=''; } });
         } else {
-          playerCount=1; scCount.value='1'; useHcap=false; scUseHcap.checked=false; handicaps=[0,0,0,0];
-          nameEls.forEach((el,i)=>{ el.value=''; headEls[i].textContent=`P${i+1}`; });
+          playerCount=1; scCount.value='1'; useHcap=false; setSwitch(false); handicaps=[0,0,0,0];
+          nameEls.forEach((el,i)=>{ el.value=''; });
           hcapEls.forEach((el)=>{ el.value=''; });
         }
       }catch{}
@@ -710,7 +855,7 @@
         }
       }catch{ scores=Array.from({length:4},()=>Array(holes.length).fill(null)); }
 
-      // show setup, grid hidden until Create
+      // Show setup by default; table appears after Create
       buildScorecard();
     }
 
@@ -724,13 +869,11 @@
       localStorage.removeItem(`dd_sc2_scores_${courseIdForScores}`);
       // reset UI
       scCount.value='1'; playerCount=1;
-      scUseHcap.checked=false; useHcap=false;
-      nameEls.forEach((el,i)=>{ el.value=''; headEls[i].textContent=`P${i+1}`; });
+      setSwitch(false); useHcap=false;
+      nameEls.forEach((el,i)=>{ el.value=''; });
       hcapEls.forEach((el)=>{ el.value=''; });
       applySetupVisibility();
       buildScorecard();
-      scHead.style.display='none';
-      scTotals.style.display='none';
     }
 
     // Init
