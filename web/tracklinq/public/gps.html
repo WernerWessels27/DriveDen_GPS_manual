@@ -5,6 +5,7 @@
   <title>TrackLinq GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#14532d" />
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 
@@ -16,20 +17,20 @@
       --line:#e5e7eb; --soft:#f3f4f6;
     }
     html, body { height: 100%; margin: 0; overscroll-behavior: none; }
-    body { touch-action: pan-x pan-y; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    body { touch-action: pan-x pan-y; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:#f6f7f9; }
     #map { height: 100%; position: relative; }
 
+    /* Hide Leaflet attribution & zoom (+/–) */
     .leaflet-control-attribution { display: none !important; }
     .leaflet-control-zoom { display: none !important; }
 
-    /* Top center hole controls */
     .holeWrap{ position: fixed; z-index:10000; left:50%; transform:translateX(-50%); top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
     .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:10px; min-width: 220px; }
     .holeNav button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; text-align:center; }
     .scoreBtn { border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; box-shadow: 0 6px 12px rgba(0,0,0,.15); }
 
-    /* Wind (top-right) */
+    /* Compact wind bubble */
     .windBox{ position: fixed; top: 10px; right: 10px; z-index: 10000; background: var(--panel); padding: 6px 8px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; min-width: 140px; }
     .windLeft { display:flex; align-items:center; gap:6px; }
     .windSock { width:22px; height:22px; }
@@ -38,21 +39,19 @@
     .windDirTxt { font-size:11px; color:var(--muted); }
     .windArrow { width:18px; height:18px; transform-origin:50% 50%; opacity:.85; }
 
-    /* Distances (top-left). Mid emphasized */
-    .distBox { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 200px; }
-    .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
-    .row.mid .label { font-weight:700; }
-    .row.mid .value { font-size:20px; line-height:1; }
+    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 210px; }
+    .row { display:flex; justify-content:space-between; margin: 6px 0; font-size:14px; gap:6px; }
+    .row.mid .label { font-size: 15px; }
+    .row.mid .value { font-weight:800; font-size:22px; }   /* Mid larger */
     .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { color:var(--muted); }
-    .value { font-weight:700; }
+    .value { font-weight:700; font-size:18px; }
     .delta { font-size:12px; color:var(--muted); }
     .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
 
     .footer { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10000; background: var(--panel); padding: 8px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; justify-content:center; gap:18px; font-size:14px; }
     .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--chip); color:var(--chipText); font-weight:700; }
 
-    /* Settings panel (hidden in club mode) */
     .panel { position: fixed; top: 80px; right: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 330px; max-width: calc(100% - 20px); max-height: 75vh; overflow: auto; transition: transform .25s ease, opacity .2s ease; }
     .panel.hidden { transform: translateY(16px); opacity:0; pointer-events:none; }
     .grid { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
@@ -79,7 +78,7 @@
     .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
     .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
 
-    /* ===== Scorecard v2 (traditional table) ===== */
+    /* ===== Scorecard ===== */
     .scorecard{
       position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
       width: min(980px, calc(100% - 20px)); max-height: 70vh; overflow: auto;
@@ -93,7 +92,6 @@
     .sc-button{ background: var(--brand-2); color:#fff; border:0; border-radius:8px; padding:6px 10px; cursor:pointer; }
     .sc-button.danger{ background:#b91c1c; }
     .sc-muted{ font-size:12px; color:var(--muted); }
-
     .sc-setup{ background:#f9fafb; border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
     .sc-row2{ display:grid; grid-template-columns: 1fr 130px; gap:8px; margin-bottom:6px; }
     .sc-row3{ display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; margin-bottom:6px; }
@@ -117,24 +115,23 @@
     .chip.under{ background:#dcfce7; color:#065f46; }
     .chip.over{  background:#fee2e2; color:#7f1d1d; }
     .chip.even{  background:#e5e7eb; color:#111827; }
-
-    .sc-summary{ margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px; }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- TOP CENTER: hole controls + scorecard toggle -->
   <div class="holeWrap">
     <div class="holeNav">
       <button id="prevHole">◀</button>
       <div class="holeTitle" id="holeTitle">Hole –</div>
       <button id="nextHole">▶</button>
     </div>
-    <button id="scoreToggle" class="scoreBtn">Scorecard</button>
+    <div style="display:flex; gap:8px;">
+      <button id="scoreToggle" class="scoreBtn">Scorecard</button>
+      <button id="historyToggle" class="scoreBtn" style="background:#14532d;">History</button>
+    </div>
   </div>
 
-  <!-- TOP RIGHT: wind -->
   <div class="windBox" id="windBox" title="10 m wind at 10 m height">
     <div class="windLeft">
       <svg class="windSock" viewBox="0 0 64 64" aria-hidden="true">
@@ -154,7 +151,6 @@
     </svg>
   </div>
 
-  <!-- TOP LEFT: distances (Mid emphasized) -->
   <div class="distBox">
     <div class="row"><span class="label">Front</span><span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span></div>
     <div class="row mid"><span class="label">Mid</span><span class="col"><span class="value" id="dMid">–</span><span class="delta" id="eMid">–</span></span></div>
@@ -167,25 +163,20 @@
     <div>Stroke <span class="badge" id="stroke">–</span></div>
   </div>
 
-  <!-- Settings panel (course chooser hidden in club mode) -->
   <div class="panel hidden" id="panel">
-    <div id="courseChooserBlock">
-      <div><strong>Select course</strong></div>
-      <div class="grid" style="margin-top:6px;">
-        <select id="courseSelect"></select>
-        <button id="btnLoadCourse">Load</button>
-      </div>
-      <div class="muted">Open with <code>?course=&lt;id&gt;</code> as well.</div>
-      <hr style="margin:10px 0; border:none; border-top:1px solid var(--line);" />
+    <div><strong>Select course</strong></div>
+    <div class="grid" style="margin-top:6px;">
+      <select id="courseSelect"></select>
+      <button id="btnLoadCourse">Load</button>
     </div>
-
-    <div style="margin-top:6px;"><strong>Hole</strong></div>
+    <div class="muted">Open with <code>?course=&lt;id&gt;</code> as well.</div>
+    <div style="margin-top:10px;"><strong>Hole</strong></div>
     <div class="grid" style="margin-top:6px;">
       <select id="holes"></select><button id="btnGoHole">Go</button>
     </div>
   </div>
 
-  <!-- View buttons -->
+  <!-- Bottom-left: view mode buttons -->
   <button id="holeViewBtn" class="fab-left" title="Fit hole (tee→green)" style="bottom: 140px;">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="#ffffff">
       <path d="M6 3a1 1 0 0 0-1 1v16H3v2h4V4a1 1 0 0 0-1-1z"></path>
@@ -208,19 +199,19 @@
     </svg>
   </button>
 
+  <!-- Clear layup button -->
   <button id="clearLayupBtn">Clear layup</button>
 
-  <!-- Panel toggle (hidden in club mode) -->
-  <button id="panelToggle" class="fab" title="Menu">☰</button>
+  <button id="panelToggle" class="fab">☰</button>
 
-  <!-- ===== SCORECARD v2 (traditional) ===== -->
+  <!-- ===== SCORECARD ===== -->
   <div id="scorecard" class="scorecard" aria-live="polite">
     <div class="sc-header">
       <div class="sc-title">Scorecard</div>
       <div class="sc-actions">
+        <button id="scSave" class="sc-button" title="Save round locally">Save</button>
         <button id="scEndRound" class="sc-button danger" title="End Round (clear scores)">End Round</button>
         <button id="scClear" class="sc-button danger" title="Clear inputs">Clear</button>
-        <button id="scSave" class="sc-button" title="Save round">Save</button>
         <button id="scClose" class="sc-button">Close</button>
       </div>
     </div>
@@ -260,16 +251,22 @@
     </div>
   </div>
 
+  <!-- History Modal -->
+  <div id="historyModal" class="scorecard" aria-live="polite" style="display:none;">
+    <div class="sc-header">
+      <div class="sc-title">Recent Rounds (last 10)</div>
+      <div class="sc-actions">
+        <button id="histClear" class="sc-button danger" title="Clear saved history">Clear</button>
+        <button id="histClose" class="sc-button">Close</button>
+      </div>
+    </div>
+    <div id="historyWrap" style="overflow:auto;">
+      <table class="sc-table" id="historyTable"></table>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
-    // ------- Helpers for login mode -------
-    function isClubMode(){
-      return (localStorage.getItem('tl_mode')||'').toLowerCase()==='club';
-    }
-    function getClubCourseId(){
-      return localStorage.getItem('tl_course_id') || '';
-    }
-
     // ------- Prevent pull-to-refresh bounce -------
     let _touchStartY = 0;
     window.addEventListener('touchstart', (e)=>{ _touchStartY = e.touches[0].clientY; }, {passive:true});
@@ -287,7 +284,7 @@
     const map = L.map('map', { zoomControl: false, layers: [esriImagery] });
     map.setView([-25.7542, 28.2322], 15);
 
-    // Geo helpers
+    // Helpers
     const toRad = d => d * Math.PI / 180;
     function meters(a,b){
       const R=6371000;
@@ -343,11 +340,11 @@
     async function ensureWind(){ if(!lastPos)return; const now=Date.now(); if(now-windCache.ts>WIND_TTL){ const {speed,dir}=await fetchWind(lastPos.lat,lastPos.lng); windCache={ts:now,lat:lastPos.lat,lng:lastPos.lng,speed,dir}; } renderWind(); }
     function renderWind(){ const {speed,dir}=windCache; windSpeedEl.textContent=(typeof speed==='number')?`${speed.toFixed(1)} m/s`:'– m/s'; windDirTxtEl.textContent=(typeof dir==='number')?`${degToCompass(dir)} (${Math.round(dir)}°)`:'–'; windArrowEl.style.transform=`rotate(${(typeof dir==='number'?dir:0)}deg)`; }
 
-    // Panel toggle (hidden in club mode)
+    // Panel toggle
     function setPanelHidden(h){ panel.classList.toggle('hidden',h); toggleBtn.textContent=h?'☰':'✕'; }
     setPanelHidden(true); toggleBtn.onclick=()=>setPanelHidden(!panel.classList.contains('hidden'));
 
-    // Elevation (per-user cached)
+    // Elevation
     let lastElev=null,lastElevAt=0;
     async function fetchCurrentElevation(p){
       const now=Date.now();
@@ -355,6 +352,19 @@
       try{ const r=await fetch(`/elevation?lat=${p.lat}&lng=${p.lng}`); const js=await r.json(); const v=js?.results?.[0]?.elevation; if(typeof v==='number'){ lastElev=v; lastElevAt=now; return v; } }catch{} return null;
     }
     function fmtDelta(d){ if(d==null) return '–'; if(Math.abs(d)<0.5) return '±0 m'; return d>0?`↑ ${Math.round(d)} m`:`↓ ${Math.round(Math.abs(d))} m`; }
+
+    async function ensureHoleElevations(h){
+      if(!h) return;
+      if(!h.elevation) h.elevation = {};
+      const toFetch=[];
+      if(!Number.isFinite(h.elevation.front) && (h.green.front||h.green.center)) toFetch.push(['front',h.green.front||h.green.center]);
+      if(!Number.isFinite(h.elevation.mid)   && (h.green.mid  ||h.green.center)) toFetch.push(['mid',  h.green.mid  ||h.green.center]);
+      if(!Number.isFinite(h.elevation.back)  && (h.green.back ||h.green.center)) toFetch.push(['back', h.green.back ||h.green.center]);
+      for(const [key,pt] of toFetch){
+        const v=await fetchElevPoint(pt.lat,pt.lng);
+        if(Number.isFinite(v)) h.elevation[key]=v;
+      }
+    }
 
     function updateHoleUI(center=true){
       if(!holes.length) return;
@@ -380,6 +390,8 @@
       dFront.textContent=Math.round(meters(lastPos,f));
       dMid.textContent  =Math.round(meters(lastPos,m));
       dBack.textContent =Math.round(meters(lastPos,b));
+
+      await ensureHoleElevations(h);
       const curElev=await fetchCurrentElevation(lastPos);
       const df=h.elevation?.front??null, dm=h.elevation?.mid??null, db=h.elevation?.back??null;
       eFront.textContent=(curElev!=null&&df!=null)?fmtDelta(df-curElev):'–';
@@ -387,7 +399,7 @@
       eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
     }
 
-    // Layup
+    // Layup (two segments) + floating clear button
     const clearLayupBtn=document.getElementById('clearLayupBtn');
     let measureTarget=null, measureMarker=null, measureMarker2=null, measureLine=null, measureLine2=null;
     function bubbleEl(initial='– m'){
@@ -477,7 +489,7 @@
         lastPos=p; you.setLatLng([p.lat,p.lng]);
         status.textContent=`Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
         if(!movedOnce){ movedOnce=true; if(viewMode==='hole') holeFit(); else cartFit(); }
-        if(viewMode==='cart' && (pos.coords.accuracy||999) <= ACCURACY_MAX) cartFit();  // live
+        if(viewMode==='cart' && (pos.coords.accuracy||999) <= ACCURACY_MAX) cartFit();
         await updateDistancesAndDeltas(); ensureWind(); updateMeasureBubbles();
       }, err=>{ status.textContent=err.message; }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
     } else { status.textContent='Geolocation not supported'; }
@@ -487,55 +499,28 @@
     document.getElementById('holeViewBtn').onclick = ()=> setViewMode('hole');
     document.getElementById('cartViewBtn').onclick = ()=> setViewMode('cart');
 
-    // Course loading
+    // ===== Course + list loading (from /course/*.json) =====
     async function loadCourseList(){
-      // Optional: if you keep an index.json, populate here. Otherwise leave empty.
       try{
-        const r=await fetch('/courses/index.json',{cache:'no-store'});
-        const js=await r.json(); courseList=js.courses||[];
+        const r=await fetch('/course/index.json'); const js=await r.json();
+        courseList=js.courses||[];
         courseSel.innerHTML='';
         courseList.forEach(c=>{
-          const o=document.createElement('option'); o.value=c.id; o.textContent=c.name||c.id; courseSel.appendChild(o);
+          const o=document.createElement('option');
+          o.value=c.id; o.textContent=c.name||c.id;
+          courseSel.appendChild(o);
         });
       }catch{
-        // fallback: leave empty, manual ?course=<id>
-        courseSel.innerHTML='';
+        // fallback – nothing in dropdown
+        courseList=[]; courseSel.innerHTML='';
       }
     }
-
     async function loadCourse(id){
-      holes=[]; currentIndex=0; holesSel.innerHTML='';
-      clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
-
-      const baseId = String(id || '').trim().replace(/\.json$/,'');
-      const candidates = [
-        `/course/${encodeURIComponent(baseId)}.json`,
-        `/courses/${encodeURIComponent(baseId)}.json`,
-        `/course/${encodeURIComponent(id)}`,
-        `/courses/${encodeURIComponent(id)}`
-      ];
-
-      let lastErr = '';
-      let data = null;
-
-      for (const url of candidates){
-        try{
-          const r = await fetch(url, { cache: 'no-store' });
-          if (!r.ok) { lastErr = `HTTP ${r.status} on ${url}`; continue; }
-          data = await r.json();
-          break;
-        }catch(e){ lastErr = `${e.message} on ${url}`; }
-      }
-
-      if (!data){
-        status.textContent = `Failed to load course ${id}. ${lastErr}`;
-        console.error('Course load failed. Tried:', candidates, 'Last error:', lastErr);
-        return;
-      }
-
+      holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
       try{
-        const root = data.course || data;
-        holes = (root.holes||[]).map(h=>({
+        const r=await fetch(`/course/${encodeURIComponent(id)}.json`); const raw=await r.json();
+        const root=raw.course||raw;
+        holes=(root.holes||[]).map(h=>({
           number:(h.number??h.hole??h.holeNumber??null)*1,
           par:(h.par!=null?Number(h.par):null),
           strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null,
@@ -545,35 +530,21 @@
         })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
 
         holesSel.innerHTML='';
-        holes.forEach(h=>{
-          const o=document.createElement('option');
-          o.value=h.number;
-          o.textContent=`Hole ${h.number}`;
-          holesSel.appendChild(o);
-        });
+        holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
+        if(holes.length){ currentIndex=0; updateHoleUI(true); }
+        status.textContent=`Loaded course: ${root.name||id}`;
 
-        if(holes.length){
-          currentIndex=0;
-          updateHoleUI(true);
-          status.textContent=`Loaded course: ${root.name || baseId}`;
-          buildScorecard();
-          loadSavedScores(baseId);
-          if(viewMode==='hole') holeFit(); else cartFit();
-        }else{
-          status.textContent=`Course ${id} loaded but contains no holes.`;
-        }
-      }catch(parseErr){
-        status.textContent=`Failed to parse course ${id}. ${parseErr.message}`;
-        console.error(parseErr);
-      }
+        await autofillElevationsForCourse(id);
+        buildScorecard(); loadSavedScores(id);
+        if(viewMode==='hole') holeFit(); else cartFit();
+      }catch(e){ status.textContent=`Failed to load course ${id}`; }
     }
-
     document.getElementById('btnLoadCourse').onclick=()=>{ const id=courseSel.value; if(!id)return; loadCourse(id); };
     document.getElementById('btnGoHole').onclick=()=>{ const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); } };
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
 
-    // Elevation autofill (localStorage cache)
+    // Elevation autofill (cache per course)
     const ELEV_CACHE_TTL=1000*60*60*24*30;
     function loadElevCache(courseId){ try{ const raw=localStorage.getItem('tl_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
     function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('tl_elev_'+courseId, JSON.stringify(cache)); }catch{} }
@@ -601,7 +572,7 @@
       saveElevCache(courseId,cache); updateHoleUI(false);
     }
 
-    /* ===================== SCORECARD v2 ===================== */
+    /* ===================== SCORECARD ===================== */
     const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
     const scSetup=document.getElementById('scSetup'), scTableWrap=document.getElementById('scTableWrap'), scTable=document.getElementById('scTable'), scTotals=document.getElementById('scTotals');
     const scCount=document.getElementById('scCount'), scHcapSwitch=document.getElementById('scHcapSwitch');
@@ -616,7 +587,6 @@
       scHcapSwitch.classList.toggle('on', !!on);
       scHcapSwitch.setAttribute('aria-checked', on ? 'true' : 'false');
     }
-
     function showSetup(flag){
       scSetup.style.display = flag ? '' : 'none';
       scTableWrap.style.display = flag ? 'none' : '';
@@ -628,21 +598,16 @@
       }
       hcapRow.style.display = useHcap ? '' : 'none';
     }
-
     scoreToggle.onclick=()=>{ scorecard.classList.toggle('show'); };
     scClose.onclick=()=>scorecard.classList.remove('show');
     scClear.onclick=()=>{ if(!confirm('Clear all entered scores?')) return; clearScoresOnly(); };
     scEndRound.onclick=()=>{ if(!confirm('End round? This clears players, handicaps and scores for this course.')) return; endRoundFull(); };
-    scSave.onclick=()=>{ persistScores(); alert('Round saved locally.'); };
 
     scCount.onchange=()=>{ playerCount=Number(scCount.value); applySetupVisibility(); persistMeta(); rebuildAndRender(); };
-
     scHcapSwitch.addEventListener('click', ()=>{ useHcap=!useHcap; setSwitch(useHcap); applySetupVisibility(); persistMeta(); rebuildAndRender(); });
     scHcapSwitch.addEventListener('keydown', (e)=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); scHcapSwitch.click(); } });
-
     nameEls.forEach((inp)=>{ inp.addEventListener('input',()=>{ persistMeta(); rebuildAndRender(false); }); });
     hcapEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ handicaps[idx]=Math.max(0, Math.min(54, Number(inp.value)||0)); persistMeta(); renderScores(); }); });
-
     scCreate.onclick=()=>{ showSetup(false); rebuildAndRender(true); };
 
     function buildScorecard(){
@@ -677,7 +642,6 @@
       scTable.innerHTML='';
       const thead=document.createElement('thead');
 
-      // Top header
       const trTop=document.createElement('tr');
       const thCorner=document.createElement('th'); thCorner.textContent='Hole'; trTop.appendChild(thCorner);
 
@@ -699,7 +663,6 @@
       const thNet=document.createElement('th'); thNet.className='sc-total-col'; thNet.textContent='Net'; trTop.appendChild(thNet);
       thead.appendChild(trTop);
 
-      // Par row
       const trPar=document.createElement('tr');
       const thPar=document.createElement('th'); thPar.textContent='Par'; trPar.appendChild(thPar);
       for(let i=1;i<=frontEnd;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.par??'–'); trPar.appendChild(td); }
@@ -710,7 +673,6 @@
       const tdParNet=document.createElement('td'); tdParNet.className='sc-total-col'; tdParNet.textContent='–'; trPar.appendChild(tdParNet);
       thead.appendChild(trPar);
 
-      // Stroke Index row
       const trSi=document.createElement('tr');
       const thSi=document.createElement('th'); thSi.textContent='SI'; trSi.appendChild(thSi);
       for(let i=1;i<=frontEnd;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.strokeIndex??'–'); trSi.appendChild(td); }
@@ -746,6 +708,7 @@
       scTable.appendChild(tbody);
 
       renderScores();
+      attachAutoAdvanceHandlers(); // ensure inputs trigger auto-advance
     }
 
     function sumPar(start, end){
@@ -766,10 +729,7 @@
       const chip=document.createElement('span'); chip.className='chip even'; chip.textContent='E';
       const pts=document.createElement('span'); pts.className='sc-points'; pts.textContent='0';
 
-      input.addEventListener('input', ()=>{
-        const val=input.value?Number(input.value):null;
-        onScoreChange(p, idx, val);
-      });
+      input.addEventListener('input', ()=>{ const val=input.value?Number(input.value):null; onScoreChange(p, idx, val); });
 
       wrap.appendChild(input);
       wrap.appendChild(chip);
@@ -815,28 +775,61 @@
         row.querySelector(`#net-${p}`).textContent = nett || 0;
       }
 
+      // summary
       const parts=[];
       for(let p=0;p<playerCount;p++){
-        let gross=0, stab=0;
+        let gross=0, stbf=0;
         for(let i=0;i<holes.length;i++){
           const v=scores[p][i]; const par=holes[i]?.par??null; const si=holes[i]?.strokeIndex??null;
           if(v!=null) gross+=v;
-          stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
+          stbf+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
         }
         const nett = gross - (useHcap ? (handicaps[p]||0) : 0);
         const nm   = (nameEls[p].value||`P${p+1}`);
-        parts.push(`${nm}: Gross ${gross||0}  •  Net ${nett||0}  •  Stableford ${stab||0}`);
+        parts.push(`${nm}: Gross ${gross||0}  •  Net ${nett||0}  •  Stableford ${stbf||0}`);
       }
       scTotals.textContent = parts.join('   •   ');
-
-      // After updating the UI, check if current hole is complete and maybe advance
-      maybeAdvanceHoleIfComplete();
     }
 
     function onScoreChange(p,i,val){
       if(!scores[p]) scores[p]=[];
       scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
       persistScores(); renderScores();
+      checkAutoAdvance(i);
+    }
+
+    function attachAutoAdvanceHandlers(){
+      // already wired via onScoreChange -> checkAutoAdvance
+    }
+
+    function everyoneHasScoreForHole(holeIdx){
+      for(let p=0;p<playerCount;p++){
+        const v = scores?.[p]?.[holeIdx];
+        if(!(typeof v==='number' && !Number.isNaN(v))) return false;
+      }
+      return true;
+    }
+
+    let lastAutoAdvancedHole = -1;
+    function checkAutoAdvance(holeIdx){
+      if(!holes.length) return;
+      if(holeIdx!==currentIndex) return; // only when editing current hole
+      if(everyoneHasScoreForHole(holeIdx) && lastAutoAdvancedHole!==holeIdx){
+        // advance
+        lastAutoAdvancedHole = holeIdx;
+        currentIndex = Math.min(currentIndex+1, holes.length-1);
+        updateHoleUI(true);
+        if(viewMode==='hole') holeFit(); else cartFit();
+        // move focus to next hole first player's input (if table exists)
+        const frontEnd=Math.min(9,holes.length);
+        const row = scTable.tBodies[0]?.rows?.[0];
+        if(row){
+          const holeCellIndex = 1 + currentIndex + (currentIndex>=frontEnd ? 1 : 0);
+          const nextCell = row.cells[holeCellIndex];
+          const nextInput = nextCell?.querySelector?.('.sc-score-input');
+          if(nextInput) nextInput.focus();
+        }
+      }
     }
 
     function persistMeta(){
@@ -847,14 +840,14 @@
         names: nameEls.map((el,i)=> (i<playerCount ? (el.value||`P${i+1}`) : null)),
         handicaps: hcapEls.map((el,i)=> (i<playerCount ? Math.max(0,Math.min(54, Number(el.value)||0)) : null))
       };
-      localStorage.setItem(`tl_sc2_meta_${courseIdForScores}`, JSON.stringify(meta));
+      localStorage.setItem(`tl_sc_meta_${courseIdForScores}`, JSON.stringify(meta));
     }
-    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`tl_sc2_scores_${courseIdForScores}`, JSON.stringify(scores)); }
+    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`tl_sc_scores_${courseIdForScores}`, JSON.stringify(scores)); }
 
     function loadSavedScores(id){
       courseIdForScores=id;
       try{
-        const meta=JSON.parse(localStorage.getItem(`tl_sc2_meta_${id}`)||'null');
+        const meta=JSON.parse(localStorage.getItem(`tl_sc_meta_${id}`)||'null');
         if(meta){
           scCount.value = String(meta.count||1);
           playerCount = Number(scCount.value);
@@ -866,16 +859,12 @@
           nameEls.forEach((el)=>{ el.value=''; });
           hcapEls.forEach((el)=>{ el.value=''; });
         }
-      }catch{
-        playerCount=1; scCount.value='1'; useHcap=false; setSwitch(false); handicaps=[0,0,0,0];
-        nameEls.forEach((el)=>{ el.value=''; });
-        hcapEls.forEach((el)=>{ el.value=''; });
-      }
+      }catch{}
       applySetupVisibility();
 
       try{
-        const saved=JSON.parse(localStorage.getItem(`tl_sc2_scores_${id}`)||'null');
-        if(saved&&Array.isArray(saved)&&saved.length===4){
+        const saved=JSON.parse(localStorage.getItem(`tl_sc_scores_${id}`)||'null');
+        if(saved&&Array.isArray(saved)&&saved.length===4&&saved[0].length===holes.length){
           scores=saved;
         } else {
           scores=Array.from({length:4},()=>Array(holes.length).fill(null));
@@ -891,8 +880,8 @@
     }
     function endRoundFull(){
       if(!courseIdForScores) return;
-      localStorage.removeItem(`tl_sc2_meta_${courseIdForScores}`);
-      localStorage.removeItem(`tl_sc2_scores_${courseIdForScores}`);
+      localStorage.removeItem(`tl_sc_meta_${courseIdForScores}`);
+      localStorage.removeItem(`tl_sc_scores_${courseIdForScores}`);
       scCount.value='1'; playerCount=1;
       setSwitch(false); useHcap=false;
       nameEls.forEach((el)=>{ el.value=''; });
@@ -901,50 +890,132 @@
       buildScorecard();
     }
 
-    // Auto-advance once ALL active players have a score for the current hole
-    function maybeAdvanceHoleIfComplete(){
-      if(!holes.length) return;
-      // Only if score table is created (setup hidden)
-      if(scSetup.style.display !== 'none') return;
+    // ===== Round History (local-only) =====
+    const historyBtn = document.getElementById('historyToggle');
+    const historyModal = document.getElementById('historyModal');
+    const histClose = document.getElementById('histClose');
+    const histClear = document.getElementById('histClear');
+    const historyTable = document.getElementById('historyTable');
 
-      const needed = playerCount;
-      let have = 0;
-      for(let p=0; p<playerCount; p++){
-        const v = scores[p]?.[currentIndex];
-        if(typeof v === 'number' && !Number.isNaN(v)) have++;
+    function getHistoryKey(){ return 'tl_round_history'; }
+    function loadHistory(){
+      try{ return JSON.parse(localStorage.getItem(getHistoryKey())||'[]'); }catch{ return []; }
+    }
+    function saveHistory(arr){
+      try{ const trimmed = arr.slice(0,10); localStorage.setItem(getHistoryKey(), JSON.stringify(trimmed)); }catch{}
+    }
+    function getClubCourseId(){
+      // set by login.html when club PIN is used
+      return localStorage.getItem('tl_club_course_id') || null;
+    }
+    function summarizeRound(){
+      const dateISO = new Date().toISOString();
+      const courseId = courseIdForScores || (new URLSearchParams(location.search).get('course') || getClubCourseId() || 'unknown');
+      const players = [];
+      for(let p=0;p<playerCount;p++){
+        const name = (document.getElementById(`p${p+1}`).value || `P${p+1}`);
+        let gross=0, stbf=0;
+        for(let i=0;i<holes.length;i++){
+          const v=scores[p]?.[i];
+          const par=holes[i]?.par??null;
+          const si=holes[i]?.strokeIndex??null;
+          if(typeof v==='number') gross+=v;
+          const shots = shotsReceivedForHole(handicaps[p]||0, si);
+          stbf += stablefordFor(v, par, shots);
+        }
+        const hcap = useHcap ? (handicaps[p]||0) : 0;
+        const net  = gross - hcap;
+        players.push({ name, hcap, gross, net, stbf });
       }
-      if(have === needed){
-        // advance
-        currentIndex = (currentIndex + 1) % holes.length;
-        updateHoleUI(true);
-        // sync the select
-        holesSel.value = String(holes[currentIndex].number);
+      return { dateISO, courseId, players };
+    }
+    function renderHistory(){
+      const hist = loadHistory();
+      historyTable.innerHTML = '';
+      const thead = document.createElement('thead');
+      const trh = document.createElement('tr');
+      ['Course','Date','Player','Hcap','Gross','Net','Stableford'].forEach(h=>{
+        const th=document.createElement('th'); th.textContent=h; trh.appendChild(th);
+      });
+      thead.appendChild(trh); historyTable.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      hist.forEach(entry=>{
+        const d = new Date(entry.dateISO);
+        const dTxt = isNaN(d.getTime()) ? entry.dateISO : d.toLocaleString();
+        entry.players.forEach((pl, idx)=>{
+          const tr = document.createElement('tr');
+          const courseCell = document.createElement('td'); courseCell.textContent = (idx===0? entry.courseId : ''); tr.appendChild(courseCell);
+          const dateCell = document.createElement('td'); dateCell.textContent = (idx===0? dTxt : ''); tr.appendChild(dateCell);
+          const pCell = document.createElement('td'); pCell.textContent = pl.name; tr.appendChild(pCell);
+          const hcCell = document.createElement('td'); hcCell.textContent = pl.hcap ?? 0; tr.appendChild(hcCell);
+          const gCell = document.createElement('td'); gCell.textContent = pl.gross ?? 0; tr.appendChild(gCell);
+          const nCell = document.createElement('td'); nCell.textContent = pl.net ?? 0; tr.appendChild(nCell);
+          const sCell = document.createElement('td'); sCell.textContent = pl.stbf ?? 0; tr.appendChild(sCell);
+          tbody.appendChild(tr);
+        });
+        const sep=document.createElement('tr');
+        const td=document.createElement('td'); td.colSpan=7; td.style.background='#f9fafb'; td.style.height='6px';
+        sep.appendChild(td); tbody.appendChild(sep);
+      });
+      historyTable.appendChild(tbody);
+    }
+
+    historyBtn.addEventListener('click', ()=>{ renderHistory(); historyModal.style.display='block'; });
+    histClose.addEventListener('click', ()=> historyModal.style.display='none');
+    histClear.addEventListener('click', ()=>{
+      if(!confirm('Clear all saved rounds on this device?')) return;
+      saveHistory([]);
+      renderHistory();
+    });
+    scSave.onclick = ()=>{
+      persistScores();
+      const hist = loadHistory();
+      hist.unshift(summarizeRound());
+      saveHistory(hist);
+      alert('Round saved to device history.');
+    };
+
+    // ===== Mode: hide course panel in club mode =====
+    function getMode(){ return localStorage.getItem('tl_mode') || 'guest'; } // 'club' | 'guest'
+    function setupModeUI(){
+      const mode = getMode();
+      if(mode==='club'){
+        // hide panel + toggle
+        setPanelHidden(true);
+        toggleBtn.style.display='none';
+      } else {
+        toggleBtn.style.display='';
       }
     }
 
     // Init
     async function init(){
+      setupModeUI();
       await loadCourseList();
 
-      // Hide course chooser & panel toggle in club mode
-      if(isClubMode()){
-        const courseBlock = document.getElementById('courseChooserBlock');
-        if(courseBlock) courseBlock.style.display='none';
-        const panelToggle = document.getElementById('panelToggle');
-        if(panelToggle) panelToggle.style.display='none';
-      }
+      // pick course priority: URL ?course=... > club stored course > manual
+      const urlCid = new URLSearchParams(location.search).get('course');
+      const clubCid = getClubCourseId();
 
-      const q = new URLSearchParams(location.search);
-      const cid = q.get('course') || (isClubMode()? getClubCourseId() : '');
-      if(cid){
-        await loadCourse(cid);
-        // Preload elevations quietly
-        autofillElevationsForCourse(cid);
-      }else{
-        status.textContent = 'No course selected.';
+      if(urlCid){ await loadCourse(urlCid); setTimeout(()=>{ const f=courseList.find(c=>c.id===urlCid); if(f) courseSel.value=urlCid; },300); }
+      else if(getMode()==='club' && clubCid){ await loadCourse(clubCid); setTimeout(()=>{ courseSel.value=clubCid; },300); }
+      else {
+        // no auto-load; user can open panel and choose
+        setPanelHidden(false);
       }
     }
     init();
+  </script>
+
+  <script>
+    // PWA SW
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .catch(err => console.log('SW register failed:', err));
+      });
+    }
   </script>
 </body>
 </html>
