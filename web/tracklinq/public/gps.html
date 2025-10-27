@@ -796,11 +796,20 @@ function holeComplete(holeIdx){
       scTotals.textContent = parts.join('   •   ');
     }
 
-    function onScoreChange(p,i,val){
-      if(!scores[p]) scores[p]=[];
-      scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
-      persistScores(); renderScores();
-    }
+function onScoreChange(p,i,val){
+  if(!scores[p]) scores[p]=[];
+  scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
+
+  persistScores();
+  renderScores();
+
+  // Only consider advancing when the edited cell is for the CURRENT hole
+  if (i === currentIndex && holeComplete(currentIndex)) {
+    // small delay so the value renders before we move
+    setTimeout(advanceHole, 200);
+  }
+}
+
 
     function persistMeta(){
       if(!courseIdForScores) return;
