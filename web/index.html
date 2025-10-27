@@ -1,10 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#14532d">
-
+  <meta name="theme-color" content="#14532d">
   <meta charset="utf-8" />
   <title>TrackLinq GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -27,11 +25,8 @@
     .leaflet-control-attribution { display: none !important; }
     .leaflet-control-zoom { display: none !important; }
 
-    .brand { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; }
-    .brand img { height: 34px; }
-
+    /* Center header (hole nav + scorecard) */
     .holeWrap{ position: fixed; z-index:10000; left:50%; transform:translateX(-50%); top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-    /* Center title using 3-column grid */
     .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:10px; min-width: 220px; }
     .holeNav button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:4px 10px; font-size:16px; cursor:pointer; }
     .holeTitle { font-weight:600; text-align:center; }
@@ -46,11 +41,15 @@
     .windDirTxt { font-size:11px; color:var(--muted); }
     .windArrow { width:18px; height:18px; transform-origin:50% 50%; opacity:.85; }
 
-    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 190px; }
+    /* Distances – Mid emphasized */
+    .distBox { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 190px; }
     .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
     .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { color:var(--muted); }
     .value { font-weight:700; }
+    /* Emphasize MID distance */
+    #dMid { font-size: 20px; font-weight: 800; line-height: 1.1; }
+    /* Keep delta muted but readable */
     .delta { font-size:12px; color:var(--muted); }
     .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
 
@@ -101,9 +100,8 @@
     .sc-setup{ background:#f9fafb; border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
     .sc-row2{ display:grid; grid-template-columns: 1fr 130px; gap:8px; margin-bottom:6px; }
     .sc-row3{ display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; margin-bottom:6px; }
-    .sc-toggle-line{ display:flex; align-items:center; gap:10px; margin:8px 0; } /* toggle right after text */
+    .sc-toggle-line{ display:flex; align-items:center; gap:10px; margin:8px 0; }
 
-    /* Toggle switch */
     .switch{ position:relative; width:44px; height:24px; background:#d1d5db; border-radius:999px; cursor:pointer; }
     .switch::after{ content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition: transform .2s ease; box-shadow:0 1px 3px rgba(0,0,0,.2); }
     .switch.on{ background:#16a34a; }
@@ -128,6 +126,8 @@
 </head>
 <body>
   <div id="map"></div>
+
+  <!-- Removed the old DriveDen logo bubble -->
 
   <div class="holeWrap">
     <div class="holeNav">
@@ -360,7 +360,6 @@
       if(center){ if(viewMode==='hole') holeFit(); else cartFit(); }
       if(lastPos) updateDistancesAndDeltas();
       refreshMeasureSecondSegment();
-      // scorecard row highlight not needed in table mode
     }
 
     async function updateDistancesAndDeltas(){
@@ -459,7 +458,7 @@
     }
     function setViewMode(mode){ viewMode=mode; if(mode==='hole') holeFit(); else cartFit(); }
 
-    // GPS (live cart fitting; still ignores very poor accuracy)
+    // GPS
     if('geolocation' in navigator){
       navigator.geolocation.watchPosition(async pos=>{
         const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
@@ -506,7 +505,7 @@
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
 
-    // Elevation autofill (unchanged)
+    // Elevation autofill
     const ELEV_CACHE_TTL=1000*60*60*24*30;
     function loadElevCache(courseId){ try{ const raw=localStorage.getItem('dd_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
     function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('dd_elev_'+courseId, JSON.stringify(cache)); }catch{} }
@@ -534,7 +533,7 @@
       saveElevCache(courseId,cache); updateHoleUI(false);
     }
 
-    /* ===================== SCORECARD v2 (traditional) ===================== */
+    /* ===================== SCORECARD v2 with auto-advance ===================== */
     const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
     const scSetup=document.getElementById('scSetup'), scTableWrap=document.getElementById('scTableWrap'), scTable=document.getElementById('scTable'), scTotals=document.getElementById('scTotals');
     const scCount=document.getElementById('scCount'), scHcapSwitch=document.getElementById('scHcapSwitch');
@@ -575,7 +574,7 @@
     nameEls.forEach((inp)=>{ inp.addEventListener('input',()=>{ persistMeta(); rebuildAndRender(false); }); });
     hcapEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ handicaps[idx]=Math.max(0, Math.min(54, Number(inp.value)||0)); persistMeta(); renderScores(); }); });
 
-    scCreate.onclick=()=>{ showSetup(false); rebuildAndRender(true); };
+    scCreate.onclick=()=>{ showSetup(false); rebuildAndRender(true); focusScoreInputForHole(currentIndex); };
 
     function buildScorecard(){
       showSetup(true);
@@ -611,7 +610,7 @@
 
       // Top header
       const trTop=document.createElement('tr');
-      const thCorner=document.createElement('th'); thCorner.textContent='Hole'; trTop.appendChild(thCorner); // << changed from "Player" to "Hole"
+      const thCorner=document.createElement('th'); thCorner.textContent='Hole'; trTop.appendChild(thCorner);
 
       const makeHeaderCells=(start,end,labelAfter)=>{
         for(let i=start;i<=end;i++){
@@ -685,6 +684,11 @@
       return s||'–';
     }
 
+    function holeCellIndexForColumn(i, frontEnd){
+      // table cell index in row for a given hole column (skip sticky first th)
+      return 1 + i + (i>=frontEnd ? 1 : 0);
+    }
+
     function makeHoleCell(p, idx){
       const td=document.createElement('td');
       td.className='sc-hole-col';
@@ -701,6 +705,17 @@
       input.addEventListener('input', ()=>{
         const val=input.value?Number(input.value):null;
         onScoreChange(p, idx, val);
+        maybeAdvanceAfterScoreInput(idx); // auto-advance if all players filled for current hole
+      });
+
+      // Force-advance on Enter
+      input.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          const val=input.value?Number(input.value):null;
+          onScoreChange(p, idx, val);
+          advanceHole(true); // force
+        }
       });
 
       wrap.appendChild(input);
@@ -721,7 +736,7 @@
           const si=holes[i]?.strokeIndex??null;
 
           const row = scTable.tBodies[0].rows[p];
-          const holeCellIndex = 1 + i + (i>=frontEnd ? 1 : 0);
+          const holeCellIndex = holeCellIndexForColumn(i, frontEnd);
           const cell = row.cells[holeCellIndex];
           const input = cell.querySelector('.sc-score-input');
           const chip  = cell.querySelector('.chip');
@@ -745,8 +760,6 @@
         row.querySelector(`#tot-${p}`).textContent = total || 0;
         const nett = total - (useHcap ? (handicaps[p]||0) : 0);
         row.querySelector(`#net-${p}`).textContent = nett || 0;
-
-        // summary composed below
       }
 
       const parts=[];
@@ -768,6 +781,51 @@
       if(!scores[p]) scores[p]=[];
       scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
       persistScores(); renderScores();
+    }
+
+    function allPlayersFilledForHole(i){
+      for(let p=0; p<playerCount; p++){
+        if(scores[p][i]==null) return false;
+      }
+      return true;
+    }
+
+    function maybeAdvanceAfterScoreInput(i){
+      // Advance only when the current hole is fully scored for all active players
+      if(i===currentIndex && allPlayersFilledForHole(i)){
+        advanceHole(false);
+      }
+    }
+
+    function advanceHole(force=false){
+      if(!holes.length) return;
+      // If not forcing and not all filled, do nothing
+      if(!force && !allPlayersFilledForHole(currentIndex)) return;
+
+      if(currentIndex < holes.length - 1){
+        currentIndex++;
+        updateHoleUI(true);
+        focusScoreInputForHole(currentIndex);
+      } else {
+        // Last hole: stay on last hole unless forced wrap is desired. Keeping position.
+        // If you prefer wrap: uncomment next two lines.
+        // currentIndex = 0;
+        // updateHoleUI(true);
+      }
+    }
+
+    function focusScoreInputForHole(holeIdx){
+      try{
+        const nHoles=holes.length;
+        const frontEnd=Math.min(9,nHoles);
+        const row = scTable.tBodies[0]?.rows?.[0];
+        if(!row) return;
+        const idx = holeCellIndexForColumn(holeIdx, frontEnd);
+        const cell = row.cells[idx];
+        const input = cell?.querySelector?.('.sc-score-input');
+        input?.focus?.();
+        input?.select?.();
+      }catch{}
     }
 
     function persistMeta(){
@@ -840,14 +898,12 @@
   </script>
 
   <script>
-    
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .catch(err => console.log('SW register failed:', err));
     });
   }
-</script>
-
+  </script>
 </body>
 </html>
