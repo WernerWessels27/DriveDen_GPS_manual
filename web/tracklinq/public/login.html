@@ -27,36 +27,51 @@
     <label for="pin">Club PIN</label>
     <div class="row">
       <input id="pin" placeholder="e.g. SLK1234567" />
-      <button id="pinBtn">Continue</button>
+      <button id="pinBtn" type="button">Continue</button>
     </div>
 
     <label for="dev" style="margin-top:14px;">Device code</label>
     <div class="row">
       <input id="dev" placeholder="e.g. SLK-7F4K-J2" />
-      <button id="devBtn">Resolve</button>
+      <button id="devBtn" type="button">Resolve</button>
     </div>
 
     <div id="msg" class="muted">Tip: use <b>SLK1234567</b> or <b>SLK-7F4K-J2</b> to test.</div>
   </div>
 
   <script>
-    const msg = (t, cls='muted') => { const el=document.getElementById('msg'); el.className=cls; el.textContent=t; };
+    // Map short_code -> course JSON id (filename without .json)
+    const COURSE_BY_SHORTCODE = {
+      SLK: 'silverlakes'
+    };
 
-    async function resolvePin() {
+    function msg(t, cls='muted'){
+      const el=document.getElementById('msg'); el.className=cls; el.textContent=t;
+    }
+
+    function goToGPSForClub(club){
+      const sc = String(club.short_code || '').toUpperCase();
+      const courseId = COURSE_BY_SHORTCODE[sc];
+      if(!courseId){
+        msg(`No course mapping for ${sc}.`, 'err');
+        return;
+      }
+      localStorage.setItem('tl_club', JSON.stringify(club));
+      const url = `/gps.html?course=${encodeURIComponent(courseId)}&t=${Date.now()}`; // cache-bust
+      console.log('Redirecting to', url);
+      window.location.assign(url);
+    }
+
+    async function resolvePin(){
       const pin = document.getElementById('pin').value.trim();
       if(!pin) return msg('Please enter a PIN','err');
       msg('Checking PIN…');
       try{
-        const r = await fetch(`/api/pin/resolve?pin=${encodeURIComponent(pin)}`);
+        const r = await fetch(`/api/pin/resolve?pin=${encodeURIComponent(pin)}`, { cache:'no-store' });
         const j = await r.json();
         if(!j.ok) return msg('PIN not found or inactive','err');
-
-        // Save chosen club for the GPS app to consume later
-        localStorage.setItem('tl_club', JSON.stringify(j.club));
         msg(`Club: ${j.club.name} (${j.club.short_code})`, 'ok');
-
-        // TODO: when GPS UI is copied into this service, redirect to it:
-        // location.href = '/index.html?course=silverlakes';
+        goToGPSForClub(j.club);
       }catch(e){ msg('Network error','err'); }
     }
 
@@ -65,15 +80,11 @@
       if(!code) return msg('Please enter a device code','err');
       msg('Checking device…');
       try{
-        const r = await fetch(`/api/device/resolve?code=${encodeURIComponent(code)}`);
+        const r = await fetch(`/api/device/resolve?code=${encodeURIComponent(code)}`, { cache:'no-store' });
         const j = await r.json();
         if(!j.ok) return msg(j.error === 'device_inactive' ? 'Device inactive' : 'Device not found', 'err');
-
-        localStorage.setItem('tl_device', JSON.stringify(j.device));
         msg(`Device OK for ${j.device.club_name} (${j.device.short_code})`, 'ok');
-
-        // TODO: redirect to GPS with course once front-end moved:
-        // location.href = '/index.html?course=silverlakes';
+        goToGPSForClub({ id:j.device.club_id, name:j.device.club_name, short_code:j.device.short_code });
       }catch(e){ msg('Network error','err'); }
     }
 
