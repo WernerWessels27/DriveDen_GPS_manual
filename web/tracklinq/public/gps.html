@@ -260,7 +260,7 @@
   <script>
 
 //REMOVE COURSE DROPDOWN FOR CLUBS
-    <script>
+    
 // ===== TrackLinq mode handling =====
 const TL_MODE = localStorage.getItem('tl_mode') || 'guest'; // 'club' | 'guest'
 const TL_CLUB = (() => { try { return JSON.parse(localStorage.getItem('tl_club')||'null'); } catch { return null; } })();
@@ -282,7 +282,6 @@ window.addEventListener('DOMContentLoaded', () => {
     if (loadBtn)   loadBtn.disabled   = true;
   }
 });
-</script>
 
 
 
