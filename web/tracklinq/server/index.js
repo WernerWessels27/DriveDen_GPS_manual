@@ -40,7 +40,61 @@ app.get("/dbtest", async (_req, res) => {
   }
 });
 
-// ----- One-time migration + seed (allows GET or POST) -----
+// ========== PUBLIC API ==========
+
+// List active clubs (for guest mode chooser)
+app.get("/api/clubs", async (_req, res) => {
+  try {
+    const { rows } = await query(
+      "SELECT id, name, short_code FROM clubs WHERE is_active = TRUE ORDER BY name ASC"
+    );
+    res.json({ ok: true, clubs: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Resolve a club by 10-digit PIN (for clubs)
+app.get("/api/pin/resolve", async (req, res) => {
+  const pin = String(req.query.pin || "").trim();
+  if (!pin) return res.status(400).json({ ok: false, error: "pin required" });
+  try {
+    const { rows } = await query(
+      "SELECT id, name, short_code FROM clubs WHERE pin_code = $1 AND is_active = TRUE LIMIT 1",
+      [pin]
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+    res.json({ ok: true, club: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Resolve a tablet/device code (for carts/tablets)
+app.get("/api/device/resolve", async (req, res) => {
+  const code = String(req.query.code || "").trim();
+  if (!code) return res.status(400).json({ ok: false, error: "code required" });
+  try {
+    const { rows } = await query(
+      `SELECT d.id as device_id, d.is_active, d.device_code,
+              c.id as club_id, c.name as club_name, c.short_code
+         FROM devices d
+         JOIN clubs c ON c.id = d.club_id
+        WHERE d.device_code = $1
+        LIMIT 1`,
+      [code]
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+    if (!rows[0].is_active)
+      return res.status(403).json({ ok: false, error: "device_inactive" });
+    res.json({ ok: true, device: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ========== ONE-TIME ADMIN MIGRATION/SEED (allows GET or POST) ==========
+
 function checkToken(req) {
   const token = process.env.MIGRATION_TOKEN || "";
   if (!token) return false;
@@ -86,7 +140,6 @@ SELECT id, 'SLK-7F4K-J2' FROM clubs WHERE short_code='SLK'
 ON CONFLICT (device_code) DO NOTHING;
 `;
 
-// Accept GET/POST so you can click in a browser
 app.all("/admin/migrate", async (req, res) => {
   if (!checkToken(req)) return res.status(401).json({ ok: false, error: "unauthorized" });
   try {
