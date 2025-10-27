@@ -5,7 +5,6 @@
   <title>TrackLinq GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#14532d" />
-  <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 
@@ -20,9 +19,7 @@
     body { touch-action: pan-x pan-y; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
     #map { height: 100%; position: relative; }
 
-    /* Hide Leaflet attribution & zoom (+/–) */
-    .leaflet-control-attribution { display: none !important; }
-    .leaflet-control-zoom { display: none !important; }
+    .leaflet-control-attribution, .leaflet-control-zoom { display: none !important; }
 
     .holeWrap{ position: fixed; z-index:10000; left:50%; transform:translateX(-50%); top: 10px; display:flex; flex-direction:column; align-items:center; gap:8px; }
     .holeNav { background: var(--panel); padding: 6px 10px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:10px; min-width: 220px; }
@@ -30,7 +27,6 @@
     .holeTitle { font-weight:600; text-align:center; }
     .scoreBtn { border:0; background:var(--brand-2); color:#fff; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; box-shadow: 0 6px 12px rgba(0,0,0,.15); }
 
-    /* Wind bubble (top-right) */
     .windBox{ position: fixed; top: 10px; right: 10px; z-index: 10000; background: var(--panel); padding: 6px 8px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:8px; min-width: 140px; }
     .windLeft { display:flex; align-items:center; gap:6px; }
     .windSock { width:22px; height:22px; }
@@ -39,15 +35,12 @@
     .windDirTxt { font-size:11px; color:var(--muted); }
     .windArrow { width:18px; height:18px; transform-origin:50% 50%; opacity:.85; }
 
-    /* Distances (top-left) */
-    .distBox { position: fixed; top: 10px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 190px; }
+    .distBox { position: fixed; top: 60px; left: 10px; z-index: 10000; background: var(--panel); padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.15); width: 200px; }
     .row { display:flex; justify-content:space-between; margin: 4px 0; font-size:14px; gap:6px; }
     .col { display:flex; flex-direction:column; align-items:flex-end; }
     .label { color:var(--muted); }
     .value { font-weight:800; }
-    /* Make Mid stand out */
-    #dMid { font-size: 18px; }
-    #eMid { font-size: 12px; }
+    .value.mid { font-size: 22px; line-height: 1; } /* MID larger */
     .delta { font-size:12px; color:var(--muted); }
     .muted { font-size: 12px; color:var(--muted); margin-top: 4px; }
 
@@ -62,9 +55,8 @@
     .fab { position: fixed; right: 12px; bottom: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
     .fab-left { position: fixed; left: 12px; z-index: 10001; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 22px; background: var(--brand); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2); cursor: pointer; }
     .fab-left svg { width:22px; height:22px; }
-    #recenterBtn { display:none; } /* kept but hidden */
+    #recenterBtn { display:none; }
 
-    /* Clear layup floating button */
     #clearLayupBtn{
       position: fixed; left: 50%; transform: translateX(-50%);
       bottom: 64px; z-index: 10001;
@@ -73,14 +65,12 @@
       display:none;
     }
 
-    /* Measure bubbles */
-    .dd-measure { pointer-events: auto; }
     .dd-measure .anchor-dot { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #111827; border: 2px solid #ffffff; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
     .dd-measure .bubble { position: absolute; transform: translate(8px, -28px); }
     .measure-bubble { background: rgba(17,24,39,.95); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 6px 12px rgba(0,0,0,.25); user-select: none; }
     .measure-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; font-weight: 700; }
 
-    /* ===== Scorecard v2 (traditional table) ===== */
+    /* Scorecard */
     .scorecard{
       position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
       width: min(980px, calc(100% - 20px)); max-height: 70vh; overflow: auto;
@@ -90,8 +80,9 @@
     .scorecard.show{ display: block; }
     .sc-header{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
     .sc-title{ font-weight:700; }
-    .sc-actions{ display:flex; gap:8px; }
+    .sc-actions{ display:flex; gap:8px; flex-wrap: wrap; }
     .sc-button{ background: var(--brand-2); color:#fff; border:0; border-radius:8px; padding:6px 10px; cursor:pointer; }
+    .sc-button.secondary{ background:#334155; }
     .sc-button.danger{ background:#b91c1c; }
     .sc-muted{ font-size:12px; color:var(--muted); }
 
@@ -100,7 +91,6 @@
     .sc-row3{ display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:8px; margin-bottom:6px; }
     .sc-toggle-line{ display:flex; align-items:center; gap:10px; margin:8px 0; }
 
-    /* Toggle switch */
     .switch{ position:relative; width:44px; height:24px; background:#d1d5db; border-radius:999px; cursor:pointer; }
     .switch::after{ content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition: transform .2s ease; box-shadow:0 1px 3px rgba(0,0,0,.2); }
     .switch.on{ background:#16a34a; }
@@ -119,13 +109,31 @@
     .chip.under{ background:#dcfce7; color:#065f46; }
     .chip.over{  background:#fee2e2; color:#7f1d1d; }
     .chip.even{  background:#e5e7eb; color:#111827; }
+
     .sc-summary{ margin-top:10px; font-weight:600; text-align:center; background:#f3f4f6; border-radius:8px; padding:8px; }
+
+    /* History modal */
+    .history{
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: min(980px, calc(100% - 20px)); max-height: 80vh; overflow: auto;
+      background: var(--panel); color: var(--text); border-radius: 12px;
+      box-shadow: 0 14px 30px rgba(0,0,0,.25); padding: 12px; z-index: 10003; display: none;
+    }
+    .history.show{ display:block; }
+    .hist-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .hist-title{ font-weight:700; }
+    .hist-close{ background:#334155; color:#fff; border:0; padding:6px 10px; border-radius:8px; cursor:pointer; }
+    .hist-card{ border:1px solid var(--line); border-radius:10px; margin:8px 0; overflow:hidden; }
+    .hist-top{ background:var(--soft); padding:10px 12px; font-weight:600; }
+    .hist-meta{ font-size:12px; color:var(--muted); margin-left:6px; font-weight:500; }
+    .hist-table{ width:100%; border-collapse:collapse; }
+    .hist-table th, .hist-table td{ border-top:1px solid var(--line); padding:8px 10px; text-align:center; }
+    .hist-table th:first-child, .hist-table td:first-child{ text-align:left; }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Top-center hole controls -->
   <div class="holeWrap">
     <div class="holeNav">
       <button id="prevHole">◀</button>
@@ -135,7 +143,6 @@
     <button id="scoreToggle" class="scoreBtn">Scorecard</button>
   </div>
 
-  <!-- Top-right wind -->
   <div class="windBox" id="windBox" title="10 m wind at 10 m height">
     <div class="windLeft">
       <svg class="windSock" viewBox="0 0 64 64" aria-hidden="true">
@@ -155,21 +162,18 @@
     </svg>
   </div>
 
-  <!-- Top-left distances -->
   <div class="distBox">
     <div class="row"><span class="label">Front</span><span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span></div>
-    <div class="row"><span class="label">Mid</span><span class="col"><span class="value" id="dMid">–</span><span class="delta" id="eMid">–</span></span></div>
+    <div class="row"><span class="label">Mid</span><span class="col"><span class="value mid" id="dMid">–</span><span class="delta" id="eMid">–</span></span></div>
     <div class="row"><span class="label">Back</span><span class="col"><span class="value" id="dBack">–</span><span class="delta" id="eBack">–</span></span></div>
     <div class="muted" id="status">Getting GPS…</div>
   </div>
 
-  <!-- Footer -->
   <div class="footer">
     <div>Par <span class="badge" id="par">–</span></div>
     <div>Stroke <span class="badge" id="stroke">–</span></div>
   </div>
 
-  <!-- Right panel (course select etc.) -->
   <div class="panel hidden" id="panel">
     <div><strong>Select course</strong></div>
     <div class="grid" style="margin-top:6px;">
@@ -183,14 +187,13 @@
     </div>
   </div>
 
-  <!-- Left FABs -->
-  <button id="holeViewBtn" class="fab-left" title="Fit hole (tee→green)" style="bottom: 204px;">
+  <button id="holeViewBtn" class="fab-left" title="Fit hole (tee→green)" style="bottom: 140px;">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="#ffffff">
       <path d="M6 3a1 1 0 0 0-1 1v16H3v2h4V4a1 1 0 0 0-1-1z"></path>
       <path d="M7 5h9l-2 3 2 3H7z"></path>
     </svg>
   </button>
-  <button id="cartViewBtn" class="fab-left" title="Auto-fit (you + green)" style="bottom: 140px;">
+  <button id="cartViewBtn" class="fab-left" title="Auto-fit (you + green)" style="bottom: 76px;">
     <svg viewBox="0 0 40 32" aria-hidden="true" fill="#ffffff">
       <rect x="5" y="10" width="24" height="10" rx="2" ry="2"></rect>
       <polygon points="5,10 15,4 29,4 29,10"></polygon>
@@ -198,7 +201,7 @@
       <circle cx="27" cy="24" r="4"></circle>
     </svg>
   </button>
-  <button id="recenterBtn" class="fab-left" title="Recenter" style="bottom: 76px; display:none;">
+  <button id="recenterBtn" class="fab-left" title="Recenter" style="bottom: 12px; display:none;">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="2" fill="#ffffff"/>
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
@@ -206,25 +209,17 @@
     </svg>
   </button>
 
-  <!-- Guest History button (shows only for guests) -->
-  <button id="historyBtn" class="fab-left" title="History (guest)" style="bottom: 268px; display:none;">
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill="#ffffff">
-      <path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Z"></path>
-      <path d="M12.5 7h-2v6l5.25 3.15 1-1.63-4.25-2.52Z"></path>
-    </svg>
-  </button>
-
-  <!-- Clear layup button -->
   <button id="clearLayupBtn">Clear layup</button>
 
-  <!-- Panel toggle (☰) -->
   <button id="panelToggle" class="fab">☰</button>
 
-  <!-- ===== SCORECARD v2 (traditional) ===== -->
+  <!-- SCORECARD -->
   <div id="scorecard" class="scorecard" aria-live="polite">
     <div class="sc-header">
       <div class="sc-title">Scorecard</div>
       <div class="sc-actions">
+        <button id="scSave" class="sc-button">Save</button>
+        <button id="scHistory" class="sc-button secondary">History</button>
         <button id="scEndRound" class="sc-button danger" title="End Round (clear scores)">End Round</button>
         <button id="scClear" class="sc-button danger" title="Clear inputs">Clear</button>
         <button id="scClose" class="sc-button">Close</button>
@@ -259,52 +254,32 @@
       <div class="sc-muted">Stableford points auto-calc per hole from par, stroke index and handicaps.</div>
     </div>
 
-    <!-- Traditional table -->
+    <!-- Table -->
     <div id="scTableWrap" style="display:none; overflow:auto;">
       <table class="sc-table" id="scTable"></table>
       <div class="sc-summary" id="scTotals">Totals…</div>
     </div>
   </div>
 
-  <!-- Guest History panel -->
-  <div class="panel hidden" id="historyPanel" aria-live="polite" style="max-width:420px;">
-    <div><strong>Recent Rounds (Guest)</strong></div>
-    <div id="historyList" class="muted" style="margin-top:8px;">No rounds yet.</div>
-    <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
-      <button id="historyClose">Close</button>
-      <button id="historyClear" style="background:#b91c1c; color:#fff;">Clear All</button>
+  <!-- HISTORY MODAL -->
+  <div id="historyModal" class="history" aria-live="polite">
+    <div class="hist-header">
+      <div class="hist-title">Saved Rounds (last 10)</div>
+      <button id="histClose" class="hist-close">Close</button>
     </div>
+    <div id="histList"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
+    // ===== Helpers =====
+    const qs = new URLSearchParams(location.search);
+    const COURSE_ID = qs.get('course') || '';
 
-function holeComplete(holeIdx){
-  for (let p = 0; p < playerCount; p++){
-    if (!scores[p] || scores[p][holeIdx] == null) return false;
-  }
-  return true;
-}
+    let holes=[], currentIndex=0, courseList=[];
+    let lastPos=null, movedOnce=false;
 
-    
-    // ------- Prevent pull-to-refresh bounce -------
-    let _touchStartY = 0;
-    window.addEventListener('touchstart', (e)=>{ _touchStartY = e.touches[0].clientY; }, {passive:true});
-    window.addEventListener('touchmove', (e)=>{
-      const y = e.touches[0].clientY;
-      const scrollingDownAtTop = (window.scrollY === 0) && (y > _touchStartY);
-      if (scrollingDownAtTop) { e.preventDefault(); }
-    }, {passive:false});
-
-    // ------- Base map -------
-    const esriImagery = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
-    );
-    const map = L.map('map', { zoomControl: false, layers: [esriImagery] });
-    map.setView([-25.7542, 28.2322], 15);
-
-    // Helpers
+    // Haversine meters
     const toRad = d => d * Math.PI / 180;
     function meters(a,b){
       const R=6371000;
@@ -314,6 +289,31 @@ function holeComplete(holeIdx){
       return 2*R*Math.asin(Math.sqrt(q));
     }
     function latLngBoundsFrom(a,b){ return L.latLngBounds(L.latLng(a.lat,a.lng), L.latLng(b.lat,b.lng)); }
+
+    // ===== Map =====
+    const esriImagery = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
+    );
+    const map = L.map('map', { zoomControl: false, layers: [esriImagery] });
+    map.setView([-25.7542, 28.2322], 15);
+
+    const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
+    const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
+    const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
+
+    const status=document.getElementById('status');
+    const dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
+    const eFront=document.getElementById('eFront'), eMid=document.getElementById('eMid'), eBack=document.getElementById('eBack');
+    const parEl=document.getElementById('par'), strokeEl=document.getElementById('stroke');
+    const holeTitle=document.getElementById('holeTitle');
+    const panel=document.getElementById('panel'), toggleBtn=document.getElementById('panelToggle');
+    const courseSel=document.getElementById('courseSelect'), holesSel=document.getElementById('holes');
+    const holeViewBtn=document.getElementById('holeViewBtn'), cartViewBtn=document.getElementById('cartViewBtn');
+
+    // Panels
+    function setPanelHidden(h){ panel.classList.toggle('hidden',h); toggleBtn.textContent=h?'☰':'✕'; }
+    setPanelHidden(true); toggleBtn.onclick=()=>setPanelHidden(!panel.classList.contains('hidden'));
 
     // Markers
     function mstyle(n){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[n]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:.9,color:p[0],fillColor:p[1]}; }
@@ -330,29 +330,28 @@ function holeComplete(holeIdx){
     function clearTee(){ if(markers.tee){ map.removeLayer(markers.tee); markers.tee=null; } }
     function clearMarkers(){ ['front','mid','back'].forEach(k=>{ if(markers[k]){ map.removeLayer(markers[k]); markers[k]=null; }}); clearTee(); }
 
-    // Cart icon
-    const cartSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
-    const cartIcon = L.icon({ iconUrl: `data:image/svg+xml;utf8,${cartSvg}`, iconSize: [28,22], iconAnchor: [14,11] });
-    const you = L.marker([0,0], { icon: cartIcon }).addTo(map);
-
-    // UI refs / state
-    const status=document.getElementById('status');
-    const dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
-    const eFront=document.getElementById('eFront'), eMid=document.getElementById('eMid'), eBack=document.getElementById('eBack');
-    const parEl=document.getElementById('par'), strokeEl=document.getElementById('stroke');
-    const holeTitle=document.getElementById('holeTitle');
-    const panel=document.getElementById('panel'), toggleBtn=document.getElementById('panelToggle');
-    const courseSel=document.getElementById('courseSelect'), holesSel=document.getElementById('holes');
-    const holeViewBtn=document.getElementById('holeViewBtn'), cartViewBtn=document.getElementById('cartViewBtn');
-
-    let holes=[], currentIndex=0, courseList=[];
-    let lastPos=null, movedOnce=false;
-
-    // View mode
+    // View
     let viewMode='cart';
-    const ACCURACY_MAX=25;
+    function getGreenAnchor(h){ return h.green?.back || h.green?.mid || h.green?.center || null; }
+    function cartFit(){
+      const h=holes[currentIndex]; if(!h || !lastPos) return;
+      const g=getGreenAnchor(h); if(!g) return;
+      map.fitBounds(latLngBoundsFrom(lastPos,g), { padding:[60,60,60,60] });
+    }
+    function holeFit(){
+      const h=holes[currentIndex]; if(!h) return;
+      const back=getGreenAnchor(h);
+      if(h.tee && back) map.fitBounds(latLngBoundsFrom(h.tee, back), { padding:[60,60,60,60] });
+      else if(back){
+        const ref=lastPos||back;
+        map.fitBounds(latLngBoundsFrom(ref, back), { padding:[60,60,60,60] });
+      }
+    }
+    function setViewMode(mode){ viewMode=mode; if(mode==='hole') holeFit(); else cartFit(); }
+    document.getElementById('holeViewBtn').onclick = ()=> setViewMode('hole');
+    document.getElementById('cartViewBtn').onclick = ()=> setViewMode('cart');
 
-    // Wind
+    // Wind (simple caching)
     const windSpeedEl=document.getElementById('windSpeed'), windDirTxtEl=document.getElementById('windDirTxt'), windArrowEl=document.getElementById('windArrow');
     let windCache={ts:0,lat:null,lng:null,speed:null,dir:null}; const WIND_TTL=10*60*1000;
     function degToCompass(d){ const dirs=['N','NE','E','SE','S','SW','W','NW','N']; return dirs[Math.round(((d%360)/45))]; }
@@ -360,11 +359,7 @@ function holeComplete(holeIdx){
     async function ensureWind(){ if(!lastPos)return; const now=Date.now(); if(now-windCache.ts>WIND_TTL){ const {speed,dir}=await fetchWind(lastPos.lat,lastPos.lng); windCache={ts:now,lat:lastPos.lat,lng:lastPos.lng,speed,dir}; } renderWind(); }
     function renderWind(){ const {speed,dir}=windCache; windSpeedEl.textContent=(typeof speed==='number')?`${speed.toFixed(1)} m/s`:'– m/s'; windDirTxtEl.textContent=(typeof dir==='number')?`${degToCompass(dir)} (${Math.round(dir)}°)`:'–'; windArrowEl.style.transform=`rotate(${(typeof dir==='number'?dir:0)}deg)`; }
 
-    // Panel toggle
-    function setPanelHidden(h){ panel.classList.toggle('hidden',h); toggleBtn.textContent=h?'☰':'✕'; }
-    setPanelHidden(true); toggleBtn.onclick=()=>setPanelHidden(!panel.classList.contains('hidden'));
-
-    // Elevation
+    // Elevation delta (cached)
     let lastElev=null,lastElevAt=0;
     async function fetchCurrentElevation(p){
       const now=Date.now();
@@ -372,24 +367,6 @@ function holeComplete(holeIdx){
       try{ const r=await fetch(`/elevation?lat=${p.lat}&lng=${p.lng}`); const js=await r.json(); const v=js?.results?.[0]?.elevation; if(typeof v==='number'){ lastElev=v; lastElevAt=now; return v; } }catch{} return null;
     }
     function fmtDelta(d){ if(d==null) return '–'; if(Math.abs(d)<0.5) return '±0 m'; return d>0?`↑ ${Math.round(d)} m`:`↓ ${Math.round(Math.abs(d))} m`; }
-
-    function updateHoleUI(center=true){
-      if(!holes.length) return;
-      const h=holes[currentIndex];
-      clearMarkers();
-      setMarker('front',h.green.front||h.green.center,'Front','front');
-      setMarker('mid',  h.green.mid  ||h.green.center,'Mid','mid');
-      setMarker('back', h.green.back ||h.green.center,'Back','back');
-      if(h.tee) setMarker('tee',h.tee,'Tee'); else clearTee();
-
-      holeTitle.textContent=`Hole ${h.number}`;
-      parEl.textContent=h.par??'–'; strokeEl.textContent=h.strokeIndex??'–';
-      holesSel.value=String(h.number);
-
-      if(center){ if(viewMode==='hole') holeFit(); else cartFit(); }
-      if(lastPos) updateDistancesAndDeltas();
-      refreshMeasureSecondSegment();
-    }
 
     async function updateDistancesAndDeltas(){
       if(!lastPos || !holes.length) return;
@@ -404,19 +381,14 @@ function holeComplete(holeIdx){
       eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
     }
 
-    // Layup (two segments)
+    // Layup measure with 2 segments
     const clearLayupBtn=document.getElementById('clearLayupBtn');
     let measureTarget=null, measureMarker=null, measureMarker2=null, measureLine=null, measureLine2=null;
     function bubbleEl(initial='– m'){
       const el=document.createElement('div');
       el.className='dd-measure';
       el.innerHTML=`<div class="anchor-dot"></div>
-        <div class="bubble">
-          <div class="measure-bubble">
-            <span class="measure-text">${initial}</span>
-            <span class="measure-close" aria-label="Clear">×</span>
-          </div>
-        </div>`;
+        <div class="bubble"><div class="measure-bubble"><span class="measure-text">${initial}</span><span class="measure-close" aria-label="Clear">×</span></div></div>`;
       el.querySelector('.measure-close').addEventListener('click',(ev)=>{ ev.stopPropagation(); clearMeasure(); });
       L.DomEvent.disableClickPropagation(el);
       return el;
@@ -469,25 +441,8 @@ function holeComplete(holeIdx){
     map.on('click', (e)=> setMeasure({lat:e.latlng.lat, lng:e.latlng.lng}) );
     clearLayupBtn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); clearMeasure(); });
 
-    // View modes (no rotation)
-    function getGreenAnchor(h){ return h.green?.back || h.green?.mid || h.green?.center || null; }
-    function cartFit(){
-      const h=holes[currentIndex]; if(!h || !lastPos) return;
-      const g=getGreenAnchor(h); if(!g) return;
-      map.fitBounds(latLngBoundsFrom(lastPos,g), { padding:[60,60,60,60] });
-    }
-    function holeFit(){
-      const h=holes[currentIndex]; if(!h) return;
-      const back=getGreenAnchor(h);
-      if(h.tee && back) map.fitBounds(latLngBoundsFrom(h.tee, back), { padding:[60,60,60,60] });
-      else if(back){
-        const ref=lastPos||back;
-        map.fitBounds(latLngBoundsFrom(ref, back), { padding:[60,60,60,60] });
-      }
-    }
-    function setViewMode(mode){ viewMode=mode; if(mode==='hole') holeFit(); else cartFit(); }
-
     // GPS
+    const ACCURACY_MAX=25;
     if('geolocation' in navigator){
       navigator.geolocation.watchPosition(async pos=>{
         const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
@@ -499,17 +454,20 @@ function holeComplete(holeIdx){
       }, err=>{ status.textContent=err.message; }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
     } else { status.textContent='Geolocation not supported'; }
 
-    // Buttons
-    document.getElementById('recenterBtn').onclick=()=>{ if(viewMode==='hole') holeFit(); else cartFit(); };
-    document.getElementById('holeViewBtn').onclick = ()=> setViewMode('hole');
-    document.getElementById('cartViewBtn').onclick = ()=> setViewMode('cart');
-
-    // Course load
-    async function loadCourseList(){ try{ const r=await fetch('/courses/index.json'); const js=await r.json(); courseList=js.courses||[]; courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);}); }catch{ courseSel.innerHTML=''; } }
+    // ===== Course load =====
+    async function loadCourseList(){
+      try{
+        const r=await fetch('/courses/index.json'); // optional, if you have one
+        const js=await r.json(); courseList=js.courses||[];
+        courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);});
+      }catch{ courseSel.innerHTML=''; }
+    }
     async function loadCourse(id){
       holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
       try{
-        const r=await fetch(`/courses/${encodeURIComponent(id)}.json`); const raw=await r.json();
+        // Your course JSONs live at /course/<id>.json
+        const r=await fetch(`/course/${encodeURIComponent(id)}.json`);
+        const raw=await r.json();
         const root=raw.course||raw;
         holes=(root.holes||[]).map(h=>({
           number:(h.number??h.hole??h.holeNumber??null)*1,
@@ -523,8 +481,6 @@ function holeComplete(holeIdx){
         holesSel.innerHTML=''; holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
         if(holes.length){ currentIndex=0; updateHoleUI(true); }
         status.textContent=`Loaded course: ${root.name||id}`;
-
-        await autofillElevationsForCourse(id);
         buildScorecard(); loadSavedScores(id);
         if(viewMode==='hole') holeFit(); else cartFit();
       }catch{ status.textContent=`Failed to load course ${id}`; }
@@ -534,35 +490,25 @@ function holeComplete(holeIdx){
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
 
-    // Elevation autofill (cache)
-    const ELEV_CACHE_TTL=1000*60*60*24*30;
-    function loadElevCache(courseId){ try{ const raw=localStorage.getItem('dd_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
-    function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('dd_elev_'+courseId, JSON.stringify(cache)); }catch{} }
-    async function fetchElevPoint(lat,lng){
-      try{ const r=await fetch(`/elevation?lat=${lat}&lng=${lng}`); if(r.ok){ const j=await r.json(); const v=j?.results?.[0]?.elevation; if(typeof v==='number') return v; } }catch{}
-      return null;
-    }
-    async function autofillElevationsForCourse(courseId){
+    function updateHoleUI(center=true){
       if(!holes.length) return;
-      const cache=loadElevCache(courseId);
-      holes.forEach(h=>{ const ch=cache.holes?.[h.number]; if(ch){ h.elevation=h.elevation||{}; if(ch.front!=null && h.elevation.front==null) h.elevation.front=ch.front; if(ch.mid!=null && h.elevation.mid==null) h.elevation.mid=ch.mid; if(ch.back!=null && h.elevation.back==null) h.elevation.back=ch.back; } });
-      const jobs=[];
-      for(const h of holes){
-        const pts=[['front',h.green.front],['mid',h.green.mid||h.green.center],['back',h.green.back]];
-        for(const [key,pt] of pts){ if(!pt) continue; if(h.elevation?.[key]==null) jobs.push({hole:h,key,lat:pt.lat,lng:pt.lng}); }
-      }
-      if(!jobs.length){ updateHoleUI(false); return; }
-      for(const job of jobs){
-        const v=await fetchElevPoint(job.lat,job.lng);
-        if(!job.hole.elevation) job.hole.elevation={};
-        if(v!=null) job.hole.elevation[job.key]=v;
-        const entry=cache.holes[job.hole.number]||{}; if(v!=null) entry[job.key]=v; cache.holes[job.hole.number]=entry;
-        if(job.hole===holes[currentIndex]) updateDistancesAndDeltas();
-      }
-      saveElevCache(courseId,cache); updateHoleUI(false);
+      const h=holes[currentIndex];
+      clearMarkers();
+      setMarker('front',h.green.front||h.green.center,'Front','front');
+      setMarker('mid',  h.green.mid  ||h.green.center,'Mid','mid');
+      setMarker('back', h.green.back ||h.green.center,'Back','back');
+      if(h.tee) setMarker('tee',h.tee,'Tee'); else clearTee();
+
+      holeTitle.textContent=`Hole ${h.number}`;
+      parEl.textContent=h.par??'–'; strokeEl.textContent=h.strokeIndex??'–';
+      holesSel.value=String(h.number);
+
+      if(center){ if(viewMode==='hole') holeFit(); else cartFit(); }
+      if(lastPos) updateDistancesAndDeltas();
+      refreshMeasureSecondSegment();
     }
 
-    /* ===================== SCORECARD v2 (traditional) ===================== */
+    // ===== Scorecard v2 (with Save & History) =====
     const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
     const scSetup=document.getElementById('scSetup'), scTableWrap=document.getElementById('scTableWrap'), scTable=document.getElementById('scTable'), scTotals=document.getElementById('scTotals');
     const scCount=document.getElementById('scCount'), scHcapSwitch=document.getElementById('scHcapSwitch');
@@ -570,6 +516,7 @@ function holeComplete(holeIdx){
     const hcapEls=[document.getElementById('h1'),document.getElementById('h2'),document.getElementById('h3'),document.getElementById('h4')];
     const hcapRow=document.getElementById('hcapRow');
     const scCreate=document.getElementById('scCreate'), scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear'), scEndRound=document.getElementById('scEndRound');
+    const scSave=document.getElementById('scSave'), scHistory=document.getElementById('scHistory');
 
     let playerCount=1, scores=[], handicaps=[0,0,0,0], useHcap=false, courseIdForScores=null;
 
@@ -593,16 +540,9 @@ function holeComplete(holeIdx){
     scoreToggle.onclick=()=>{ scorecard.classList.toggle('show'); };
     scClose.onclick=()=>scorecard.classList.remove('show');
     scClear.onclick=()=>{ if(!confirm('Clear all entered scores?')) return; clearScoresOnly(); };
-
-    // Save history for guest before full end
-    scEndRound.onclick=()=>{
-      if(!confirm('End round? This clears players, handicaps and scores for this course.')) return;
-      try { tl_saveGuestRoundIfNeeded(); } catch {}
-      endRoundFull();
-    };
+    scEndRound.onclick=()=>{ if(!confirm('End round? This clears players, handicaps and scores for this course.')) return; endRoundFull(); };
 
     scCount.onchange=()=>{ playerCount=Number(scCount.value); applySetupVisibility(); persistMeta(); rebuildAndRender(); };
-
     scHcapSwitch.addEventListener('click', ()=>{ useHcap=!useHcap; setSwitch(useHcap); applySetupVisibility(); persistMeta(); rebuildAndRender(); });
     scHcapSwitch.addEventListener('keydown', (e)=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); scHcapSwitch.click(); } });
 
@@ -615,8 +555,7 @@ function holeComplete(holeIdx){
       showSetup(true);
       setSwitch(useHcap);
       applySetupVisibility();
-      scTable.innerHTML='';
-      scTotals.textContent='Totals…';
+      scTable.innerHTML=''; scTotals.textContent='Totals…';
     }
 
     function relationToPar(score,par){
@@ -643,29 +582,19 @@ function holeComplete(holeIdx){
       scTable.innerHTML='';
       const thead=document.createElement('thead');
 
-      // Top header
       const trTop=document.createElement('tr');
       const thCorner=document.createElement('th'); thCorner.textContent='Hole'; trTop.appendChild(thCorner);
-
       const makeHeaderCells=(start,end,labelAfter)=>{
-        for(let i=start;i<=end;i++){
-          const th=document.createElement('th'); th.className='sc-hole-col'; th.textContent=String(i); trTop.appendChild(th);
-        }
-        if(labelAfter){
-          const th=document.createElement('th'); th.className='sc-total-col'; th.textContent=labelAfter; trTop.appendChild(th);
-        }
+        for(let i=start;i<=end;i++){ const th=document.createElement('th'); th.className='sc-hole-col'; th.textContent=String(i); trTop.appendChild(th); }
+        if(labelAfter){ const th=document.createElement('th'); th.className='sc-total-col'; th.textContent=labelAfter; trTop.appendChild(th); }
       };
-
       const frontEnd = Math.min(9, nHoles);
       makeHeaderCells(1, frontEnd, 'Out');
-      if(nHoles>9) makeHeaderCells(10, nHoles, 'In'); else {
-        const thPad=document.createElement('th'); thPad.className='sc-total-col'; thPad.textContent='In'; trTop.appendChild(thPad);
-      }
+      if(nHoles>9) makeHeaderCells(10, nHoles, 'In'); else { const thPad=document.createElement('th'); thPad.className='sc-total-col'; thPad.textContent='In'; trTop.appendChild(thPad); }
       const thTotal=document.createElement('th'); thTotal.className='sc-total-col'; thTotal.textContent='Total'; trTop.appendChild(thTotal);
       const thNet=document.createElement('th'); thNet.className='sc-total-col'; thNet.textContent='Net'; trTop.appendChild(thNet);
       thead.appendChild(trTop);
 
-      // Par row
       const trPar=document.createElement('tr');
       const thPar=document.createElement('th'); thPar.textContent='Par'; trPar.appendChild(thPar);
       for(let i=1;i<=frontEnd;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.par??'–'); trPar.appendChild(td); }
@@ -676,7 +605,6 @@ function holeComplete(holeIdx){
       const tdParNet=document.createElement('td'); tdParNet.className='sc-total-col'; tdParNet.textContent='–'; trPar.appendChild(tdParNet);
       thead.appendChild(trPar);
 
-      // Stroke Index row
       const trSi=document.createElement('tr');
       const thSi=document.createElement('th'); thSi.textContent='SI'; trSi.appendChild(thSi);
       for(let i=1;i<=frontEnd;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.strokeIndex??'–'); trSi.appendChild(td); }
@@ -796,21 +724,44 @@ function holeComplete(holeIdx){
       scTotals.textContent = parts.join('   •   ');
     }
 
-function onScoreChange(p,i,val){
-  if(!scores[p]) scores[p]=[];
-  scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
+    // ===== Auto-advance (only when all players filled current hole) =====
+    function focusScoreInput(playerIdx, holeIdx) {
+      try {
+        const nHoles = holes.length;
+        const frontEnd = Math.min(9, nHoles);
+        const row = document.getElementById('scTable')?.tBodies?.[0]?.rows?.[playerIdx];
+        if (!row) return;
+        const cellIndex = 1 + holeIdx + (holeIdx >= frontEnd ? 1 : 0);
+        const cell = row.cells[cellIndex];
+        const input = cell?.querySelector('.sc-score-input');
+        if (input) input.focus();
+      } catch {}
+    }
+    function advanceHole() {
+      if (!holes.length) return;
+      currentIndex = (currentIndex + 1) % holes.length;
+      updateHoleUI(true);
+      const holesSel = document.getElementById('holes');
+      if (holesSel) holesSel.value = String(holes[currentIndex].number);
+      focusScoreInput(0, currentIndex);
+    }
+    function holeComplete(holeIdx){
+      for (let p = 0; p < playerCount; p++){
+        if (!scores[p] || scores[p][holeIdx] == null) return false;
+      }
+      return true;
+    }
+    function onScoreChange(p,i,val){
+      if(!scores[p]) scores[p]=[];
+      scores[p][i] = (typeof val==='number'&&!Number.isNaN(val))?val:null;
+      persistScores();
+      renderScores();
+      if (i === currentIndex && holeComplete(currentIndex)) {
+        setTimeout(advanceHole, 200);
+      }
+    }
 
-  persistScores();
-  renderScores();
-
-  // Only consider advancing when the edited cell is for the CURRENT hole
-  if (i === currentIndex && holeComplete(currentIndex)) {
-    // small delay so the value renders before we move
-    setTimeout(advanceHole, 200);
-  }
-}
-
-
+    // ===== Persist (per-course) =====
     function persistMeta(){
       if(!courseIdForScores) return;
       const meta={
@@ -819,14 +770,14 @@ function onScoreChange(p,i,val){
         names: nameEls.map((el,i)=> (i<playerCount ? (el.value||`P${i+1}`) : null)),
         handicaps: hcapEls.map((el,i)=> (i<playerCount ? Math.max(0,Math.min(54, Number(el.value)||0)) : null))
       };
-      localStorage.setItem(`dd_sc2_meta_${courseIdForScores}`, JSON.stringify(meta));
+      localStorage.setItem(`tl_sc_meta_${courseIdForScores}`, JSON.stringify(meta));
     }
-    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`dd_sc2_scores_${courseIdForScores}`, JSON.stringify(scores)); }
+    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`tl_sc_scores_${courseIdForScores}`, JSON.stringify(scores)); }
 
     function loadSavedScores(id){
       courseIdForScores=id;
       try{
-        const meta=JSON.parse(localStorage.getItem(`dd_sc2_meta_${id}`)||'null');
+        const meta=JSON.parse(localStorage.getItem(`tl_sc_meta_${id}`)||'null');
         if(meta){
           scCount.value = String(meta.count||1);
           playerCount = Number(scCount.value);
@@ -842,7 +793,7 @@ function onScoreChange(p,i,val){
       applySetupVisibility();
 
       try{
-        const saved=JSON.parse(localStorage.getItem(`dd_sc2_scores_${id}`)||'null');
+        const saved=JSON.parse(localStorage.getItem(`tl_sc_scores_${id}`)||'null');
         if(saved&&Array.isArray(saved)&&saved.length===4&&saved[0].length===holes.length){
           scores=saved;
         } else {
@@ -859,140 +810,122 @@ function onScoreChange(p,i,val){
     }
     function endRoundFull(){
       if(!courseIdForScores) return;
-      localStorage.removeItem(`dd_sc2_meta_${courseIdForScores}`);
-      localStorage.removeItem(`dd_sc2_scores_${courseIdForScores}`);
+      localStorage.removeItem(`tl_sc_meta_${courseIdForScores}`);
+      localStorage.removeItem(`tl_sc_scores_${courseIdForScores}`);
       scCount.value='1'; playerCount=1;
-      setSwitch(false); useHcap=false; handicaps=[0,0,0,0];
+      setSwitch(false); useHcap=false;
       nameEls.forEach((el)=>{ el.value=''; });
       hcapEls.forEach((el)=>{ el.value=''; });
       applySetupVisibility();
       buildScorecard();
     }
 
-    // Init
+    // ===== Save Round & History (last 10) =====
+    function computeRoundSummary(){
+      const players=[];
+      for(let p=0;p<playerCount;p++){
+        let gross=0, stab=0;
+        for(let i=0;i<holes.length;i++){
+          const v=scores[p][i];
+          const par=holes[i]?.par??null;
+          const si=holes[i]?.strokeIndex??null;
+          if(v!=null) gross+=v;
+          stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
+        }
+        const nett = gross - (useHcap ? (handicaps[p]||0) : 0);
+        players.push({
+          name: (nameEls[p].value || `P${p+1}`),
+          handicap: (useHcap ? (handicaps[p]||0) : 0),
+          gross: gross||0,
+          net: nett||0,
+          stableford: stab||0
+        });
+      }
+      const meta = JSON.parse(localStorage.getItem(`tl_sc_meta_${courseIdForScores}`)||'{}');
+      return {
+        savedAt: new Date().toISOString(),
+        courseId: courseIdForScores || COURSE_ID || 'unknown',
+        courseName: courseSel?.selectedOptions?.[0]?.textContent || holeTitle?.textContent?.replace('Hole','Course') || COURSE_ID,
+        players
+      };
+    }
+    function saveRound(){
+      const key='tl_guest_rounds';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      arr.unshift(computeRoundSummary());
+      while(arr.length>10) arr.pop();
+      localStorage.setItem(key, JSON.stringify(arr));
+      alert('Round saved to device (last 10 kept).');
+    }
+    function openHistory(){
+      const key='tl_guest_rounds';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      renderHistory(arr);
+      document.getElementById('historyModal').classList.add('show');
+    }
+    function closeHistory(){ document.getElementById('historyModal').classList.remove('show'); }
+
+    function renderHistory(rounds){
+      const wrap = document.getElementById('histList');
+      wrap.innerHTML='';
+      if(!rounds.length){ wrap.innerHTML='<div class="hist-card"><div class="hist-top">No saved rounds yet.</div></div>'; return; }
+      rounds.forEach(r=>{
+        const top = document.createElement('div');
+        top.className='hist-top';
+        const dateStr = new Date(r.savedAt).toLocaleString();
+        top.innerHTML = `<strong>${(r.courseName||r.courseId||'Course')}</strong><span class="hist-meta"> • ${dateStr}</span>`;
+
+        const table = document.createElement('table');
+        table.className='hist-table';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Hcap</th>
+              <th>Total</th>
+              <th>Net</th>
+              <th>Stableford</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(r.players||[]).map(p=>`
+              <tr>
+                <td style="text-align:left;">${escapeHtml(p.name||'-')}</td>
+                <td>${Number(p.handicap||0)}</td>
+                <td><strong>${Number(p.gross||0)}</strong></td>
+                <td>${Number(p.net||0)}</td>
+                <td>${Number(p.stableford||0)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+
+        const card = document.createElement('div');
+        card.className='hist-card';
+        card.appendChild(top);
+        card.appendChild(table);
+        wrap.appendChild(card);
+      });
+    }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+    scSave.addEventListener('click', saveRound);
+    scHistory.addEventListener('click', openHistory);
+    document.getElementById('histClose').addEventListener('click', closeHistory);
+
+    // ===== Init =====
+    document.getElementById('recenterBtn').onclick=()=>{ if(viewMode==='hole') holeFit(); else cartFit(); };
+
     async function init(){
       await loadCourseList();
-      const cid=new URLSearchParams(location.search).get('course');
-      if(cid){
+      const cid = COURSE_ID || (courseList[0]?.id || '');
+      if (cid) {
         loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); });
       }
     }
     init();
-
-    /* ===== TrackLinq mode handling (club vs guest) ===== */
-    const TL_MODE = localStorage.getItem('tl_mode') || 'guest'; // 'club' | 'guest'
-    const TL_CLUB = (() => { try { return JSON.parse(localStorage.getItem('tl_club')||'null'); } catch { return null; } })();
-
-    window.addEventListener('DOMContentLoaded', () => {
-      // Hide the bottom-right panel toggle (☰) for clubs; guests can switch courses
-      const toggleBtn = document.getElementById('panelToggle');
-      if (toggleBtn) {
-        if (TL_MODE === 'club') toggleBtn.style.display = 'none';
-        else toggleBtn.style.display = '';
-      }
-      // Also disable the course picker controls for clubs
-      const courseSel = document.getElementById('courseSelect');
-      const loadBtn   = document.getElementById('btnLoadCourse');
-      if (TL_MODE === 'club') {
-        if (courseSel) courseSel.disabled = true;
-        if (loadBtn)   loadBtn.disabled   = true;
-      }
-    });
-
-    /* ===== Guest history (last 10 rounds) ===== */
-    function tl_getGuestHistory(){
-      try { return JSON.parse(localStorage.getItem('tl_guest_history') || '[]'); } catch { return []; }
-    }
-    function tl_setGuestHistory(arr){
-      try { localStorage.setItem('tl_guest_history', JSON.stringify(arr.slice(0,10))); } catch {}
-    }
-    function tl_collectRoundSummary(){
-      const when = new Date().toISOString();
-      const courseId = (typeof courseIdForScores !== 'undefined' ? courseIdForScores : null);
-      const courseName =
-        (typeof holes !== 'undefined' && holes.length ? (document.getElementById('status')?.textContent?.replace(/^Loaded course:\s*/,'') || null) : null)
-        || courseId || 'Unknown Course';
-
-      const nHoles = holes?.length || 0;
-      const players = [];
-      for (let p=0; p<4; p++){
-        const isActive = (p < (Number(document.getElementById('scCount')?.value || '1')));
-        if (!isActive) continue;
-        const nameEl = document.getElementById(['p1','p2','p3','p4'][p]);
-        const hcapEl = document.getElementById(['h1','h2','h3','h4'][p]);
-        const name = (nameEl?.value || `P${p+1}`);
-        const hcap = Number(hcapEl?.value || 0) || 0;
-
-        let gross = 0, stab = 0;
-        for (let i=0; i<nHoles; i++){
-          const v = (scores?.[p]?.[i] ?? null);
-          const par = holes?.[i]?.par ?? null;
-          const si  = holes?.[i]?.strokeIndex ?? null;
-          if (v != null) gross += v;
-
-          // Simple shots received (useHcap if enabled, or guest baseline)
-          let shots = 0;
-          if (Number.isFinite(hcap) && Number.isFinite(si)) {
-            const base = Math.floor(hcap/18);
-            const rem  = hcap % 18;
-            shots = base + (si >= 1 && si <= rem ? 1 : 0);
-          }
-          if (v!=null && par!=null){
-            const netRel = (par + shots) - v;
-            stab += Math.max(0, 2 + netRel);
-          }
-        }
-        players.push({ name, gross, hcap, stab });
-      }
-      return { when, courseId, courseName, players };
-    }
-    function tl_saveGuestRoundIfNeeded(){
-      if ((localStorage.getItem('tl_mode') || 'guest') !== 'guest') return;
-      const hist = tl_getGuestHistory();
-      hist.unshift(tl_collectRoundSummary());
-      tl_setGuestHistory(hist);
-    }
-
-    // Guest history UI
-    function tl_renderHistory(){
-      const listEl = document.getElementById('historyList');
-      const data = tl_getGuestHistory();
-      if (!data.length) { listEl.innerHTML = '<span class="muted">No rounds yet.</span>'; return; }
-      const rows = data.map((r) => {
-        const d = new Date(r.when);
-        const when = d.toLocaleString();
-        const course = r.courseName || r.courseId || 'Course';
-        const players = (r.players||[]).map(p => `${p.name}: ${p.gross || 0} (Hcap: ${p.hcap||0}, SF: ${p.stab||0})`).join('<br>');
-        return `<div style="padding:8px 0; border-bottom:1px solid #eee;">
-          <div style="font-weight:700;">${course}</div>
-          <div class="muted" style="font-size:12px;">${when}</div>
-          <div style="margin-top:4px; line-height:1.35;">${players}</div>
-        </div>`;
-      }).join('');
-      listEl.innerHTML = rows;
-    }
-
-    (function tl_setupHistoryUI(){
-      const mode = localStorage.getItem('tl_mode') || 'guest';
-      const btn = document.getElementById('historyBtn');
-      const panel = document.getElementById('historyPanel');
-      const close = document.getElementById('historyClose');
-      const clear = document.getElementById('historyClear');
-
-      if (btn) btn.style.display = (mode === 'guest' ? '' : 'none');
-
-      function show(h){ panel.classList.toggle('hidden', !h); if(h) tl_renderHistory(); }
-      if (btn) btn.addEventListener('click', () => show(!panel || panel.classList.contains('hidden')));
-      if (close) close.addEventListener('click', () => show(false));
-      if (clear) clear.addEventListener('click', () => {
-        if (!confirm('Clear all saved guest rounds?')) return;
-        tl_setGuestHistory([]);
-        tl_renderHistory();
-      });
-    })();
   </script>
 
-  <!-- Service worker register -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
