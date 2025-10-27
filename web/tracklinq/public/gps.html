@@ -455,58 +455,77 @@
     } else { status.textContent='Geolocation not supported'; }
 
     // ===== Course load =====
-    async function loadCourseList(){
-      try{
-        const r=await fetch('/courses/index.json'); // optional, if you have one
-        const js=await r.json(); courseList=js.courses||[];
-        courseSel.innerHTML=''; courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);});
-      }catch{ courseSel.innerHTML=''; }
-    }
     async function loadCourse(id){
-      holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
-      try{
-        // Your course JSONs live at /course/<id>.json
-        const r=await fetch(`/course/${encodeURIComponent(id)}.json`);
-        const raw=await r.json();
-        const root=raw.course||raw;
-        holes=(root.holes||[]).map(h=>({
-          number:(h.number??h.hole??h.holeNumber??null)*1,
-          par:(h.par!=null?Number(h.par):null),
-          strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null,
-          tee: (h.tee && h.tee.lat!=null && h.tee.lng!=null) ? { lat:Number(h.tee.lat), lng:Number(h.tee.lng) } : null,
-          green:{ center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null },
-          elevation:{ front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null }
-        })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
+  holes=[]; currentIndex=0; holesSel.innerHTML='';
+  clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
 
-        holesSel.innerHTML=''; holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
-        if(holes.length){ currentIndex=0; updateHoleUI(true); }
-        status.textContent=`Loaded course: ${root.name||id}`;
-        buildScorecard(); loadSavedScores(id);
-        if(viewMode==='hole') holeFit(); else cartFit();
-      }catch{ status.textContent=`Failed to load course ${id}`; }
+  const baseId = String(id || '').trim().replace(/\.json$/,'');
+  // Try several likely locations/names
+  const candidates = [
+    `/course/${encodeURIComponent(baseId)}.json`,     // you said your file is here
+    `/courses/${encodeURIComponent(baseId)}.json`,    // some setups use plural
+    `/course/${encodeURIComponent(id)}`,              // if id already contains .json
+    `/courses/${encodeURIComponent(id)}`
+  ];
+
+  let lastErr = '';
+  let data = null;
+
+  for (const url of candidates){
+    try{
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) {
+        lastErr = `HTTP ${r.status} on ${url}`;
+        continue;
+      }
+      data = await r.json();
+      break;
+    }catch(e){
+      lastErr = `${e.message} on ${url}`;
     }
-    document.getElementById('btnLoadCourse').onclick=()=>{ const id=courseSel.value; if(!id)return; loadCourse(id); };
-    document.getElementById('btnGoHole').onclick=()=>{ const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); } };
-    document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
-    document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
+  }
 
-    function updateHoleUI(center=true){
-      if(!holes.length) return;
-      const h=holes[currentIndex];
-      clearMarkers();
-      setMarker('front',h.green.front||h.green.center,'Front','front');
-      setMarker('mid',  h.green.mid  ||h.green.center,'Mid','mid');
-      setMarker('back', h.green.back ||h.green.center,'Back','back');
-      if(h.tee) setMarker('tee',h.tee,'Tee'); else clearTee();
+  if (!data){
+    status.textContent = `Failed to load course ${id}. ${lastErr}`;
+    console.error('Course load failed. Tried:', candidates, 'Last error:', lastErr);
+    return;
+  }
 
-      holeTitle.textContent=`Hole ${h.number}`;
-      parEl.textContent=h.par??'–'; strokeEl.textContent=h.strokeIndex??'–';
-      holesSel.value=String(h.number);
+  try{
+    const root = data.course || data;
+    holes = (root.holes||[]).map(h=>({
+      number:(h.number??h.hole??h.holeNumber??null)*1,
+      par:(h.par!=null?Number(h.par):null),
+      strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null,
+      tee: (h.tee && h.tee.lat!=null && h.tee.lng!=null) ? { lat:Number(h.tee.lat), lng:Number(h.tee.lng) } : null,
+      green:{ center:h.green?.center||h.green?.mid||null, front:h.green?.front||null, mid:h.green?.mid||null, back:h.green?.back||null },
+      elevation:{ front:h.elevation?.front??null, mid:h.elevation?.mid??null, back:h.elevation?.back??null }
+    })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
 
-      if(center){ if(viewMode==='hole') holeFit(); else cartFit(); }
-      if(lastPos) updateDistancesAndDeltas();
-      refreshMeasureSecondSegment();
+    holesSel.innerHTML='';
+    holes.forEach(h=>{
+      const o=document.createElement('option');
+      o.value=h.number;
+      o.textContent=`Hole ${h.number}`;
+      holesSel.appendChild(o);
+    });
+
+    if(holes.length){
+      currentIndex=0;
+      updateHoleUI(true);
+      status.textContent=`Loaded course: ${root.name || baseId}`;
+      buildScorecard();
+      loadSavedScores(baseId);
+      if(viewMode==='hole') holeFit(); else cartFit();
+    }else{
+      status.textContent=`Course ${id} loaded but contains no holes.`;
     }
+  }catch(parseErr){
+    status.textContent=`Failed to parse course ${id}. ${parseErr.message}`;
+    console.error(parseErr);
+  }
+}
+
 
     // ===== Scorecard v2 (with Save & History) =====
     const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
