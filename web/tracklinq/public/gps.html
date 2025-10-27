@@ -258,6 +258,35 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
+
+//REMOVE COURSE DROPDOWN FOR CLUBS
+    <script>
+// ===== TrackLinq mode handling =====
+const TL_MODE = localStorage.getItem('tl_mode') || 'guest'; // 'club' | 'guest'
+const TL_CLUB = (() => { try { return JSON.parse(localStorage.getItem('tl_club')||'null'); } catch { return null; } })();
+
+// Run after DOM is ready so we can touch buttons
+window.addEventListener('DOMContentLoaded', () => {
+  // Hide the bottom-right panel toggle (☰) for clubs
+  const toggleBtn = document.getElementById('panelToggle');
+  if (toggleBtn) {
+    if (TL_MODE === 'club') toggleBtn.style.display = 'none';
+    else toggleBtn.style.display = ''; // guest sees it
+  }
+
+  // (Optional hard lock) also disable the course picker controls for clubs
+  const courseSel = document.getElementById('courseSelect');
+  const loadBtn   = document.getElementById('btnLoadCourse');
+  if (TL_MODE === 'club') {
+    if (courseSel) courseSel.disabled = true;
+    if (loadBtn)   loadBtn.disabled   = true;
+  }
+});
+</script>
+
+
+
+    
     // ------- Prevent pull-to-refresh bounce -------
     let _touchStartY = 0;
     window.addEventListener('touchstart', (e)=>{ _touchStartY = e.touches[0].clientY; }, {passive:true});
