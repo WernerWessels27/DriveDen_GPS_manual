@@ -5,15 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TrackLinq</title>
     <style>
-      body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; display:grid; place-items:center; min-height:100vh; }
-      .card { padding:24px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,.06); }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        background: #f8fafc;
+      }
+      .card {
+        padding: 28px 32px;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+        background: white;
+        text-align: center;
+      }
+      h1 {
+        margin-top: 0;
+        color: #111827;
+        font-size: 24px;
+      }
+      p {
+        color: #374151;
+        margin: 8px 0 16px;
+      }
+      a.button {
+        display: inline-block;
+        padding: 12px 20px;
+        border-radius: 8px;
+        background-color: #14532d;
+        color: white;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 0.2s ease;
+      }
+      a.button:hover {
+        background-color: #166534;
+      }
+      code {
+        background: #f1f5f9;
+        padding: 3px 6px;
+        border-radius: 6px;
+      }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>TrackLinq</h1>
-      <p>Step 1 complete — server is serving <code>/public</code>.</p>
-      <p>Health: <a href="/health">/health</a></p>
+      <h1>TrackLinq GPS</h1>
+      <p>Welcome to the TrackLinq server. Static files are being served from <code>/public</code>.</p>
+      <p>
+        <a class="button" href="/login.html">Open the PIN Login Screen</a>
+      </p>
+      <p style="margin-top:20px;">Health check: <a href="/health">/health</a></p>
     </div>
   </body>
 </html>
