@@ -278,6 +278,15 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
+
+function holeComplete(holeIdx){
+  for (let p = 0; p < playerCount; p++){
+    if (!scores[p] || scores[p][holeIdx] == null) return false;
+  }
+  return true;
+}
+
+    
     // ------- Prevent pull-to-refresh bounce -------
     let _touchStartY = 0;
     window.addEventListener('touchstart', (e)=>{ _touchStartY = e.touches[0].clientY; }, {passive:true});
