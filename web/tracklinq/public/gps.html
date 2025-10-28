@@ -97,6 +97,15 @@
     .chip.even{background:#e5e7eb;color:#111827}
     .sc-summary{margin-top:10px;font-weight:600;text-align:center;background:#f3f4f6;border-radius:8px;padding:8px}
   </style>
+
+
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+
+  
 </head>
 <body>
   <div id="map"></div>
@@ -835,5 +844,20 @@
     // Buttons for view
     document.getElementById('historyBtn');
   </script>
+
+
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .catch(console.error);
+  });
+}
+</script>
+
+
+
+  
 </body>
 </html>
