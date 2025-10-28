@@ -284,6 +284,29 @@
     }
     function latLngBoundsFrom(a,b){ return L.latLngBounds(L.latLng(a.lat,a.lng), L.latLng(b.lat,b.lng)); }
 
+    // *** NEW: robust elevation readers ***
+    function readElevation(obj){
+      if(!obj || typeof obj!=='object') return null;
+      for(const k of ['elev','elevation','alt','altitude','z']){
+        if(obj[k]!=null && !Number.isNaN(Number(obj[k]))) return Number(obj[k]);
+      }
+      return null;
+    }
+    function asPoint(x){
+      if(!x) return null;
+      if(Array.isArray(x)){ // [lat,lng,(elev)]
+        const [lat,lng,maybeElev]=x;
+        const p={lat:Number(lat),lng:Number(lng)};
+        const e=(maybeElev!=null)?Number(maybeElev):null;
+        if(!Number.isNaN(e)) p.elev=e;
+        return p;
+      }
+      const p={lat:Number(x.lat ?? x.latitude), lng:Number(x.lng ?? x.lon ?? x.longitude)};
+      const e=readElevation(x);
+      if(e!=null) p.elev=e;
+      return p;
+    }
+
     // Course directories support
     const COURSE_DIRS = ['/course', '/courses'];
     async function fetchJsonFromCourseDirs(relPath){
@@ -428,14 +451,35 @@
       try{
         const raw = await fetchJsonFromCourseDirs(`${encodeURIComponent(id)}.json`);
         const root = raw.course || raw;
-        holes=(root.holes||[]).map(h=>({
-          number:(h.number??h.hole??h.holeNumber??null)*1,
-          par:(h.par!=null?Number(h.par):null),
-          strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null,
-          tee:(h.tee&&h.tee.lat!=null&&h.tee.lng!=null)?{lat:Number(h.tee.lat),lng:Number(h.tee.lng)}:null,
-          green:{center:h.green?.center||h.green?.mid||null,front:h.green?.front||null,mid:h.green?.mid||null,back:h.green?.back||null},
-          elevation:{front:h.elevation?.front??null,mid:h.elevation?.mid??null,back:h.elevation?.back??null}
-        })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
+
+        // *** Normalize points & harvest embedded elevations if present ***
+        holes=(root.holes||[]).map(h=>{
+          const teePt = h.tee ? asPoint(h.tee) : null;
+          const gf = asPoint(h.green?.front || h.front || null);
+          const gm = asPoint(h.green?.mid   || h.green?.center || h.mid || h.center || null);
+          const gb = asPoint(h.green?.back  || h.back || null);
+          const gc = asPoint(h.green?.center || h.center || gm || null);
+
+          const elevObj = {
+            front: (h.elevation?.front ?? readElevation(gf)) ?? null,
+            mid:   (h.elevation?.mid   ?? readElevation(gm)) ?? null,
+            back:  (h.elevation?.back  ?? readElevation(gb)) ?? null
+          };
+
+          return {
+            number:(h.number??h.hole??h.holeNumber??null)*1,
+            par:(h.par!=null?Number(h.par):null),
+            strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null,
+            tee: (teePt && teePt.lat!=null && teePt.lng!=null) ? {lat:teePt.lat, lng:teePt.lng} : null,
+            green:{
+              center: gc || gm || gf || gb || null,
+              front: gf || null,
+              mid:   gm || null,
+              back:  gb || null
+            },
+            elevation: elevObj
+          };
+        }).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
 
         holesSel.innerHTML='';
         holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
@@ -504,7 +548,12 @@
       dMid.textContent  =Math.round(meters(lastPos,m));
       dBack.textContent =Math.round(meters(lastPos,b));
       const curElev=await fetchCurrentElevation(lastPos);
-      const df=h.elevation?.front??null, dm=h.elevation?.mid??null, db=h.elevation?.back??null;
+
+      // *** Use explicit h.elevation first, else fall back to embedded elevation on points ***
+      const df = (h.elevation?.front ?? readElevation(f)) ?? null;
+      const dm = (h.elevation?.mid   ?? readElevation(m)) ?? null;
+      const db = (h.elevation?.back  ?? readElevation(b)) ?? null;
+
       eFront.textContent=(curElev!=null&&df!=null)?fmtDelta(df-curElev):'–';
       eMid.textContent  =(curElev!=null&&dm!=null)?fmtDelta(dm-curElev):'–';
       eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
