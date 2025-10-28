@@ -14,11 +14,11 @@
       --panel:#ffffffee; --text:#111827; --muted:#6b7280;
       --chip:#e6f6ea; --chipText:#14532d;
       --line:#e5e7eb; --soft:#f3f4f6;
+      --ok:#16a34a; --warn:#f59e0b; --danger:#b91c1c;
     }
     html,body{height:100%;margin:0;overscroll-behavior:none}
     body{touch-action:pan-x pan-y;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
     #map{height:100%;position:relative}
-
     .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
 
     .holeWrap{position:fixed;z-index:10000;left:50%;transform:translateX(-50%);top:10px;display:flex;flex-direction:column;align-items:center;gap:8px}
@@ -47,11 +47,18 @@
 
     .footer{position:fixed;left:10px;right:10px;bottom:10px;z-index:10000;background:var(--panel);padding:8px 12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);display:flex;justify-content:center;gap:18px;font-size:14px}
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chipText);font-weight:700}
+    .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12px;white-space:nowrap}
+    .pill.ok{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+    .pill.warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
 
-    .panel{position:fixed;top:80px;right:10px;z-index:10000;background:var(--panel);padding:10px 12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);width:330px;max-width:calc(100% - 20px);max-height:75vh;overflow:auto;transition:transform .25s ease, opacity .2s ease}
+    .panel{position:fixed;top:80px;right:10px;z-index:10000;background:var(--panel);padding:10px 12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);width:360px;max-width:calc(100% - 20px);max-height:75vh;overflow:auto;transition:transform .25s ease, opacity .2s ease}
     .panel.hidden{transform:translateY(16px);opacity:0;pointer-events:none}
     .grid{display:grid;grid-template-columns:1fr auto;gap:8px}
     select,button,input{width:100%;padding:8px;font-size:14px}
+    .metaLine{display:flex;align-items:center;gap:8px;margin-top:6px}
+    .sm{font-size:12px;color:var(--muted)}
+    .btnLink{background:#111827;color:#fff;border-radius:8px;padding:6px 10px;border:0;cursor:pointer}
+    .btnSecondary{background:#e5e7eb;color:#111827}
 
     .fab{position:fixed;right:12px;bottom:12px;z-index:10001;width:52px;height:52px;border-radius:50%;border:0;font-size:22px;background:var(--accent);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);cursor:pointer}
     .fab-left{position:fixed;left:12px;z-index:10001;width:52px;height:52px;border-radius:50%;border:0;font-size:22px;background:var(--brand);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);cursor:pointer}
@@ -96,16 +103,17 @@
     .chip.over{background:#fee2e2;color:#7f1d1d}
     .chip.even{background:#e5e7eb;color:#111827}
     .sc-summary{margin-top:10px;font-weight:600;text-align:center;background:#f3f4f6;border-radius:8px;padding:8px}
+
+    /* Offline modal */
+    .modalMask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:11000;display:flex;align-items:center;justify-content:center;padding:12px}
+    .modalCard{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:16px;box-shadow:0 14px 30px rgba(0,0,0,.3)}
+    .modalHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .modalTitle{font-weight:800;font-size:18px}
+    .modalBody{color:#374151}
+    .progressWrap{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:999px;height:12px;overflow:hidden;margin-top:10px}
+    .progressBar{background:#16a34a;height:100%;width:0%}
+    .modalActions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
   </style>
-
-
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-
-  
 </head>
 <body>
   <div id="map"></div>
@@ -153,14 +161,21 @@
     <div>Stroke <span class="badge" id="stroke">–</span></div>
   </div>
 
-  <!-- Right panel (course controls) -->
+  <!-- Right panel -->
   <div class="panel hidden" id="panel">
     <div><strong>Select course</strong></div>
     <div class="grid" style="margin-top:6px;">
       <select id="courseSelect"></select>
       <button id="btnLoadCourse">Load</button>
     </div>
-    <div class="muted">Open with <code>?course=&lt;id&gt;</code> as well.</div>
+
+    <!-- Offline status + actions for the currently selected course -->
+    <div class="metaLine">
+      <div id="courseBadges"></div>
+      <button id="btnOfflineAction" class="btnLink btnSecondary" style="display:none">Make available offline</button>
+    </div>
+
+    <div class="sm">Open with <code>?course=&lt;id&gt;</code> as well.</div>
     <div style="margin-top:10px;"><strong>Hole</strong></div>
     <div class="grid" style="margin-top:6px;">
       <select id="holes"></select><button id="btnGoHole">Go</button>
@@ -195,7 +210,7 @@
   <!-- Club selector toggle (hidden for clubs) -->
   <button id="panelToggle" class="fab" title="Clubs" style="display:none">☰</button>
 
-  <!-- SCORECARD -->
+  <!-- SCORECARD (unchanged structure, with auto-advance) -->
   <div id="scorecard" class="scorecard" aria-live="polite">
     <div class="sc-header">
       <div class="sc-title">Scorecard</div>
@@ -240,6 +255,23 @@
     </div>
   </div>
 
+  <!-- Offline download modal (hidden by default) -->
+  <div id="dlMask" class="modalMask" style="display:none">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div class="modalTitle" id="dlTitle">Download for offline play?</div>
+        <button id="dlClose" class="btnLink btnSecondary">Close</button>
+      </div>
+      <div class="modalBody">
+        <div id="dlText">This will save the course data, hole elevations and nearby map tiles on this device.</div>
+        <div class="progressWrap" id="dlProgWrap" style="display:none"><div id="dlBar" class="progressBar" style="width:0%"></div></div>
+        <div class="modalActions">
+          <button id="dlStart" class="btnLink">Download Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
     /* ---------- Session mode: club vs guest ---------- */
@@ -254,21 +286,26 @@
     const panel = document.getElementById('panel');
     const panelToggle = document.getElementById('panelToggle');
     const historyBtn = document.getElementById('historyBtn');
-
     function setPanelHidden(h){ panel.classList.toggle('hidden', h); panelToggle.textContent = h ? '☰' : '✕'; }
-    setPanelHidden(true); // start hidden always
+    setPanelHidden(true);
 
-    // Visibility rules
     if (session.mode === 'guest') {
-      // Guests: can open club picker, can see history
       panelToggle.style.display = 'block';
       historyBtn.style.display = 'inline-block';
       panelToggle.onclick = () => setPanelHidden(!panel.classList.contains('hidden'));
     } else {
-      // Clubs: no club picker, ensure panel stays hidden and we don't auto-open
       panelToggle.style.display = 'none';
       setPanelHidden(true);
     }
+
+    /* ---------- Offline pack state (local) ---------- */
+    // tl_packs: { [courseId]: { cached:true, version:'x', date:'ISO' } }
+    function readPacks(){ try{ return JSON.parse(localStorage.getItem('tl_packs')||'{}'); }catch{return {};} }
+    function writePacks(obj){ localStorage.setItem('tl_packs', JSON.stringify(obj||{})); }
+    function getPack(courseId){ const p=readPacks(); return p[courseId]||null; }
+    function setPack(courseId, data){ const p=readPacks(); p[courseId]=data; writePacks(p); }
+    function markCached(courseId, version){ setPack(courseId,{cached:true,version:version||'1',date:new Date().toISOString()}); }
+    function isCached(courseId, version){ const p=getPack(courseId); if(!p||!p.cached) return false; if(version && p.version && p.version!==version) return false; return true; }
 
     /* ---------- Base map ---------- */
     let map, holes=[], currentIndex=0, courseList=[];
@@ -424,14 +461,54 @@
     document.getElementById('holeViewBtn').onclick = ()=> setViewMode('hole');
     document.getElementById('cartViewBtn').onclick = ()=> setViewMode('cart');
 
+    /* ---------- Courses & offline UI ---------- */
+    const courseBadges = document.getElementById('courseBadges');
+    const btnOfflineAction = document.getElementById('btnOfflineAction');
+
     async function loadCourseList(){
       try{
         const js = await fetchJsonFromCourseDirs('index.json');
         courseList=js.courses||[];
         courseSel.innerHTML='';
-        courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);});
+        courseList.forEach(c=>{
+          const o=document.createElement('option');
+          o.value=c.id; o.textContent=c.name||c.id;
+          courseSel.appendChild(o);
+        });
+        courseSel.onchange = renderCourseStatusLine;
+        renderCourseStatusLine();
       }catch{ courseSel.innerHTML=''; }
     }
+
+    function getCourseMeta(id){
+      const c = courseList.find(x=>x.id===id);
+      return { id, name: c?.name||id, version: c?.version||'1' };
+    }
+
+    function renderCourseStatusLine(){
+      const id = courseSel.value;
+      const meta = getCourseMeta(id);
+      courseBadges.innerHTML = '';
+      btnOfflineAction.style.display = 'none';
+
+      if(!id) return;
+
+      if(isCached(id, meta.version)){
+        const pill = document.createElement('span');
+        pill.className='pill ok';
+        pill.textContent='Available Offline';
+        courseBadges.appendChild(pill);
+      } else {
+        const pill = document.createElement('span');
+        pill.className='pill warn';
+        pill.textContent='Not cached';
+        courseBadges.appendChild(pill);
+        btnOfflineAction.textContent = 'Make available offline';
+        btnOfflineAction.style.display = '';
+        btnOfflineAction.onclick = ()=> promptDownloadPack(id);
+      }
+    }
+
     async function loadCourse(id){
       holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
       try{
@@ -454,13 +531,24 @@
         await autofillElevationsForCourse(id);
         buildScorecard(); loadSavedScores(id);
         if(viewMode==='hole') holeFit(); else cartFit();
+
+        // After loading course: show offline prompt if not cached
+        const meta = getCourseMeta(id);
+        renderCourseStatusLine(); // refresh pills/action visibility
+        if(!isCached(id, meta.version)){
+          // Clubs auto-start; guests prompt
+          if(session.mode==='club'){ startDownloadPack(id); }
+          else { promptDownloadPack(id); }
+        }
       }catch(e){ statusEl.textContent=`Failed to load course ${id}`; console.error(e); }
     }
+
     document.getElementById('btnLoadCourse').onclick=()=>{ const id=courseSel.value; if(!id)return; loadCourse(id); };
     document.getElementById('btnGoHole').onclick=()=>{ const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); } };
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
 
+    /* ---------- Elevation caching (unchanged logic) ---------- */
     const ELEV_CACHE_TTL=1000*60*60*24*30;
     function loadElevCache(courseId){ try{ const raw=localStorage.getItem('tl_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
     function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('tl_elev_'+courseId, JSON.stringify(cache)); }catch{} }
@@ -519,7 +607,7 @@
       eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
     }
 
-    /* ================= SCORECARD (with auto-advance) ================= */
+    /* ================= SCORECARD (auto-advance) ================= */
     const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
     const scSetup=document.getElementById('scSetup'), scTableWrap=document.getElementById('scTableWrap'), scTable=document.getElementById('scTable'), scTotals=document.getElementById('scTotals');
     const scCount=document.getElementById('scCount'), scHcapSwitch=document.getElementById('scHcapSwitch');
@@ -625,7 +713,7 @@
       input.addEventListener('input', ()=>{
         const val=input.value?Number(input.value):null;
         onScoreChange(p, idx, val);
-        maybeAdvanceAfterHole(idx); // try auto-advance on every change
+        maybeAdvanceAfterHole(idx);
       });
 
       wrap.appendChild(input); wrap.appendChild(chip); wrap.appendChild(pts); td.appendChild(wrap); return td;
@@ -634,7 +722,7 @@
     function renderScores(){
       const nHoles=holes.length, frontEnd=Math.min(9,nHoles);
       for(let p=0;p<playerCount;p++){
-        let out=0,inSum=0,total=0,stab=0;
+        let out=0,inSum=0,total=0;
         for(let i=0;i<nHoles;i++){
           const v=scores[p][i]; const par=holes[i]?.par??null; const si=holes[i]?.strokeIndex??null;
 
@@ -651,7 +739,6 @@
           const pts=stablefordFor(v,par,shots); ptsEl.textContent=String(pts);
 
           if(v!=null){ total+=v; if(i<frontEnd) out+=v; else inSum+=v; }
-          stab+=pts;
         }
         const row=scTable.tBodies[0].rows[p];
         row.querySelector(`#out-${p}`).textContent=out||0;
@@ -670,8 +757,7 @@
           stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
         }
         const nett=gross-(useHcap?(handicaps[p]||0):0);
-        const nm=(nameEls[p].value||`P${p+1}`);
-        parts.push(`${nm}: Gross ${gross||0}  •  Net ${nett||0}  •  Stableford ${stab||0}`);
+        const nm=(nameEls[p].value||`P${p+1}`); parts.push(`${nm}: Gross ${gross||0}  •  Net ${nett||0}  •  Stableford ${stab||0}`);
       }
       scTotals.textContent=parts.join('   •   ');
     }
@@ -682,19 +768,15 @@
       persistScores(); renderScores();
     }
 
-    // Auto-advance once all players have a value for THIS hole
     function maybeAdvanceAfterHole(holeIdx){
-      // Only advance if the edited hole is the current hole:
       if(currentIndex!==holeIdx) return;
       for(let p=0;p<playerCount;p++){
         const v=scores[p]?.[holeIdx];
-        if(v==null || Number.isNaN(v)){ return; } // someone still missing
+        if(v==null || Number.isNaN(v)) return;
       }
-      // Everyone has a score -> advance
       if(holes.length){
         currentIndex=(currentIndex+1)%holes.length;
         updateHoleUI(true);
-        // Scroll scorecard grid to show next hole column is optional; we keep fit
         if(viewMode==='hole') holeFit(); else cartFit();
       }
     }
@@ -748,15 +830,13 @@
       applySetupVisibility(); buildScorecard();
     }
 
-    // Guest history (modal from localStorage) — summary saves
+    // Guest history
     function saveRoundSummary(){
-      if(session.mode!=='guest') return; // only guests track local history
+      if(session.mode!=='guest') return;
       const id = courseIdForScores || (session.courseId||'unknown');
       const courseName = (courseList.find(c=>c.id===id)?.name) || id;
       const date = new Date().toISOString();
-      const names = nameEls.slice(0,playerCount).map(el=>el.value||'Player').join(', ');
 
-      // compute totals per player
       const perPlayer = [];
       for(let p=0;p<playerCount;p++){
         let gross=0, stab=0;
@@ -782,23 +862,21 @@
     }
 
     historyBtn.addEventListener('click', ()=>{
-      // Render a light summary modal
       const key='tl_guest_rounds';
       const arr=JSON.parse(localStorage.getItem(key)||'[]');
 
       const wrap=document.createElement('div');
-      wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10003;display:flex;align-items:center;justify-content:center;padding:10px';
+      wrap.className='modalMask';
       const card=document.createElement('div');
-      card.style.cssText='background:#fff;max-width:980px;width:100%;max-height:80vh;overflow:auto;border-radius:12px;padding:14px;box-shadow:0 14px 30px rgba(0,0,0,.3)';
+      card.className='modalCard';
 
-      const h=document.createElement('div'); h.style.display='flex'; h.style.justifyContent='space-between'; h.style.alignItems='center';
-      h.innerHTML = `<div style="font-weight:700;font-size:18px">History (last 10)</div><button id="hClose" class="sc-button">Close</button>`;
+      const h=document.createElement('div'); h.className='modalHead';
+      h.innerHTML = `<div class="modalTitle">History (last 10)</div><button id="hClose" class="btnLink btnSecondary">Close</button>`;
       card.appendChild(h);
 
       if(!arr.length){
         const p=document.createElement('p'); p.textContent='No saved rounds yet.'; p.style.color='#6b7280'; p.style.marginTop='8px'; card.appendChild(p);
       } else {
-        // Build table header like scorecard style
         const table=document.createElement('table'); table.className='sc-table'; table.style.marginTop='10px';
         const thead=document.createElement('thead'); const tr=document.createElement('tr');
         ['Course','Date','Player','Hcap','Gross','Net','Stableford'].forEach(t=>{ const th=document.createElement('th'); th.textContent=t; tr.appendChild(th);});
@@ -808,7 +886,7 @@
         arr.forEach(rec=>{
           rec.perPlayer.forEach((pp,idx)=>{
             const tr=document.createElement('tr');
-            const courseTd=document.createElement('td'); courseTd.textContent = idx===0 ? (rec.courseName || rec.courseId) : ''; // only on first line for that round
+            const courseTd=document.createElement('td'); courseTd.textContent = idx===0 ? (rec.courseName || rec.courseId) : '';
             const dateTd=document.createElement('td'); dateTd.textContent = idx===0 ? new Date(rec.date).toLocaleString() : '';
             const nameTd=document.createElement('td'); nameTd.textContent = pp.name;
             const hcTd=document.createElement('td'); hcTd.textContent = pp.handicap;
@@ -828,36 +906,88 @@
       wrap.addEventListener('click',(e)=>{ if(e.target===wrap) document.body.removeChild(wrap); });
     });
 
-    // Init
+    /* ---------- Offline modal + SW messaging ---------- */
+    const dlMask = document.getElementById('dlMask');
+    const dlTitle = document.getElementById('dlTitle');
+    const dlText  = document.getElementById('dlText');
+    const dlProgWrap = document.getElementById('dlProgWrap');
+    const dlBar = document.getElementById('dlBar');
+    const dlStart = document.getElementById('dlStart');
+    const dlClose = document.getElementById('dlClose');
+
+    let dlCourseId=null, dlVersion='1';
+
+    function openModal(){ dlMask.style.display='flex'; }
+    function closeModal(){ dlMask.style.display='none'; }
+    dlClose.onclick = closeModal;
+
+    function promptDownloadPack(courseId){
+      const meta = getCourseMeta(courseId);
+      dlCourseId = courseId; dlVersion = meta.version||'1';
+      dlTitle.textContent = `Download ${meta.name} for offline play?`;
+      dlText.textContent = `This will save the course JSON, hole elevations and nearby map tiles on this device.`;
+      dlProgWrap.style.display='none'; dlBar.style.width='0%';
+      dlStart.style.display='';
+      openModal();
+    }
+
+    dlStart.onclick = ()=> startDownloadPack(dlCourseId);
+
+    function startDownloadPack(courseId){
+      if(!courseId){ closeModal(); return; }
+      dlStart.style.display='none';
+      dlProgWrap.style.display='';
+      postToSW({ type:'cacheCoursePack', courseId });
+    }
+
+    function postToSW(msg){
+      if(navigator.serviceWorker && navigator.serviceWorker.controller){
+        navigator.serviceWorker.controller.postMessage(msg);
+      } else {
+        // SW not ready—mark cached after basic fetch as a graceful fallback (will still need SW for true offline)
+        // We at least fetch JSON to warm cache.
+        fetch(`/courses/${encodeURIComponent(msg.courseId)}.json`).finally(()=>{
+          markCached(msg.courseId, dlVersion);
+          renderCourseStatusLine();
+          dlBar.style.width='100%';
+          dlText.textContent='Cached (basic). Service worker will enhance offline once registered.';
+          setTimeout(closeModal, 800);
+        });
+      }
+    }
+
+    // Receive progress from SW
+    navigator.serviceWorker?.addEventListener?.('message', (ev)=>{
+      const d=ev.data||{};
+      if(d.type==='cacheProgress' && d.courseId===dlCourseId){
+        const pct = Math.max(0, Math.min(100, Math.round(d.percent||0)));
+        dlBar.style.width = pct+'%';
+        dlText.textContent = d.label ? d.label : `Caching… ${pct}%`;
+      }
+      if(d.type==='cacheDone' && d.courseId===dlCourseId){
+        markCached(dlCourseId, dlVersion);
+        renderCourseStatusLine();
+        dlBar.style.width='100%';
+        dlText.textContent='Done. This course is now available offline.';
+        setTimeout(closeModal, 700);
+      }
+      if(d.type==='cacheError' && d.courseId===dlCourseId){
+        dlText.textContent = `Error: ${d.error||'failed to cache'}`;
+        dlStart.style.display=''; // allow retry
+      }
+    });
+
+    /* ---------- Init ---------- */
     async function init(){
       await loadCourseList();
       const cid = session.courseId || new URLSearchParams(location.search).get('course');
       if(cid){
-        loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); });
+        loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; renderCourseStatusLine(); },300); });
       } else {
-        // No course set (guest can pick; club usually redirected with course)
-        if(session.mode==='guest'){ setPanelHidden(false); }
+        if(session.mode==='guest'){ setPanelHidden(false); renderCourseStatusLine(); }
       }
     }
     init();
-
-    // Buttons for view
-    document.getElementById('historyBtn');
   </script>
-
-
-
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .catch(console.error);
-  });
-}
-</script>
-
-
-
-  
 </body>
 </html>
