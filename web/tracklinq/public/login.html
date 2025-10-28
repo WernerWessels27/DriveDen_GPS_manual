@@ -22,6 +22,16 @@
     .links{ margin-top:10px; font-size:13px; color:#6b7280; }
     .links a{ color:#14532d; text-decoration:none; }
   </style>
+
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+<meta name="theme-color" content="#14532d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+
+
+  
 </head>
 <body>
   <div class="card">
@@ -112,5 +122,18 @@
       if (e.key === 'Enter') resolvePinLocal();
     });
   </script>
+
+  
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .catch(console.error);
+  });
+}
+</script>
+
+
+  
 </body>
 </html>
