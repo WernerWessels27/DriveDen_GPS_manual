@@ -1,437 +1,549 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TrackLinq GPS</title>
+
+  <!-- Leaflet (map) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTR2GpWQ="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
   <style>
     :root{
-      --bg:#0f1115; --card:#171a21; --muted:#a9b0bf; --text:#e8ecf3; --accent:#42a5f5; --good:#6fdc8c; --warn:#ffd166;
+      --bg:#0f1115; --card:#171a21; --muted:#a9b0bf; --text:#e8ecf3; --accent:#42a5f5; --good:#6fdc8c; --warn:#ffd166; --danger:#ef6461;
+      --stroke:#232837; --stroke2:#2b3242;
     }
     *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-    .wrap{max-width:1000px;margin:0 auto;padding:12px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .brand{display:flex;align-items:center;gap:10px}
-    .brand b{letter-spacing:.3px}
-    .chip{font-size:12px;padding:4px 8px;border:1px solid #2a2f3a;border-radius:999px;background:#131622;color:var(--muted)}
-    .row{display:flex;gap:10px}
-    .grow{flex:1}
-    .card{background:var(--card);border:1px solid #232837;border-radius:14px;padding:12px}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-    .kpi{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;border-radius:12px;border:1px dashed #2b3242}
-    .kpi .big{font-size:28px;font-weight:700}
-    .kpi .sub{font-size:12px;color:var(--muted)}
-    button{background:#1c2230;border:1px solid #2b3242;color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
+    .brand b{letter-spacing:.3px;font-size:18px}
+    .chip{font-size:12px;padding:4px 8px;border:1px solid var(--stroke);border-radius:999px;background:#131622;color:var(--muted)}
+    .toolbar{display:flex;gap:8px;align-items:center}
+    button{background:#1c2230;border:1px solid var(--stroke2);color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
     button:active{transform:translateY(1px)}
     .btn-accent{background:var(--accent);border-color:#2b6bb3;color:#04121f}
     .btn-ghost{background:transparent}
-    .toolbar{display:flex;gap:8px}
-    .hide{display:none !important}
+    .btn-danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+    .hide{display:none!important}
+    .row{display:flex;gap:12px}
+    .col{display:flex;flex-direction:column;gap:12px}
+    .grow{flex:1}
+    .card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:12px}
+    .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .kpi{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;border-radius:12px;border:1px dashed var(--stroke2);min-height:92px}
+    .kpi .title{font-size:12px;color:var(--muted);margin-bottom:4px}
+    .kpi .big{font-size:28px;font-weight:700}
+    .kpi .sub{font-size:12px;color:var(--muted)}
+    .holeBar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .holeBar .chip{background:#121826}
+    .note{color:var(--muted);font-size:12px}
+    #map{width:100%;height:460px;border-radius:12px;border:1px solid var(--stroke)}
     .menuWrap{position:relative}
-    .hamburger{position:relative;min-width:44px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;border:1px solid #2b3242;background:#1c2230}
-    .hamburger:after{ /* selection bubble only when .open */
+    .hamburger{position:relative;min-width:44px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;border:1px solid var(--stroke2);background:#1c2230}
+    .hamburger:after{
       content:""; position:absolute; inset:auto auto -6px 50%; width:10px; height:10px;
       transform:translateX(-50%); border-radius:50%; background:transparent; transition:.2s;
     }
     .menuWrap.open .hamburger:after{background:var(--accent)}
-    .menu{position:absolute; top:48px; right:0; background:#0f1420; border:1px solid #2b3242; border-radius:12px; min-width:220px; padding:6px; z-index:10}
+    .menu{position:absolute; top:48px; right:0; background:#0f1420; border:1px solid var(--stroke2); border-radius:12px; min-width:260px; padding:8px; z-index:10}
+    .menu .group{padding:6px 8px}
+    .menu .groupTitle{font-size:11px;color:var(--muted);margin:0 0 4px 0}
+    .menu .rowB{display:flex;gap:6px;flex-wrap:wrap}
     .menu button{width:100%; text-align:left; background:transparent}
-    .two{display:grid;grid-template-columns:1fr 1fr; gap:10px}
+    .twoCol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .rowWrap{display:flex; gap:10px; flex-wrap:wrap}
-    .btnWide{width:100%}
-    .note{color:var(--muted);font-size:12px}
+    .w120{min-width:120px}
+    pre#debug{white-space:pre-wrap;font-size:12px;color:#9fb2ff;margin:0;max-height:180px;overflow:auto}
+    @media (max-width:980px){
+      .twoCol{grid-template-columns:1fr}
+      #map{height:380px}
+    }
     @media (max-width:720px){
-      .grid{grid-template-columns:1fr}
-      .two{grid-template-columns:1fr}
+      .kpis{grid-template-columns:1fr}
+      #map{height:320px}
     }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <!-- Header -->
     <header>
       <div class="brand">
         <button id="hamburger" class="hamburger" aria-label="Open menu">
-          <!-- icon -->
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M3 6h18M3 12h18M3 18h18" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </button>
         <b>TrackLinq GPS</b>
-        <span id="roleChip" class="chip">Role: <span id="roleText">GUEST</span></span>
-        <span id="courseChip" class="chip">Course: <span id="courseText">silverlakes</span></span>
+        <span class="chip">Role: <span id="roleText">GUEST</span></span>
+        <span class="chip">Course: <span id="courseText">None</span></span>
+        <span class="chip">Hole: <span id="holeText">-- / --</span></span>
       </div>
       <div class="toolbar">
-        <button id="btnScorecard" class="btn-accent">Scorecard</button>
-        <button id="btnHistory" class="">History</button>
+        <button id="btnScorecard" class="btn-accent w120">Scorecard</button>
+        <button id="btnHistory" class="w120">History</button>
         <button id="btnSwitchRole" class="btn-ghost">Switch Role</button>
       </div>
       <div class="menuWrap" id="menuWrap">
         <div id="menu" class="menu hide" role="menu" aria-label="Main menu">
-          <div class="card" style="padding:6px">
-            <div class="note" style="margin:8px 6px 6px">Quick actions</div>
-            <button data-action="selectCourse">Select Course</button>
-            <button data-action="selectClub">Select Club</button>
-            <button data-action="logout">Logout</button>
+          <div class="group">
+            <div class="groupTitle">Quick actions</div>
+            <div class="rowB">
+              <button data-action="selectCourse">Select course</button>
+              <button data-action="selectClub">Select club</button>
+              <button data-action="logout" class="btn-danger">Logout</button>
+            </div>
+          </div>
+          <div class="group">
+            <div class="groupTitle">Course tools</div>
+            <div class="rowB">
+              <button data-action="reloadCourse">Reload course file</button>
+              <button data-action="recenter">Center to player</button>
+            </div>
+          </div>
+          <div class="group">
+            <div class="groupTitle">Debug</div>
+            <div class="rowB">
+              <button data-action="dumpState">Dump state</button>
+              <button data-action="clearStorage">Clear localStorage</button>
+            </div>
           </div>
         </div>
       </div>
     </header>
 
-    <div class="row" style="margin-top:12px">
-      <div class="card grow">
-        <div class="grid">
-          <div class="kpi">
-            <div class="sub">Front</div>
-            <div id="frontDist" class="big">--</div>
-            <div id="frontElev" class="sub">Δ --</div>
-          </div>
-          <div class="kpi">
-            <div class="sub">Middle</div>
-            <div id="midDist" class="big">--</div>
-            <div id="midElev" class="sub">Δ --</div>
-          </div>
-          <div class="kpi">
-            <div class="sub">Back</div>
-            <div id="backDist" class="big">--</div>
-            <div id="backElev" class="sub">Δ --</div>
-          </div>
+    <!-- KPIs -->
+    <div class="card" style="margin-top:12px">
+      <div class="kpis">
+        <div class="kpi">
+          <div class="title">Front</div>
+          <div id="frontDist" class="big">--</div>
+          <div id="frontElev" class="sub">Δ --</div>
         </div>
-        <div class="rowWrap" style="margin-top:10px">
-          <button id="prevHole">◀ Hole</button>
-          <div class="chip" id="holeChip">Hole 1 / 18</div>
-          <button id="nextHole">Hole ▶</button>
-          <span class="note">Tap the map to re-center target.</span>
+        <div class="kpi">
+          <div class="title">Middle</div>
+          <div id="midDist" class="big">--</div>
+          <div id="midElev" class="sub">Δ --</div>
         </div>
+        <div class="kpi">
+          <div class="title">Back</div>
+          <div id="backDist" class="big">--</div>
+          <div id="backElev" class="sub">Δ --</div>
+        </div>
+      </div>
+      <div class="holeBar" style="margin-top:10px">
+        <button id="prevHole">◀ Prev</button>
+        <button id="nextHole">Next ▶</button>
+        <span class="chip">Tap map to re-center target</span>
       </div>
     </div>
 
-    <div class="two" style="margin-top:10px">
+    <!-- Map + Actions -->
+    <div class="twoCol">
       <div class="card">
-        <div class="note">Live</div>
-        <div id="liveInfo">Waiting for GPS…</div>
+        <div class="note" style="margin-bottom:8px">Map</div>
+        <div id="map"></div>
       </div>
-      <div class="card">
-        <div class="note">Actions</div>
-        <div class="rowWrap">
-          <button id="btnCenter">Center to Player</button>
-          <button id="btnSaveShot">Save Shot</button>
-          <button id="btnEndHole">End Hole</button>
+      <div class="col">
+        <div class="card">
+          <div class="note" style="margin-bottom:8px">Live</div>
+          <div id="liveInfo">Waiting for GPS…</div>
+        </div>
+        <div class="card">
+          <div class="note" style="margin-bottom:8px">Actions</div>
+          <div class="rowWrap">
+            <button id="btnCenter">Center to Player</button>
+            <button id="btnSaveShot">Save Shot</button>
+            <button id="btnEndHole">End Hole</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="note" style="margin-bottom:8px">Debug</div>
+          <pre id="debug"></pre>
         </div>
       </div>
-    </div>
-
-    <div class="card" style="margin-top:10px">
-      <div class="note">Debug</div>
-      <pre id="debug" style="white-space:pre-wrap; font-size:12px; color:#9fb2ff; margin:0"></pre>
     </div>
   </div>
 
   <script>
-  /***********************
-   * SIMPLE STATE
-   ***********************/
-  const state = {
-    role: localStorage.getItem('tracklinq_role') || 'GUEST', // 'GUEST' | 'CLUB'
-    course: localStorage.getItem('tracklinq_course') || 'silverlakes',
-    holeIndex: 0,
-    courseData: null,
-    position: null,  // {lat, lng, elev?}
-  };
+    /*****************************************************************
+     * STATE
+     *****************************************************************/
+    const state = {
+      role: localStorage.getItem('tracklinq_role') || 'GUEST', // GUEST | CLUB
+      course: localStorage.getItem('tracklinq_course') || '',  // no default; empty means “select”
+      courseData: null,    // normalized {holes:[{green:{front,mid,back}, ...}]}
+      holeIndex: 0,
+      position: null,      // {lat,lng,elev?}
+      map: null,
+      markers: { player:null, front:null, mid:null, back:null }
+    };
 
-  const els = {
-    roleText: document.getElementById('roleText'),
-    roleChip: document.getElementById('roleChip'),
-    courseText: document.getElementById('courseText'),
-    courseChip: document.getElementById('courseChip'),
-    btnScorecard: document.getElementById('btnScorecard'),
-    btnHistory: document.getElementById('btnHistory'),
-    btnSwitchRole: document.getElementById('btnSwitchRole'),
-    hamburger: document.getElementById('hamburger'),
-    menu: document.getElementById('menu'),
-    menuWrap: document.getElementById('menuWrap'),
-    holeChip: document.getElementById('holeChip'),
-    frontDist: document.getElementById('frontDist'),
-    midDist: document.getElementById('midDist'),
-    backDist: document.getElementById('backDist'),
-    frontElev: document.getElementById('frontElev'),
-    midElev: document.getElementById('midElev'),
-    backElev: document.getElementById('backElev'),
-    prevHole: document.getElementById('prevHole'),
-    nextHole: document.getElementById('nextHole'),
-    liveInfo: document.getElementById('liveInfo'),
-    center: document.getElementById('btnCenter'),
-    saveShot: document.getElementById('btnSaveShot'),
-    endHole: document.getElementById('btnEndHole'),
-    debug: document.getElementById('debug'),
-  };
+    /*****************************************************************
+     * ELEMENTS
+     *****************************************************************/
+    const els = {
+      roleText: document.getElementById('roleText'),
+      courseText: document.getElementById('courseText'),
+      holeText: document.getElementById('holeText'),
+      frontDist: document.getElementById('frontDist'),
+      midDist: document.getElementById('midDist'),
+      backDist: document.getElementById('backDist'),
+      frontElev: document.getElementById('frontElev'),
+      midElev: document.getElementById('midElev'),
+      backElev: document.getElementById('backElev'),
+      btnScorecard: document.getElementById('btnScorecard'),
+      btnHistory: document.getElementById('btnHistory'),
+      btnSwitchRole: document.getElementById('btnSwitchRole'),
+      prevHole: document.getElementById('prevHole'),
+      nextHole: document.getElementById('nextHole'),
+      btnCenter: document.getElementById('btnCenter'),
+      btnSaveShot: document.getElementById('btnSaveShot'),
+      btnEndHole: document.getElementById('btnEndHole'),
+      liveInfo: document.getElementById('liveInfo'),
+      debug: document.getElementById('debug'),
+      hamburger: document.getElementById('hamburger'),
+      menu: document.getElementById('menu'),
+      menuWrap: document.getElementById('menuWrap'),
+      map: document.getElementById('map'),
+    };
 
-  /***********************
-   * UTILITIES
-   ***********************/
-  const metersToDisplay = (m) => `${Math.round(m)} m`;
-  const elevToDisplay = (m) => {
-    if (m == null || Number.isNaN(m)) return 'Δ --';
-    const sign = m > 0 ? '+' : (m < 0 ? '−' : '±');
-    return `Δ ${sign}${Math.abs(Math.round(m))} m`;
-  };
-
-  // Haversine for distance
-  function distanceMeters(a, b){
-    const R = 6371000;
-    const toRad = d => d*Math.PI/180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const lat1 = toRad(a.lat);
-    const lat2 = toRad(b.lat);
-    const s = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2*Math.cos(lat1)*Math.cos(lat2);
-    return 2*R*Math.asin(Math.sqrt(s));
-  }
-
-  // Robust elevation getter — supports multiple key names
-  function readElevation(obj){
-    if (!obj || typeof obj !== 'object') return null;
-    for (const k of ['elev','elevation','alt','altitude','z']){
-      if (obj[k] != null && !Number.isNaN(Number(obj[k]))) return Number(obj[k]);
+    /*****************************************************************
+     * UTILITIES
+     *****************************************************************/
+    function log(msg){
+      const ts = new Date().toLocaleTimeString();
+      els.debug.textContent = `[${ts}] ${msg}\n` + els.debug.textContent;
     }
-    return null;
-  }
-
-  // Resolve a point object {lat,lng,(elev?)} from various JSON shapes
-  function asPoint(x){
-    if (!x) return null;
-    if (Array.isArray(x)){ // [lat,lng,(elev)]
-      const [lat,lng,maybeElev] = x;
-      const p = {lat:Number(lat), lng:Number(lng)};
-      const elev = (maybeElev!=null) ? Number(maybeElev) : null;
-      if (!Number.isNaN(elev)) p.elev = elev;
+    const meters = (m)=> (m==null||Number.isNaN(m)) ? '--' : `${Math.round(m)} m`;
+    const elevDisplay = (m)=>{
+      if (m==null || Number.isNaN(m)) return 'Δ --';
+      const s = m>0?'+':(m<0?'−':'±');
+      return `Δ ${s}${Math.abs(Math.round(m))} m`;
+    };
+    function toRad(d){ return d*Math.PI/180; }
+    function distanceMeters(a,b){
+      if(!a || !b) return null;
+      const R=6371000;
+      const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+      const la1=toRad(a.lat), la2=toRad(b.lat);
+      const s = Math.sin(dLat/2)**2 + Math.sin(dLng/2)**2*Math.cos(la1)*Math.cos(la2);
+      return 2*R*Math.asin(Math.sqrt(s));
+    }
+    function readElevation(obj){
+      if (!obj || typeof obj!=='object') return null;
+      for (const k of ['elev','elevation','alt','altitude','z']){
+        if (obj[k]!=null && !Number.isNaN(Number(obj[k]))) return Number(obj[k]);
+      }
+      return null;
+    }
+    function asPoint(x){
+      if (!x) return null;
+      if (Array.isArray(x)){
+        const [lat,lng,maybeElev] = x;
+        const p = {lat:Number(lat), lng:Number(lng)};
+        const e = (maybeElev!=null) ? Number(maybeElev) : null;
+        if (!Number.isNaN(e)) p.elev = e;
+        return p;
+      }
+      const p = { lat:Number(x.lat ?? x.latitude), lng:Number(x.lng ?? x.lon ?? x.longitude) };
+      const e = readElevation(x);
+      if (e!=null) p.elev = e;
       return p;
     }
-    const p = {lat:Number(x.lat ?? x.latitude), lng:Number(x.lng ?? x.lon ?? x.longitude)};
-    const e = readElevation(x);
-    if (e!=null) p.elev = e;
-    return p;
-  }
-
-  function currentHole(){
-    return state.courseData?.holes?.[state.holeIndex] ?? null;
-  }
-
-  function updateRoleUI(){
-    els.roleText.textContent = state.role;
-    // History button visible only for GUEST
-    els.btnHistory.classList.toggle('hide', state.role !== 'GUEST');
-    // Make Scorecard & History same width when both visible
-    if (state.role === 'GUEST'){
-      els.btnScorecard.style.minWidth = '120px';
-      els.btnHistory.style.minWidth = '120px';
-    } else {
-      els.btnScorecard.style.minWidth = '';
-      els.btnHistory.style.minWidth = '';
+    function currentHole(){
+      return state.courseData?.holes?.[state.holeIndex] ?? null;
     }
-  }
-
-  function setMenu(open){
-    els.menu.classList.toggle('hide', !open);
-    // “bubble” only when open
-    els.menuWrap.classList.toggle('open', open);
-  }
-
-  // Build course URL (uses plural folder and simple name)
-  function courseUrl(name){
-    const safe = String(name || '').toLowerCase();
-    const cacheBust = Date.now();
-    return `/tracklinq/public/courses/${safe}.json?cb=${cacheBust}`;
-  }
-
-  async function loadCourse(name){
-    state.course = name;
-    localStorage.setItem('tracklinq_course', name);
-    els.courseText.textContent = name;
-    try{
-      const res = await fetch(courseUrl(name), {cache:'no-store'});
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      state.courseData = normalizeCourse(json);
-      state.holeIndex = 0;
-      renderHole();
-      logDebug(`Loaded course: ${name}`);
-    }catch(err){
-      logDebug(`Failed to load course ${name}: ${err.message}`);
-      alert(`Could not load course "${name}". Check file at /tracklinq/public/courses/${name}.json`);
+    function courseUrl(name){
+      const safe = String(name||'').toLowerCase();
+      const cb = Date.now();
+      // IMPORTANT: plural folder, no default filename forced
+      return `/tracklinq/public/courses/${safe}.json?cb=${cb}`;
     }
-  }
 
-  // Accept a couple of course JSON shapes; ensure holes[*].green.{front,mid,back} points
-  function normalizeCourse(raw){
-    const out = {...raw};
-    if (!out.holes && Array.isArray(raw)) out.holes = raw;
-    out.holes = (out.holes || []).map(h => {
-      const hole = {...h};
-      // Allow direct front/mid/back on hole or inside green
-      const g = hole.green || {};
-      const front = asPoint(hole.front || g.front);
-      const mid   = asPoint(hole.mid   || g.mid   || g.middle);
-      const back  = asPoint(hole.back  || g.back);
-      hole.green = {front, mid, back};
-      return hole;
+    /*****************************************************************
+     * MAP
+     *****************************************************************/
+    function initMap(){
+      state.map = L.map('map',{ zoomControl:true });
+      // OSM tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(state.map);
+
+      // Default view somewhere neutral until we have a course or GPS
+      state.map.setView([ -25.746, 28.188 ], 13);
+
+      // Click to “recenter target” behaviour: just recenters to player (simple)
+      state.map.on('click', ()=> centerToPlayer());
+    }
+
+    function ensureMarker(key, latlng, color){
+      if (!latlng) return null;
+      if (state.markers[key]){
+        state.markers[key].setLatLng(latlng);
+        return state.markers[key];
+      }
+      const m = L.circleMarker(latlng,{
+        radius: 7,
+        weight: 2,
+        color: color || '#fff',
+        fillColor: color || '#fff',
+        fillOpacity: 0.5
+      }).addTo(state.map);
+      state.markers[key] = m;
+      return m;
+    }
+
+    function fitMapToHole(hole){
+      const g = hole?.green || {};
+      const pts = [g.front, g.mid, g.back].filter(Boolean).map(p=>[p.lat,p.lng]);
+      if (pts.length){
+        const bounds = L.latLngBounds(pts);
+        state.map.fitBounds(bounds.pad(0.3));
+      }
+    }
+
+    /*****************************************************************
+     * RENDER
+     *****************************************************************/
+    function renderRole(){
+      els.roleText.textContent = state.role;
+      // History only for GUEST
+      els.btnHistory.classList.toggle('hide', state.role !== 'GUEST');
+      // Same widths if both visible
+      if (state.role === 'GUEST'){
+        els.btnScorecard.style.minWidth = '120px';
+        els.btnHistory.style.minWidth = '120px';
+      } else {
+        els.btnScorecard.style.minWidth = '';
+        els.btnHistory.style.minWidth = '';
+      }
+    }
+
+    function renderCourse(){
+      els.courseText.textContent = state.course || 'None';
+    }
+
+    function renderHole(){
+      const h = currentHole();
+      const total = state.courseData?.holes?.length || 0;
+      els.holeText.textContent = h ? `${state.holeIndex+1} / ${total}` : '-- / --';
+
+      // Update markers + map
+      if (h){
+        const F = h.green?.front, M = h.green?.mid, B = h.green?.back;
+        if (F) ensureMarker('front', [F.lat, F.lng], '#6fdc8c');
+        if (M) ensureMarker('mid',   [M.lat, M.lng], '#42a5f5');
+        if (B) ensureMarker('back',  [B.lat, B.lng], '#ffd166');
+        fitMapToHole(h);
+      }
+
+      // Recompute distances/elevs (if GPS known)
+      updateDistances();
+    }
+
+    function updateDistances(){
+      const h = currentHole();
+      if (!h){ setKpis('--','--','--','Δ --','Δ --','Δ --'); return; }
+      const pos = state.position;
+      const F = h.green?.front, M = h.green?.mid, B = h.green?.back;
+
+      const dF = (pos && F) ? distanceMeters(pos,F) : null;
+      const dM = (pos && M) ? distanceMeters(pos,M) : null;
+      const dB = (pos && B) ? distanceMeters(pos,B) : null;
+
+      // elevation deltas (target - player)
+      const ePos = readElevation(pos);
+      const eF = readElevation(F), eM = readElevation(M), eB = readElevation(B);
+      const dEF = (eF!=null && ePos!=null) ? (eF - ePos) : null;
+      const dEM = (eM!=null && ePos!=null) ? (eM - ePos) : null;
+      const dEB = (eB!=null && ePos!=null) ? (eB - ePos) : null;
+
+      setKpis(
+        meters(dF), meters(dM), meters(dB),
+        elevDisplay(dEF), elevDisplay(dEM), elevDisplay(dEB)
+      );
+    }
+
+    function setKpis(fd,md,bd,fe,me,be){
+      els.frontDist.textContent = fd; els.midDist.textContent = md; els.backDist.textContent = bd;
+      els.frontElev.textContent = fe; els.midElev.textContent = me; els.backElev.textContent = be;
+    }
+
+    /*****************************************************************
+     * COURSE LOADING (NO DEFAULT)
+     *****************************************************************/
+    async function loadCourse(name){
+      if (!name){ alert('Please select a course file name (without .json)'); return; }
+      state.course = name;
+      localStorage.setItem('tracklinq_course', name);
+      renderCourse();
+
+      try{
+        const res = await fetch(courseUrl(name), { cache:'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        state.courseData = normalizeCourse(data);
+        state.holeIndex = 0;
+        log(`Loaded course: ${name}`);
+        renderHole();
+      }catch(err){
+        log(`Failed to load course "${name}": ${err.message}`);
+        alert(`Could not load /tracklinq/public/courses/${name}.json`);
+      }
+    }
+
+    // Accept multiple shapes and normalize to holes[*].green.{front,mid,back}
+    function normalizeCourse(raw){
+      const out = {};
+      let holes = [];
+      if (Array.isArray(raw)) holes = raw;
+      else if (raw && Array.isArray(raw.holes)) holes = raw.holes;
+
+      out.holes = holes.map(h=>{
+        const hole = {...h};
+        const g = hole.green || {};
+        const front = asPoint(hole.front || g.front);
+        const mid   = asPoint(hole.mid   || g.mid || g.middle);
+        const back  = asPoint(hole.back  || g.back);
+        hole.green = {front, mid, back};
+        return hole;
+      });
+      return out;
+    }
+
+    /*****************************************************************
+     * GEO
+     *****************************************************************/
+    function startGPS(){
+      if (!navigator.geolocation){
+        els.liveInfo.textContent = 'Geolocation not supported.';
+        return;
+      }
+      navigator.geolocation.watchPosition(
+        (p)=>{
+          state.position = {
+            lat: p.coords.latitude,
+            lng: p.coords.longitude,
+            elev: (p.coords.altitude!=null && !Number.isNaN(p.coords.altitude)) ? Number(p.coords.altitude) : null
+          };
+          els.liveInfo.textContent =
+            `You: ${state.position.lat.toFixed(5)}, ${state.position.lng.toFixed(5)}`
+             + (state.position.elev!=null? ` • elev ${Math.round(state.position.elev)}m` : '');
+
+          // Player marker + keep view reasonable if no course yet
+          ensureMarker('player', [state.position.lat, state.position.lng], '#e8ecf3');
+          if (!state.courseData) state.map.setView([state.position.lat, state.position.lng], 16);
+
+          updateDistances();
+        },
+        (err)=>{
+          els.liveInfo.textContent = `GPS error: ${err.message}`;
+        },
+        { enableHighAccuracy:true, maximumAge:1000, timeout:10000 }
+      );
+    }
+
+    function centerToPlayer(){
+      if (state.position && state.map){
+        state.map.setView([state.position.lat, state.position.lng], Math.max(state.map.getZoom(), 16));
+      }
+    }
+
+    /*****************************************************************
+     * MENU / ROLE / EVENTS
+     *****************************************************************/
+    let menuOpen = false;
+    function setMenu(open){
+      menuOpen = open;
+      els.menu.classList.toggle('hide', !open);
+      els.menuWrap.classList.toggle('open', open); // bubble only when open
+    }
+
+    // Header buttons
+    els.btnSwitchRole.addEventListener('click', ()=>{
+      state.role = (state.role==='GUEST') ? 'CLUB' : 'GUEST';
+      localStorage.setItem('tracklinq_role', state.role);
+      renderRole();
     });
-    return out;
-  }
+    els.btnScorecard.addEventListener('click', ()=> log('Open Scorecard'));
+    els.btnHistory.addEventListener('click', ()=>{ if (state.role==='GUEST') log('Open History'); });
 
-  function logDebug(msg){
-    const ts = new Date().toLocaleTimeString();
-    els.debug.textContent = `[${ts}] ${msg}\n` + els.debug.textContent;
-  }
+    // Hole nav
+    els.prevHole.addEventListener('click', ()=>{
+      const n = state.courseData?.holes?.length || 0; if(!n) return;
+      state.holeIndex = (state.holeIndex - 1 + n) % n;
+      renderHole();
+    });
+    els.nextHole.addEventListener('click', ()=>{
+      const n = state.courseData?.holes?.length || 0; if(!n) return;
+      state.holeIndex = (state.holeIndex + 1) % n;
+      renderHole();
+    });
 
-  /***********************
-   * RENDER
-   ***********************/
-  function renderHole(){
-    const hole = currentHole();
-    if (!hole){
-      els.holeChip.textContent = `Hole -- / --`;
-      els.frontDist.textContent = els.midDist.textContent = els.backDist.textContent = '--';
-      els.frontElev.textContent = els.midElev.textContent = els.backElev.textContent = 'Δ --';
-      return;
-    }
-    const total = state.courseData.holes.length || 18;
-    els.holeChip.textContent = `Hole ${state.holeIndex+1} / ${total}`;
-    updateDistances();
-  }
+    // Actions
+    els.btnCenter.addEventListener('click', centerToPlayer);
+    els.btnSaveShot.addEventListener('click', ()=> log('Shot saved (placeholder)'));
+    els.btnEndHole.addEventListener('click', ()=> log('Hole ended (placeholder)'));
 
-  function updateDistances(){
-    const hole = currentHole();
-    if (!hole || !state.position){ return; }
-
-    const pos = state.position;
-    const F = hole.green.front, M = hole.green.mid, B = hole.green.back;
-
-    // Distances
-    const dF = F ? distanceMeters(pos, F) : null;
-    const dM = M ? distanceMeters(pos, M) : null;
-    const dB = B ? distanceMeters(pos, B) : null;
-
-    els.frontDist.textContent = dF!=null ? metersToDisplay(dF) : '--';
-    els.midDist.textContent   = dM!=null ? metersToDisplay(dM) : '--';
-    els.backDist.textContent  = dB!=null ? metersToDisplay(dB) : '--';
-
-    // Elevation Δ target - player
-    const ePos = readElevation(pos);
-    const eF = readElevation(F);
-    const eM = readElevation(M);
-    const eB = readElevation(B);
-
-    const dEF = (eF!=null && ePos!=null) ? (eF - ePos) : null;
-    const dEM = (eM!=null && ePos!=null) ? (eM - ePos) : null;
-    const dEB = (eB!=null && ePos!=null) ? (eB - ePos) : null;
-
-    els.frontElev.textContent = elevToDisplay(dEF);
-    els.midElev.textContent   = elevToDisplay(dEM);
-    els.backElev.textContent  = elevToDisplay(dEB);
-
-    // Live line
-    els.liveInfo.textContent = `You: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}${ePos!=null?` • elev ${Math.round(ePos)}m`:''}`;
-  }
-
-  /***********************
-   * GEO
-   ***********************/
-  function startGeolocation(){
-    if (!navigator.geolocation){
-      els.liveInfo.textContent = 'Geolocation not supported.';
-      return;
-    }
-    navigator.geolocation.watchPosition(
-      (p)=>{
-        // We store optional elevation if available from course/device
-        state.position = {
-          lat: p.coords.latitude,
-          lng: p.coords.longitude,
-          // Some devices expose altitude; if not, we still compute target deltas when player elev missing -> shows "Δ --"
-          elev: (p.coords.altitude != null && !Number.isNaN(p.coords.altitude)) ? Number(p.coords.altitude) : null
-        };
-        updateDistances();
-      },
-      (err)=>{
-        els.liveInfo.textContent = `GPS error: ${err.message}`;
-      },
-      {enableHighAccuracy:true, maximumAge:1000, timeout:10000}
-    );
-  }
-
-  /***********************
-   * EVENTS
-   ***********************/
-  els.prevHole.addEventListener('click', ()=>{
-    const n = state.courseData?.holes?.length||0;
-    if (!n) return;
-    state.holeIndex = (state.holeIndex - 1 + n) % n;
-    renderHole();
-  });
-  els.nextHole.addEventListener('click', ()=>{
-    const n = state.courseData?.holes?.length||0;
-    if (!n) return;
-    state.holeIndex = (state.holeIndex + 1) % n;
-    renderHole();
-  });
-  els.center.addEventListener('click', ()=>{ startGeolocation(); });
-  els.saveShot.addEventListener('click', ()=>{ logDebug('Shot saved (placeholder)'); });
-  els.endHole.addEventListener('click', ()=>{ logDebug('Hole ended (placeholder)'); });
-
-  // Role switching (quick toggle for testing)
-  els.btnSwitchRole.addEventListener('click', ()=>{
-    state.role = state.role === 'GUEST' ? 'CLUB' : 'GUEST';
-    localStorage.setItem('tracklinq_role', state.role);
-    updateRoleUI();
-  });
-
-  // History visibility is tied to role; handlers can stay
-  els.btnScorecard.addEventListener('click', ()=>{ logDebug('Open Scorecard'); });
-  els.btnHistory.addEventListener('click', ()=>{ if (state.role==='GUEST') logDebug('Open History'); });
-
-  // Hamburger + menu (bubble only when open)
-  let menuOpen = false;
-  function toggleMenu(){
-    menuOpen = !menuOpen;
-    setMenu(menuOpen);
-  }
-  els.hamburger.addEventListener('click', toggleMenu);
-  document.addEventListener('click', (e)=>{
-    if (!els.menuWrap.contains(e.target) && !els.hamburger.contains(e.target)){
-      if (menuOpen){ menuOpen=false; setMenu(false); }
-    }
-  });
-  els.menu.addEventListener('click', (e)=>{
-    if (e.target.matches('button[data-action]')){
-      const action = e.target.getAttribute('data-action');
-      if (action === 'selectCourse'){
-        const name = prompt('Course file name (without .json):', state.course);
-        if (name){ loadCourse(name.trim().toLowerCase()); }
+    // Menu
+    els.hamburger.addEventListener('click', ()=> setMenu(!menuOpen));
+    document.addEventListener('click', (e)=>{
+      if (!els.menuWrap.contains(e.target) && !els.hamburger.contains(e.target)){
+        if (menuOpen) setMenu(false);
       }
-      if (action === 'selectClub'){
-        alert('Club selection (placeholder)');
+    });
+    els.menu.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      if (action==='selectCourse'){
+        const name = prompt('Course file name (without .json):', state.course || '');
+        if (name) loadCourse(name.trim().toLowerCase());
       }
-      if (action === 'logout'){
-        alert('Logout (placeholder)');
+      if (action==='reloadCourse'){
+        if (state.course) loadCourse(state.course);
+        else alert('No course selected yet.');
       }
-      toggleMenu();
-    }
-  });
+      if (action==='recenter'){ centerToPlayer(); }
+      if (action==='selectClub'){ alert('Club selection (placeholder)'); }
+      if (action==='logout'){ alert('Logout (placeholder)'); }
+      if (action==='dumpState'){ log(JSON.stringify(state, null, 2)); }
+      if (action==='clearStorage'){ localStorage.clear(); log('localStorage cleared.'); }
+      setMenu(false);
+    });
 
-  /***********************
-   * INIT
-   ***********************/
-  (function init(){
-    // Restore role & course
-    els.roleText.textContent = state.role;
-    els.courseText.textContent = state.course;
-    updateRoleUI();
-    // Start GPS
-    startGeolocation();
-    // Load course (uses plural folder and new filename)
-    loadCourse(state.course);
-  })();
+    /*****************************************************************
+     * INIT
+     *****************************************************************/
+    (function init(){
+      els.roleText.textContent = state.role;
+      renderRole();
+      renderCourse();
+      initMap();
+      startGPS();
+
+      // Load previously selected course, if any (NO default like silverlakes)
+      if (state.course){
+        loadCourse(state.course);
+      } else {
+        log('No course selected yet. Use the menu → Select course.');
+      }
+    })();
   </script>
 </body>
 </html>
