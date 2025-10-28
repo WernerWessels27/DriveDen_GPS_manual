@@ -1,0 +1,19 @@
+{
+  "name": "TrackLinq",
+  "short_name": "TrackLinq",
+  "description": "Golf GPS & scorecard — online/offline.",
+  "start_url": "/login.html",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#14532d",
+  "background_color": "#ffffff",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Open GPS", "short_name": "GPS", "url": "/gps.html" }
+  ]
+}
