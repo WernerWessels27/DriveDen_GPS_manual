@@ -123,6 +123,40 @@
     });
   </script>
 
+
+
+<script>
+if ('serviceWorker' in navigator) {
+  (async () => {
+    try {
+      // Register the service worker at the site root so it covers /, /gps.html, /courses/*, etc.
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+
+      // If a new worker finishes installing while the page is open, refresh to activate it
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            // optional: show a toast instead of reloading immediately
+            location.reload();
+          }
+        });
+      });
+
+      // When the active controller changes (new SW took over), reload once
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        location.reload();
+      });
+    } catch (err) {
+      console.log('SW register failed:', err);
+    }
+  })();
+}
+</script>
+
+  
+
   
 <script>
 if ('serviceWorker' in navigator) {
