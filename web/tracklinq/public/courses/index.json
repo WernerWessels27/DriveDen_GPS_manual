@@ -1,5 +1,20 @@
 {
   "courses": [
-    { "id": "silverlakes", "name": "Silverlakes Golf Club" }
+    {
+      "id": "silverlakes",
+      "name": "Silver Lakes",
+      "club": "Silver Lakes Golf Club",
+      "pin": "SLK1234567",
+      "clubLat": -25.77185,
+      "clubLng": 28.35335
+    },
+    {
+      "id": "blue-valley",
+      "name": "Blue Valley Golf Estate",
+      "club": "Blue Valley Golf & Country Estate",
+      "pin": "BVY1234567",
+      "clubLat": -25.94062,
+      "clubLng": 28.12822
+    }
   ]
 }
