@@ -1,9 +1,7 @@
-/* TrackLinq SW v3 */
-const APP = 'tl-app-v3';
-const COURSES = 'tl-courses-v1';
-const TILES = 'tl-tiles-v1';
-
+/* TrackLinq Service Worker */
+const VERSION = 'tl-v5';
 const SHELL = [
+  '/',                     // your server resolves to /index.html
   '/index.html',
   '/login.html',
   '/gps.html',
@@ -11,122 +9,148 @@ const SHELL = [
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  // Leaflet core (runtime cached too, but nice to warm)
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+  // leaflet from CDN will be cached opportunistically by the browser;
+  // we serve our own sw.js and let runtime cache handle other GETs
 ];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const c = await caches.open(APP);
-    await c.addAll(SHELL.map(u => new Request(u, {cache: 'reload'})));
-    await self.skipWaiting();
-  })());
+// Helpful console tag
+const log = (...a) => console.log('[SW]', ...a);
+
+/* Install: pre-cache app shell so PWA opens offline */
+self.addEventListener('install', (evt) => {
+  log('install', VERSION);
+  evt.waitUntil(
+    caches.open(VERSION).then((c) => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    // cleanup old caches
-    const keep = new Set([APP, COURSES, TILES]);
-    for (const name of await caches.keys()) {
-      if (!keep.has(name)) await caches.delete(name);
-    }
-    // enable nav preload where supported
-    if (self.registration.navigationPreload) {
-      try { await self.registration.navigationPreload.enable(); } catch {}
-    }
+/* Activate: clean old caches */
+self.addEventListener('activate', (evt) => {
+  log('activate');
+  evt.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter(n => n !== VERSION).map(n => caches.delete(n)));
     await self.clients.claim();
   })());
 });
 
-function isCourseJson(req) {
-  try {
-    const url = new URL(req.url);
-    return (url.origin === self.location.origin) &&
-           (url.pathname.startsWith('/courses/') || url.pathname.startsWith('/tracklinq/public/courses/')) &&
-           url.pathname.endsWith('.json');
-  } catch { return false; }
-}
-
-function isLeafletTile(req) {
-  const url = new URL(req.url);
-  return /server\.arcgisonline\.com/i.test(url.hostname) ||
-         /tile\.openstreetmap\.org/i.test(url.hostname);
-}
-
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-
-  // 1) Navigation requests: network-first → cache → offline.html
-  if (request.mode === 'navigate') {
-    event.respondWith((async () => {
-      try {
-        const preload = await event.preloadResponse;
-        if (preload) return preload;
-        const net = await fetch(request);
-        // cache a fresh copy of gps/index when online
-        const cache = await caches.open(APP);
-        cache.put(new Request('/gps.html'), await fetch('/gps.html'));
-        cache.put(new Request('/index.html'), await fetch('/index.html'));
-        return net;
-      } catch {
-        const cache = await caches.open(APP);
-        return (await cache.match(request.url)) ||
-               (await cache.match('/gps.html')) ||
-               (await cache.match('/index.html')) ||
-               (await cache.match('/offline.html'));
-      }
-    })());
-    return;
+/* Message API from pages */
+self.addEventListener('message', (evt) => {
+  const data = evt.data || {};
+  if (data && data.type === 'cacheCourse' && data.courseId) {
+    log('cacheCourse request for', data.courseId);
+    evt.waitUntil(cacheCourse(data.courseId).then(() => {
+      // progress 100% + done signal
+      evt.source?.postMessage({ type: 'cacheDone', courseId: data.courseId });
+    }).catch((err) => {
+      log('cacheCourse error', err);
+      evt.source?.postMessage({ type: 'cacheError', courseId: data.courseId, error: String(err) });
+    }));
   }
-
-  // 2) Course JSON: Cache-first (stale-while-revalidate)
-  if (isCourseJson(request)) {
-    event.respondWith((async () => {
-      const cache = await caches.open(COURSES);
-      const cached = await cache.match(request);
-      const fetchAndUpdate = fetch(request).then(res => {
-        if (res && res.ok) cache.put(request, res.clone());
-        return res;
-      }).catch(() => null);
-
-      if (cached) {
-        // kick off background refresh
-        event.waitUntil(fetchAndUpdate);
-        return cached;
-      }
-      return (await fetchAndUpdate) || new Response('{}', {headers:{'Content-Type':'application/json'}});
-    })());
-    return;
-  }
-
-  // 3) Leaflet tiles: Cache-first with small cap (best-effort)
-  if (isLeafletTile(request)) {
-    event.respondWith((async () => {
-      const cache = await caches.open(TILES);
-      const cached = await cache.match(request);
-      if (cached) return cached;
-      try {
-        const net = await fetch(request, { mode: 'no-cors' }); // opaque ok
-        // naive cap
-        const keys = await cache.keys();
-        if (keys.length > 200) await cache.delete(keys[0]);
-        cache.put(request, net.clone());
-        return net;
-      } catch {
-        return cached || Response.error();
-      }
-    })());
-    return;
-  }
-
-  // 4) Default: try network then cache
-  event.respondWith((async () => {
-    try {
-      return await fetch(request);
-    } catch {
-      const cache = await caches.open(APP);
-      return (await cache.match(request)) || Response.error();
-    }
-  })());
 });
+
+/* Fetch strategy */
+self.addEventListener('fetch', (evt) => {
+  const url = new URL(evt.request.url);
+
+  // Only handle our same-origin requests
+  if (url.origin !== self.location.origin) return;
+
+  // Course JSON (network first, cache fallback)
+  if (url.pathname.startsWith('/courses/')) {
+    evt.respondWith(networkFirst(evt.request));
+    return;
+  }
+
+  // Navigations: try network, fall back to cached shell or offline
+  if (evt.request.mode === 'navigate') {
+    evt.respondWith((async () => {
+      try {
+        const res = await fetch(evt.request);
+        // cache a fresh copy of the page for offline
+        const cache = await caches.open(VERSION);
+        cache.put(evt.request, res.clone());
+        return res;
+      } catch {
+        // if we have gps/login/index cached, use them; else offline
+        const cache = await caches.open(VERSION);
+        const path = url.pathname;
+        const prefer = ['/gps.html', '/login.html', '/index.html'];
+        for (const p of [path, ...prefer]) {
+          const match = await cache.match(p);
+          if (match) return match;
+        }
+        return cache.match('/offline.html');
+      }
+    })());
+    return;
+  }
+
+  // App shell & static assets: cache first
+  if (SHELL.includes(url.pathname)) {
+    evt.respondWith(cacheFirst(evt.request));
+    return;
+  }
+
+  // Default: try cache, then network (saves things you visit)
+  evt.respondWith(cacheFallingBackToNetwork(evt.request));
+});
+
+/* Helpers */
+
+async function networkFirst(req) {
+  try {
+    const net = await fetch(req, { cache: 'no-store' });
+    const c = await caches.open(VERSION);
+    c.put(req, net.clone());
+    return net;
+  } catch {
+    const c = await caches.open(VERSION);
+    const hit = await c.match(req);
+    if (hit) return hit;
+    throw new Response('Offline and not cached', { status: 503 });
+  }
+}
+
+async function cacheFirst(req) {
+  const c = await caches.open(VERSION);
+  const hit = await c.match(req);
+  if (hit) return hit;
+  const net = await fetch(req);
+  c.put(req, net.clone());
+  return net;
+}
+
+async function cacheFallingBackToNetwork(req) {
+  const c = await caches.open(VERSION);
+  const hit = await c.match(req);
+  if (hit) return hit;
+  try {
+    const net = await fetch(req);
+    c.put(req, net.clone());
+    return net;
+  } catch {
+    // last resort
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+/* Course prefetch */
+async function cacheCourse(courseId) {
+  const c = await caches.open(VERSION);
+  // Always cache the index list too (lets us show "Available Offline" badges)
+  const listReq = new Request('/courses/index.json', { cache: 'no-store' });
+  try {
+    const listRes = await fetch(listReq);
+    await c.put(listReq, listRes.clone());
+  } catch { /* ignore */ }
+
+  const req = new Request(`/courses/${encodeURIComponent(courseId)}.json`, { cache: 'no-store' });
+  const res = await fetch(req);
+  await c.put(req, res.clone());
+
+  // If later we add per-hole image assets or static overlays, we can queue them here.
+  // We are purposely NOT caching remote map tiles (Esri) yet.
+  return true;
+}
