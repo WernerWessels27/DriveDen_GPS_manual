@@ -1036,6 +1036,14 @@ function requestCourseCache(courseId) {
   }
 }
 
+navigator.serviceWorker?.addEventListener('message', (ev) => {
+  const d = ev.data || {};
+  if (d.type === 'cacheDone') {
+    console.log(`Course ${d.courseId} cached`);
+    // Optional: visually mark course as cached
+    markCourseAsAvailableOffline?.(d.courseId);
+  }
+});
 
     
   </script>
