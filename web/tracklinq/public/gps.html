@@ -1021,6 +1021,23 @@ if ('serviceWorker' in navigator) {
       }
     }
     init();
+
+
+function requestCourseCache(courseId) {
+  if (navigator.serviceWorker?.controller) {
+    // Ask the SW to prefetch and store this course
+    navigator.serviceWorker.controller.postMessage({
+      type: 'cacheCourse',
+      courseId
+    });
+  } else {
+    // Fallback: fetch it once so the SW can see it later
+    fetch(`/courses/${encodeURIComponent(courseId)}.json`).catch(() => {});
+  }
+}
+
+
+    
   </script>
 </body>
 </html>
