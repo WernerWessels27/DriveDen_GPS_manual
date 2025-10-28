@@ -6,10 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#14532d"/>
   <link rel="icon" href="/icons/icon-192.png">
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 
   <style>
@@ -419,21 +415,14 @@
     document.getElementById('holeViewBtn').onclick = ()=> setViewMode('hole');
     document.getElementById('cartViewBtn').onclick = ()=> setViewMode('cart');
 
-    /* ---------- Course list uses /courses/index.json (now includes club, pin, clubLat/clubLng) ---------- */
     async function loadCourseList(){
       try{
         const js = await fetchJsonFromCourseDirs('index.json');
         courseList=js.courses||[];
         courseSel.innerHTML='';
-        courseList.forEach(c=>{
-          const o=document.createElement('option');
-          o.value=c.id;
-          o.textContent=c.name || c.id;
-          courseSel.appendChild(o);
-        });
+        courseList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name||c.id;courseSel.appendChild(o);});
       }catch{ courseSel.innerHTML=''; }
     }
-
     async function loadCourse(id){
       holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
       try{
@@ -463,7 +452,6 @@
     document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
     document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
 
-    /* ---------- Elevation caching/fetch ---------- */
     const ELEV_CACHE_TTL=1000*60*60*24*30;
     function loadElevCache(courseId){ try{ const raw=localStorage.getItem('tl_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
     function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('tl_elev_'+courseId, JSON.stringify(cache)); }catch{} }
@@ -529,7 +517,7 @@
     const nameEls=[document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
     const hcapEls=[document.getElementById('h1'),document.getElementById('h2'),document.getElementById('h3'),document.getElementById('h4')];
     const hcapRow=document.getElementById('hcapRow');
-    const scCreate=document.getElementById('scCreate'), scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear'), scEndRound=document.getElementById('scEndRound'), scSave=document.getElementById('scSave'];
+    const scCreate=document.getElementById('scCreate'), scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear'), scEndRound=document.getElementById('scEndRound'), scSave=document.getElementById('scSave');
 
     let playerCount=1, scores=[], handicaps=[0,0,0,0], useHcap=false, courseIdForScores=null;
 
@@ -628,7 +616,7 @@
       input.addEventListener('input', ()=>{
         const val=input.value?Number(input.value):null;
         onScoreChange(p, idx, val);
-        maybeAdvanceAfterHole(idx);
+        maybeAdvanceAfterHole(idx); // try auto-advance on every change
       });
 
       wrap.appendChild(input); wrap.appendChild(chip); wrap.appendChild(pts); td.appendChild(wrap); return td;
@@ -685,15 +673,19 @@
       persistScores(); renderScores();
     }
 
+    // Auto-advance once all players have a value for THIS hole
     function maybeAdvanceAfterHole(holeIdx){
+      // Only advance if the edited hole is the current hole:
       if(currentIndex!==holeIdx) return;
       for(let p=0;p<playerCount;p++){
         const v=scores[p]?.[holeIdx];
-        if(v==null || Number.isNaN(v)){ return; }
+        if(v==null || Number.isNaN(v)){ return; } // someone still missing
       }
+      // Everyone has a score -> advance
       if(holes.length){
         currentIndex=(currentIndex+1)%holes.length;
         updateHoleUI(true);
+        // Scroll scorecard grid to show next hole column is optional; we keep fit
         if(viewMode==='hole') holeFit(); else cartFit();
       }
     }
@@ -747,14 +739,15 @@
       applySetupVisibility(); buildScorecard();
     }
 
-    // Guest history (modal)
+    // Guest history (modal from localStorage) — summary saves
     function saveRoundSummary(){
       if(session.mode!=='guest') return; // only guests track local history
       const id = courseIdForScores || (session.courseId||'unknown');
       const courseName = (courseList.find(c=>c.id===id)?.name) || id;
       const date = new Date().toISOString();
-      const names = ''; // not used in table rendering below
+      const names = nameEls.slice(0,playerCount).map(el=>el.value||'Player').join(', ');
 
+      // compute totals per player
       const perPlayer = [];
       for(let p=0;p<playerCount;p++){
         let gross=0, stab=0;
@@ -764,7 +757,11 @@
           stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
         }
         const nett=gross-(useHcap?(handicaps[p]||0):0);
-        perPlayer.push({ name: nameEls[p].value||`P${p+1}`, handicap: useHcap?(handicaps[p]||0):0, gross, nett, stab });
+        perPlayer.push({
+          name: nameEls[p].value||`P${p+1}`,
+          handicap: useHcap?(handicaps[p]||0):0,
+          gross, nett, stab
+        });
       }
 
       const record={courseId:id, courseName, date, perPlayer};
@@ -776,6 +773,7 @@
     }
 
     historyBtn.addEventListener('click', ()=>{
+      // Render a light summary modal
       const key='tl_guest_rounds';
       const arr=JSON.parse(localStorage.getItem(key)||'[]');
 
@@ -791,6 +789,7 @@
       if(!arr.length){
         const p=document.createElement('p'); p.textContent='No saved rounds yet.'; p.style.color='#6b7280'; p.style.marginTop='8px'; card.appendChild(p);
       } else {
+        // Build table header like scorecard style
         const table=document.createElement('table'); table.className='sc-table'; table.style.marginTop='10px';
         const thead=document.createElement('thead'); const tr=document.createElement('tr');
         ['Course','Date','Player','Hcap','Gross','Net','Stableford'].forEach(t=>{ const th=document.createElement('th'); th.textContent=t; tr.appendChild(th);});
@@ -800,7 +799,7 @@
         arr.forEach(rec=>{
           rec.perPlayer.forEach((pp,idx)=>{
             const tr=document.createElement('tr');
-            const courseTd=document.createElement('td'); courseTd.textContent = idx===0 ? (rec.courseName || rec.courseId) : '';
+            const courseTd=document.createElement('td'); courseTd.textContent = idx===0 ? (rec.courseName || rec.courseId) : ''; // only on first line for that round
             const dateTd=document.createElement('td'); dateTd.textContent = idx===0 ? new Date(rec.date).toLocaleString() : '';
             const nameTd=document.createElement('td'); nameTd.textContent = pp.name;
             const hcTd=document.createElement('td'); hcTd.textContent = pp.handicap;
@@ -820,87 +819,21 @@
       wrap.addEventListener('click',(e)=>{ if(e.target===wrap) document.body.removeChild(wrap); });
     });
 
-    /* ---------- PIN enforcement using /courses/index.json ---------- */
-    function getQueryPin(){
-      const qs = new URLSearchParams(location.search);
-      const p = (qs.get('pin') || '').trim();
-      return /^[A-Za-z0-9]{10}$/.test(p) ? p : null; // 10 alphanumeric (e.g., SLK1234567)
-    }
-    function getCourseById(id){
-      return (courseList||[]).find(c=>c.id===id);
-    }
-    async function enforceClubPinFromCoursesIndex(){
-      if (session.mode !== 'club') return true;
-      const clubId = session.clubId || new URLSearchParams(location.search).get('club');
-      if (!clubId) return true;
-
-      const item = getCourseById(clubId);
-      if (!item) return true;
-
-      const expected = (item.pin || '').trim();
-      if (!/^[A-Za-z0-9]{10}$/.test(expected)) return true; // no/invalid pin configured -> allow
-
-      const cacheKey = `tl_club_auth_${clubId}`;
-      const cached = localStorage.getItem(cacheKey);
-      const qp = getQueryPin();
-      const attempt = (qp || cached || prompt(`Enter 10-character PIN for ${item.club || item.name}:`) || '').trim();
-
-      if (attempt === expected) {
-        localStorage.setItem(cacheKey, expected);
-        return true;
-      }
-
-      alert('Incorrect PIN.');
-      localStorage.setItem('tl_mode','guest');
-      location.replace('/gps.html?mode=guest');
-      return false;
-    }
-    function dropClubPinIfAvailable(){
-      if (session.mode !== 'club') return;
-      const clubId = session.clubId || new URLSearchParams(location.search).get('club');
-      if (!clubId) return;
-
-      const item = getCourseById(clubId);
-      if (!item) return;
-
-      if (typeof item.clubLat === 'number' && typeof item.clubLng === 'number'){
-        L.marker([item.clubLat, item.clubLng]).addTo(map).bindPopup(item.club || item.name || clubId);
-        if (!movedOnce) map.setView([item.clubLat, item.clubLng], 15);
-      }
-    }
-
     // Init
     async function init(){
       await loadCourseList();
-
-      // Enforce PIN early (only does anything in club mode). If fails, we redirect to guest and return.
-      const ok = await enforceClubPinFromCoursesIndex();
-      if (!ok) return;
-
-      // Show club map pin if coords present
-      dropClubPinIfAvailable();
-
       const cid = session.courseId || new URLSearchParams(location.search).get('course');
       if(cid){
         loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); });
       } else {
+        // No course set (guest can pick; club usually redirected with course)
         if(session.mode==='guest'){ setPanelHidden(false); }
       }
     }
     init();
 
-    // Buttons for view (kept for completeness)
+    // Buttons for view
     document.getElementById('historyBtn');
-  </script>
-
-  <!-- PWA: Service worker registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .catch(err => console.error('SW registration failed:', err));
-      });
-    }
   </script>
 </body>
 </html>
