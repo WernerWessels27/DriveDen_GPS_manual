@@ -3,47 +3,41 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Designer • Vector Course Builder (Freehand + Basemap)</title>
+  <title>Designer • Vector Course Builder (Freehand + Basemap) v1.2</title>
   <style>
-    :root{
-      --bg:#e8f5e9; /* neutral green background */
-      --panel:#ffffff; --line:#1f2937; --accent:#0ea5e9; --muted:#6b7280;
-    }
+    :root{ --bg:#e8f5e9; --muted:#6b7280; --border:#e5e7eb; }
     html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     .layout{display:grid;grid-template-columns:360px 1fr;grid-template-rows:auto 1fr; height:100%}
-    header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #e5e7eb;background:#fff}
+    header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff}
     header h1{font-size:18px;margin:0;font-weight:700}
     header .spacer{flex:1}
-    #left{border-right:1px solid #e5e7eb;overflow:auto;background:#fafafa}
+    #left{border-right:1px solid var(--border);overflow:auto;background:#fafafa}
     .section{padding:12px;border-bottom:1px solid #eee}
-    .group{margin-bottom:10px}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     label{display:block;font-size:12px;color:#374151;margin:6px 0 2px}
     input[type=text],input[type=number]{width:100%;box-sizing:border-box;padding:8px;border:1px solid #d1d5db;border-radius:8px;background:#fff}
     select{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;background:#fff}
     .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
-    .btn.primary{background:#111827;color:#fff;border-color:#111827}
-    .btn.warn{background:#fff7ed;color:#9a3412;border-color:#fdba74}
-    .toolbar{display:flex;flex-wrap:wrap;gap:6px}
+    .toolrow{display:flex;flex-wrap:wrap;gap:6px}
     .toolbtn{padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer}
     .toolbtn.active{outline:2px solid #0ea5e9}
-    .legend{font-size:12px;color:#6b7280}
+    .legend{font-size:12px;color:var(--muted)}
     #stageWrap{position:relative;background:var(--bg)}
     #gmaps{position:absolute;inset:0;z-index:0;display:none}
     canvas{position:absolute;inset:0;z-index:1;display:block;background:transparent}
     .top-right{position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:5}
     .toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#111827;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;opacity:.92;z-index:6}
-    #coords{position:absolute;bottom:10px;left:10px;background:rgba(255,255,255,.9);border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;font-size:12px;z-index:6}
+    #coords{position:absolute;bottom:10px;left:10px;background:rgba(255,255,255,.9);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;z-index:6}
   </style>
 </head>
 <body>
   <div class="layout">
     <header>
       <h1>Vector Course Designer</h1>
-      <span class="legend">Freehand + Basemap • v1.1</span>
+      <span class="legend">Freehand + Basemap</span>
       <div class="spacer"></div>
       <button class="btn" id="btn-import">Import JSON</button>
-      <button class="btn primary" id="btn-export-json">Export JSON</button>
+      <button class="btn" id="btn-export-json">Export JSON</button>
       <button class="btn" id="btn-export-png">Export PNG + world.json</button>
     </header>
 
@@ -85,44 +79,44 @@
           <button class="btn" id="btn-apply-bounds">Apply</button>
           <button class="btn" id="btn-fit-to-data">Fit to Data</button>
         </div>
-        <p class="legend">Tip: Set bounds to your hole rectangle. We use these to convert lat/lng ↔︎ pixels.</p>
+        <p class="legend">We use these to convert lat/lng ↔︎ pixels.</p>
       </div>
 
       <div class="section">
-        <div class="group">
-          <label>Google Maps basemap (optional)</label>
-          <input id="gmKey" type="text" placeholder="Google Maps API key"/>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn" id="btn-enable-basemap">Enable</button>
-            <button class="btn" id="btn-disable-basemap">Disable</button>
-            <button class="btn" id="btn-basemap-opacity">Opacity 60%</button>
-          </div>
-          <p class="legend">For tracing only. We don’t export Google tiles.</p>
-        </div>
-        <div class="group">
-          <label>Reference image (offline tracing)</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn" id="btn-load-ref">Load PNG/JPG</button>
-            <button class="btn" id="btn-clear-ref">Clear</button>
-            <button class="btn" id="btn-ref-opacity">Ref Opacity 50%</button>
-          </div>
+        <div class="legend" style="margin-bottom:6px">Google Maps basemap (optional for tracing)</div>
+        <input id="gmKey" type="text" placeholder="Google Maps API key"/>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn" id="btn-enable-basemap">Enable</button>
+          <button class="btn" id="btn-disable-basemap">Disable</button>
+          <button class="btn" id="btn-basemap-opacity">Opacity 60%</button>
         </div>
       </div>
 
       <div class="section">
         <label>Tools</label>
-        <div class="legend" style="margin-bottom:6px">Freehand draw for areas is ON by default. Hold mouse/pen and trace; release to finish.</div>
-        <div class="group">
-          <div class="legend">Pins</div>
-          <div class="toolbar" id="toolsPins"></div>
+        <div class="legend" style="margin-bottom:6px">Freehand draw for areas is ON. Hold mouse/pen to trace; release to finish.</div>
+        <div class="legend">Pins</div>
+        <div id="pinsRow" class="toolrow">
+          <button class="toolbtn" data-tool="teePin">Tee Pin</button>
+          <button class="toolbtn" data-tool="frontPin">Front Pin</button>
+          <button class="toolbtn" data-tool="midPin">Mid Pin</button>
+          <button class="toolbtn" data-tool="backPin">Back Pin</button>
         </div>
-        <div class="group">
-          <div class="legend">Areas</div>
-          <div class="toolbar" id="toolsAreas"></div>
+        <div class="legend" style="margin-top:10px">Areas</div>
+        <div id="areasRow" class="toolrow">
+          <button class="toolbtn" data-tool="teeArea">Tee Area</button>
+          <button class="toolbtn" data-tool="fairway">Fairway</button>
+          <button class="toolbtn" data-tool="green">Green</button>
+          <button class="toolbtn" data-tool="bunker">Bunker</button>
+          <button class="toolbtn" data-tool="rough">Rough</button>
+          <button class="toolbtn" data-tool="water">Water</button>
+          <button class="toolbtn" data-tool="rocks">Rocks</button>
         </div>
-        <div class="group">
-          <div class="legend">POIs</div>
-          <div class="toolbar" id="toolsPois"></div>
+        <div class="legend" style="margin-top:10px">POIs</div>
+        <div id="poisRow" class="toolrow">
+          <button class="toolbtn" data-tool="toilet">Toilet</button>
+          <button class="toolbtn" data-tool="tree">Tree</button>
+          <button class="toolbtn" data-tool="bush">Bush</button>
         </div>
       </div>
 
@@ -195,7 +189,7 @@
 
       <div class="section">
         <label>Shortcuts</label>
-        <p class="legend">*Pins:* click once. *Areas:* press, drag to trace, release to finish. <b>Del</b> delete selection, <b>Z/Y</b> undo/redo.</p>
+        <p class="legend">Pins: click once. Areas: press & drag to trace, release to finish. Del delete, Ctrl/Cmd+Z undo, Ctrl/Cmd+Y redo.</p>
       </div>
     </aside>
 
@@ -213,181 +207,114 @@
   </div>
 
   <script>
-    // =================== State & Projection ===================
-    const state = {
-      meta:{name:"",id:"",pin:"",active:true},
-      bounds:{south:-25.705, west:28.195, north:-25.695, east:28.205},
-      zoom:1, panX:0, panY:0,
-      canvas:null, ctx:null, refImage:null, refOpacity:0.4,
-      gmaps:null, gmapsOpacity:0.6, gmapsKey:"",
-      holes: Array.from({length:18}, (_,i)=>({number:i+1, par:4, stroke:i+1, pins:{tee:null, front:null, mid:null, back:null}})),
-      features:{polygons:[], polylines:[], points:[]},
-      tool:"fairway", drawing:[], drawingType:null, selected=null,
-      undo:[], redo:[]
-    };
+    // ---- Safe init after DOM is ready ----
+    window.addEventListener('DOMContentLoaded', () => init());
 
-    const Tools = {
-      pins:[
-        {id:"teePin", label:"Tee Pin", kind:"point", role:"tee", color:"#0ea5e9"},
-        {id:"frontPin", label:"Front Pin", kind:"point", role:"front", color:"#22c55e"},
-        {id:"midPin", label:"Mid Pin", kind:"point", role:"mid", color:"#10b981"},
-        {id:"backPin", label:"Back Pin", kind:"point", role:"back", color:"#059669"}
-      ],
-      areas:[
-        {id:"teeArea", label:"Tee Area", kind:"polygon", style:{fill:"#8dd39b", stroke:"#2f6b3b", width:2}},
-        {id:"fairway", label:"Fairway", kind:"polygon", style:{fill:"#6fbf73", stroke:"#245a2c", width:2, stripe:true}},
-        {id:"green", label:"Green", kind:"polygon", style:{fill:"#66a85e", stroke:"#1f7a3d", width:2}},
-        {id:"bunker", label:"Bunker", kind:"polygon", style:{fill:"#e8d7a6", stroke:"#b59b60", width:2}},
-        {id:"rough", label:"Rough", kind:"polygon", style:{fill:"#93c590", stroke:"#4d7c4a", width:2}},
-        {id:"water", label:"Water", kind:"polygon", style:{fill:"#6aa9e9", stroke:"#306aa8", width:2}},
-        {id:"rocks", label:"Rocks", kind:"polygon", style:{fill:"#b0b4b8", stroke:"#6b7280", width:2}}
-      ],
-      pois:[
-        {id:"toilet", label:"Toilet", kind:"point", color:"#8b5cf6"},
-        {id:"tree", label:"Tree", kind:"point", color:"#14532d"},
-        {id:"bush", label:"Bush", kind:"point", color:"#3f6212"}
-      ]
-    };
+    function init(){
+      // Basic state
+      const state = window.__STATE__ = {
+        meta:{name:"",id:"",pin:"",active:true},
+        bounds:{south:-25.705, west:28.195, north:-25.695, east:28.205},
+        zoom:1, panX:0, panY:0,
+        canvas:document.getElementById('cv'),
+        ctx:null,
+        refImage:null, refOpacity:0.4,
+        gmaps:null, gmapsOpacity:0.6, gmapsKey:"",
+        holes: Array.from({length:18}, (_,i)=>({number:i+1, par:4, stroke:i+1, pins:{tee:null, front:null, mid:null, back:null}})),
+        features:{polygons:[], polylines:[], points:[]},
+        tool:'fairway', drawing:[], isDrawing:false,
+        undo:[], redo:[]
+      };
+      state.ctx = state.canvas.getContext('2d');
 
-    const el=id=>document.getElementById(id);
-    const cv=state.canvas=el('cv');
-    const ctx=state.ctx=cv.getContext('2d');
-
-    function lngToX(lng){const {west,east}=state.bounds;return (lng-west)/(east-west)*cv.width}
-    function latToY(lat){const {south,north}=state.bounds;return (north-lat)/(north-south)*cv.height}
-    function xToLng(x){const {west,east}=state.bounds;return west + (x/cv.width)*(east-west)}
-    function yToLat(y){const {south,north}=state.bounds;return north - (y/cv.height)*(north-south)}
-
-    function worldToScreen([lat,lng]){let x=lngToX(lng), y=latToY(lat); x= (x+state.panX)*state.zoom; y=(y+state.panY)*state.zoom; return [x,y]}
-    function screenToWorld(x,y){x/=state.zoom; y/=state.zoom; x-=state.panX; y-=state.panY; return [yToLat(y), xToLng(x)]}
-
-    // ============== UI build ==============
-    function buildToolbars(){
-      const mk=(arr, host)=>{
-        host.innerHTML='';
-        arr.forEach(t=>{
-          const b=document.createElement('button'); b.className='toolbtn'; b.textContent=t.label; b.onclick=()=>{state.tool=t.id; highlightTools(); toast(t.label)}; host.appendChild(b);
+      // Tool wiring (static buttons in HTML)
+      document.querySelectorAll('.toolbtn').forEach(b=>{
+        b.addEventListener('click',()=>{
+          document.querySelectorAll('.toolbtn').forEach(x=>x.classList.remove('active'));
+          b.classList.add('active');
+          state.tool = b.dataset.tool;
+          toast(b.textContent);
         })
-      }
-      mk(Tools.pins, el('toolsPins'));
-      mk(Tools.areas, el('toolsAreas'));
-      mk(Tools.pois, el('toolsPois'));
-      highlightTools();
-    }
-    function highlightTools(){
-      document.querySelectorAll('.toolbtn').forEach(btn=> btn.classList.remove('active'));
-      const all=[...Tools.pins,...Tools.areas,...Tools.pois];
-      const t=all.find(x=>x.id===state.tool); if(!t) return;
-      [...document.querySelectorAll('.toolbtn')].find(b=>b.textContent===t.label)?.classList.add('active');
-    }
+      });
+      // Activate default tool
+      document.querySelector('[data-tool="fairway"]').classList.add('active');
 
-    // Bounds inputs
-    ['bSouth','bWest','bNorth','bEast'].forEach(id=> el(id).value = state.bounds[id.slice(1).toLowerCase()]);
-    el('btn-apply-bounds').onclick=()=>{state.bounds.south=parseFloat(el('bSouth').value);state.bounds.west=parseFloat(el('bWest').value);state.bounds.north=parseFloat(el('bNorth').value);state.bounds.east=parseFloat(el('bEast').value);render(); positionGMaps();};
+      // Bounds inputs
+      ['bSouth','bWest','bNorth','bEast'].forEach(id=> document.getElementById(id).value = state.bounds[id.slice(1).toLowerCase()]);
+      document.getElementById('btn-apply-bounds').onclick=()=>{['South','West','North','East'].forEach(k=> state.bounds[k.toLowerCase()] = parseFloat(document.getElementById('b'+k).value)); render(state); positionGMaps(state); };
 
-    // Basemap controls
-    el('btn-enable-basemap').onclick=()=>{ state.gmapsKey = el('gmKey').value.trim(); if(!state.gmapsKey) {alert('Enter API key'); return;} loadGoogleMaps(); };
-    el('btn-disable-basemap').onclick=()=>{ el('gmaps').style.display='none'; state.gmaps=null; };
-    el('btn-basemap-opacity').onclick=()=>{ state.gmapsOpacity = state.gmapsOpacity===0.6?0.85:0.6; if(state.gmaps) el('gmaps').style.opacity=state.gmapsOpacity; };
+      // Basemap
+      document.getElementById('btn-enable-basemap').onclick=()=>{ state.gmapsKey = document.getElementById('gmKey').value.trim(); if(!state.gmapsKey){alert('Enter API key'); return;} loadGoogleMaps(state); };
+      document.getElementById('btn-disable-basemap').onclick=()=>{ document.getElementById('gmaps').style.display='none'; state.gmaps=null; };
+      document.getElementById('btn-basemap-opacity').onclick=()=>{ state.gmapsOpacity = state.gmapsOpacity===0.6?0.85:0.6; if(state.gmaps) document.getElementById('gmaps').style.opacity=state.gmapsOpacity; };
 
-    // Ref image
-    el('btn-load-ref').onclick=()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=()=>{const f=inp.files?.[0]; if(!f) return; const img=new Image(); img.onload=()=>{state.refImage=img; render();}; img.src=URL.createObjectURL(f)}; inp.click(); };
-    el('btn-clear-ref').onclick=()=>{state.refImage=null; render();}
-    el('btn-ref-opacity').onclick=()=>{state.refOpacity = state.refOpacity===0.4?0.7:0.4; render();}
+      // Zoom and fit
+      document.getElementById('btn-zoom-in').onclick=()=>{ state.zoom*=1.2; render(state); };
+      document.getElementById('btn-zoom-out').onclick=()=>{ state.zoom/=1.2; render(state); };
+      document.getElementById('btn-fit-bbox').onclick=()=>{ const h = state.holes[(+document.getElementById('holeNum').value||1)-1]; const a=h?.pins?.tee, b=h?.pins?.back; if(!a||!b) return toast('Set Tee and Back first'); fitTwoPoints(state,a,b); };
 
-    // Zoom
-    el('btn-zoom-in').onclick=()=>{state.zoom*=1.2; render();};
-    el('btn-zoom-out').onclick=()=>{state.zoom/=1.2; render();};
+      // Hole meta + elevations
+      document.getElementById('btn-apply-hole').onclick=()=>{ const idx=(+document.getElementById('holeNum').value)-1; const h=state.holes[idx]; if(!h) return; h.par=+document.getElementById('holePar').value||h.par; h.stroke=+document.getElementById('holeStroke').value||h.stroke; ['Tee','Front','Mid','Back'].forEach(k=>{ const v=parseFloat(document.getElementById('elev'+k).value); if(Number.isFinite(v) && h.pins[k.toLowerCase()]) h.pins[k.toLowerCase()].elev_m=v; }); toast('Hole updated'); render(state); };
 
-    // Fit
-    el('btn-fit-bbox').onclick=()=>{ const h = state.holes[(+el('holeNum').value||1)-1]; const a=h?.pins?.tee, b=h?.pins?.back; if(!a||!b) return toast('Set Tee and Back first'); fitTwoPoints(a,b); };
-    function fitTwoPoints(A,B){ const [ax,ay]=[lngToX(A.lng), latToY(A.lat)]; const [bx,by]=[lngToX(B.lng), latToY(B.lat)]; const pad=80; const w=cv.width-2*pad, h=cv.height-2*pad; const dx=Math.abs(ax-bx), dy=Math.abs(ay-by); const zx=w/dx, zy=h/dy; const z=Math.max(1, Math.min(zx,zy)); state.zoom = z; const cx=(ax+bx)/2, cy=(ay+by)/2; state.panX = (cv.width/2)/z - cx; state.panY = (cv.height/2)/z - cy; render(); }
+      // Import/Export
+      document.getElementById('btn-export-json').onclick=()=>{ const blob=new Blob([JSON.stringify({ meta:state.meta,bounds:state.bounds,holes:state.holes,features:state.features },null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${(state.meta.id||'course')}.vector.json`; a.click(); URL.revokeObjectURL(a.href); };
+      document.getElementById('btn-export-png').onclick=()=>{ const png=state.canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=png; a.download=`${(state.meta.id||'course')}.png`; a.click(); const world={bounds:state.bounds, width:state.canvas.width, height:state.canvas.height}; const blob=new Blob([JSON.stringify(world,null,2)],{type:'application/json'}); const a2=document.createElement('a'); a2.href=URL.createObjectURL(blob); a2.download=`${(state.meta.id||'course')}.world.json`; a2.click(); URL.revokeObjectURL(a2.href); };
+      document.getElementById('btn-import').onclick=()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json'; inp.onchange=async()=>{const f=inp.files?.[0]; if(!f) return; const txt=await f.text(); try{const obj=JSON.parse(txt); importJSON(state,obj); toast('Imported');}catch(e){alert('Invalid JSON')};}; inp.click(); };
 
-    // Meta + hole meta
-    ['clubName','clubId','clubPin','clubActive'].forEach(id=> el(id).addEventListener('change',()=>{ state.meta.name=el('clubName').value.trim(); state.meta.id=el('clubId').value.trim(); state.meta.pin=el('clubPin').value.trim().toUpperCase(); state.meta.active=(el('clubActive').value==='true'); }));
-    el('btn-apply-hole').onclick=()=>{ const idx=(+el('holeNum').value)-1; const h=state.holes[idx]; if(!h) return; h.par=+el('holePar').value||h.par; h.stroke=+el('holeStroke').value||h.stroke; if(h.pins.tee) h.pins.tee.elev_m = numOrNull(el('elevTee').value); if(h.pins.front) h.pins.front.elev_m = numOrNull(el('elevFront').value); if(h.pins.mid) h.pins.mid.elev_m = numOrNull(el('elevMid').value); if(h.pins.back) h.pins.back.elev_m = numOrNull(el('elevBack').value); toast('Hole updated'); render(); }
-    function numOrNull(v){const n=parseFloat(v); return Number.isFinite(n)?n:null}
+      // Canvas input
+      state.canvas.addEventListener('mousedown', e=> onDown(state,e));
+      state.canvas.addEventListener('mousemove', e=> onMove(state,e));
+      window.addEventListener('mouseup', e=> onUp(state,e));
+      window.addEventListener('resize', ()=> sizeCanvas(state));
 
-    // Import / Export
-    el('btn-export-json').onclick=()=>{ const data = exportJSON(); const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${(state.meta.id||'course')}.vector.json`; a.click(); URL.revokeObjectURL(a.href); };
-    el('btn-export-png').onclick=()=>{ const png=cv.toDataURL('image/png'); const a=document.createElement('a'); a.href=png; a.download=`${(state.meta.id||'course')}.png`; a.click(); const world={bounds:state.bounds, width:cv.width, height:cv.height}; const blob=new Blob([JSON.stringify(world,null,2)],{type:'application/json'}); const a2=document.createElement('a'); a2.href=URL.createObjectURL(blob); a2.download=`${(state.meta.id||'course')}.world.json`; a2.click(); URL.revokeObjectURL(a2.href); };
-    el('btn-import').onclick=()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json'; inp.onchange=async()=>{const f=inp.files?.[0]; if(!f) return; const txt=await f.text(); try{const obj=JSON.parse(txt); importJSON(obj); toast('Imported');}catch(e){alert('Invalid JSON')};}; inp.click(); };
-
-    function exportJSON(){ return { meta: state.meta, bounds: state.bounds, holes: state.holes, features: state.features }; }
-    function importJSON(obj){ state.meta=obj.meta||state.meta; state.bounds=obj.bounds||state.bounds; state.holes=obj.holes||state.holes; state.features=obj.features||state.features; ['bSouth','bWest','bNorth','bEast'].forEach(id=> el(id).value = state.bounds[id.slice(1).toLowerCase()]); render(); positionGMaps(); }
-
-    // ============== Freehand drawing / points ==============
-    cv.addEventListener('mousedown', onDown); cv.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-    window.addEventListener('keydown', e=>{ if((e.key==='z'||e.key==='Z')&&(e.ctrlKey||e.metaKey)) undo(); if((e.key==='y'||e.key==='Y')&&(e.ctrlKey||e.metaKey)) redo(); if(e.key==='Delete'&&state.selected){ const {kind,index}=state.selected; if(kind==='poly') state.features.polygons.splice(index,1); if(kind==='pt') state.features.points.splice(index,1); state.selected=null; snapshot(); render(); } });
-
-    function currentAreaTool(){ return Tools.areas.find(t=>t.id===state.tool) }
-    function currentPinTool(){ return Tools.pins.find(t=>t.id===state.tool) || Tools.pois.find(t=>t.id===state.tool) }
-
-    let isDrawing=false; let lastAdd=0;
-    function onDown(e){ const pin=currentPinTool(); const area=currentAreaTool(); const [lat,lng]=screenToWorld(e.offsetX,e.offsetY); if(pin){ dropPoint(pin, lat,lng); return; } if(area){ state.drawing=[{lat,lng}]; isDrawing=true; lastAdd=performance.now(); render(); } }
-    function onMove(e){ const [lat,lng]=screenToWorld(e.offsetX,e.offsetY); el('coords').textContent=`lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`; if(!isDrawing) return; const now=performance.now(); if(now-lastAdd>25){ state.drawing.push({lat,lng}); lastAdd=now; render(); } }
-    function onUp(e){ if(!isDrawing) return; const area=currentAreaTool(); if(!area) return; // finish polygon
-      const coords=[...state.drawing]; state.drawing=[]; isDrawing=false; state.features.polygons.push({type:area.id, hole:+el('holeNum').value, style:currentStyle(area), coords}); snapshot(); render(); }
-
-    function dropPoint(tool, lat,lng){
-      // visible point
-      state.features.points.push({type: tool.role? tool.role : tool.id, coords:{lat,lng}});
-      // If pin role, sync to hole pins and try elevation
-      if(tool.role){ const h=state.holes[(+el('holeNum').value)-1]; h.pins[tool.role]={lat,lng}; fetchElevationIfPossible(tool.role, lat, lng); syncPinsUI(h); }
-      snapshot(); render();
+      sizeCanvas(state); snapshot(state); render(state);
     }
 
-    function syncPinsUI(h){ el('elevTee').value = vOrBlank(h.pins.tee?.elev_m); el('elevFront').value=vOrBlank(h.pins.front?.elev_m); el('elevMid').value=vOrBlank(h.pins.mid?.elev_m); el('elevBack').value=vOrBlank(h.pins.back?.elev_m); }
-    function vOrBlank(v){ return (v===0 || (v && !Number.isNaN(v)))? v : '' }
+    // ---- Helpers & rendering ----
+    function lngToX(state,lng){const {west,east}=state.bounds;return (lng-west)/(east-west)*state.canvas.width}
+    function latToY(state,lat){const {south,north}=state.bounds;return (north-lat)/(north-south)*state.canvas.height}
+    function xToLng(state,x){const {west,east}=state.bounds;return west + (x/state.canvas.width)*(east-west)}
+    function yToLat(state,y){const {south,north}=state.bounds;return north - (y/state.canvas.height)*(north-south)}
+    function worldToScreen(state,[lat,lng]){let x=lngToX(state,lng), y=latToY(state,lat); x= (x+state.panX)*state.zoom; y=(y+state.panY)*state.zoom; return [x,y]}
+    function screenToWorld(state,x,y){x/=state.zoom; y/=state.zoom; x-=state.panX; y-=state.panY; return [yToLat(state,y), xToLng(state,x)]}
 
-    async function fetchElevationIfPossible(role, lat, lng){
-      if(!state.gmapsKey) return; // use the same key; Elevation API must be enabled
-      try{
-        const url=`https://maps.googleapis.com/maps/api/elevation/json?locations=${lat},${lng}&key=${state.gmapsKey}`;
-        const res=await fetch(url); const data=await res.json();
-        const elev=data.results?.[0]?.elevation; if(Number.isFinite(elev)){ const idx=(+el('holeNum').value)-1; state.holes[idx].pins[role].elev_m=Math.round(elev*10)/10; syncPinsUI(state.holes[idx]); toast(`${role} elevation: ${Math.round(elev)} m`); }
-      }catch(err){ /* ignore */ }
-    }
+    function sizeCanvas(state){ state.canvas.width = (document.body.clientWidth-360); state.canvas.height = (document.body.clientHeight-50); render(state); positionGMaps(state); }
 
-    function currentStyle(tool){ const fill=el('fill').value|| (tool.style?.fill||'#6fbf73'); const stroke=el('stroke').value|| (tool.style?.stroke||'#245a2c'); const width=+el('strokeW').value || (tool.style?.width||2); const stripe=(el('stripe').value==='yes'); return {fill, stroke, width, stripe}; }
+    function render(state){ const ctx=state.ctx, cv=state.canvas; ctx.clearRect(0,0,cv.width,cv.height); if(state.refImage){ ctx.globalAlpha=state.refOpacity; ctx.drawImage(state.refImage,0,0,cv.width,cv.height); ctx.globalAlpha=1; } state.features.polygons.forEach(p=> drawPolygon(state,p)); state.features.points.forEach(p=> drawPoint(state,p)); if(state.isDrawing && state.drawing.length){ drawPreview(state); } ctx.strokeStyle="#94a3b8"; ctx.lineWidth=1; ctx.strokeRect(0,0,cv.width,cv.height); }
 
-    function snapshot(){ state.undo.push(JSON.stringify(exportJSON())); state.redo.length=0; }
-    function undo(){ if(state.undo.length<2) return; const cur=state.undo.pop(); state.redo.push(cur); importJSON(JSON.parse(state.undo[state.undo.length-1])); }
-    function redo(){ if(!state.redo.length) return; const nxt=state.redo.pop(); state.undo.push(nxt); importJSON(JSON.parse(nxt)); }
-
-    // ============== Rendering ==============
-    window.addEventListener('resize', sizeCanvas);
-    function sizeCanvas(){ cv.width = (document.body.clientWidth-360); cv.height = (document.body.clientHeight-50); render(); positionGMaps(); }
-
-    function render(){ ctx.clearRect(0,0,cv.width,cv.height); // reference image
-      if(state.refImage){ ctx.globalAlpha=state.refOpacity; ctx.drawImage(state.refImage, 0,0, cv.width, cv.height); ctx.globalAlpha=1; }
-      // polygons
-      state.features.polygons.forEach((p)=> drawPolygon(p));
-      // points
-      state.features.points.forEach((p)=> drawPoint(p));
-      // drawing preview
-      if(state.drawing.length){ drawPreview(); }
-      // frame
-      ctx.strokeStyle="#94a3b8"; ctx.lineWidth=1; ctx.strokeRect(0,0,cv.width,cv.height);
-    }
-
-    function drawPolygon(p){ const pts=p.coords.map(c=>worldToScreen([c.lat,c.lng])); if(pts.length<2) return; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fillStyle=p.style?.fill||'#6fbf73'; ctx.strokeStyle=p.style?.stroke||'#245a2c'; ctx.lineWidth=p.style?.width||2; ctx.fill(); ctx.stroke(); if(p.type==='fairway' && (p.style?.stripe)){ ctx.save(); ctx.clip(); const step=22; for(let i=-cv.height;i<cv.height*2;i+=step){ ctx.beginPath(); ctx.rect(-cv.width,i,cv.width*3, step/2); ctx.fillStyle=hexShift(p.style.fill||'#6fbf73', -10); ctx.fill(); } ctx.restore(); } }
+    function drawPolygon(state,p){ const ctx=state.ctx; const pts=p.coords.map(c=>worldToScreen(state,[c.lat,c.lng])); if(pts.length<2) return; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fillStyle=p.style?.fill||'#6fbf73'; ctx.strokeStyle=p.style?.stroke||'#245a2c'; ctx.lineWidth=p.style?.width||2; ctx.fill(); ctx.stroke(); if(p.type==='fairway' && (p.style?.stripe)){ ctx.save(); ctx.clip(); const step=22; for(let i=-state.canvas.height;i<state.canvas.height*2;i+=step){ ctx.beginPath(); ctx.rect(-state.canvas.width,i,state.canvas.width*3, step/2); ctx.fillStyle=hexShift(p.style.fill||'#6fbf73', -10); ctx.fill(); } ctx.restore(); } }
+    function drawPoint(state,p){ const ctx=state.ctx; const [x,y]=worldToScreen(state,[p.coords.lat,p.coords.lng]); const color=pointColor(p.type); ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fillStyle=color; ctx.fill(); ctx.strokeStyle="#1f2937"; ctx.lineWidth=1; ctx.stroke(); }
+    function drawPreview(state){ const ctx=state.ctx; const scr=state.drawing.map(c=>worldToScreen(state,[c.lat,c.lng])); ctx.beginPath(); ctx.moveTo(scr[0][0], scr[0][1]); for(let i=1;i<scr.length;i++) ctx.lineTo(scr[i][0], scr[i][1]); ctx.strokeStyle=document.getElementById('stroke').value||'#245a2c'; ctx.lineWidth=+document.getElementById('strokeW').value||2; ctx.stroke(); }
 
     function hexShift(hex, delta){ try{ let c=parseInt(hex.replace('#',''),16); let r=(c>>16)&255,g=(c>>8)&255,b=c&255; const adj=v=>Math.max(0,Math.min(255,v+delta)); r=adj(r); g=adj(g); b=adj(b); return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);}catch(e){return hex}}
+    function pointColor(type){ const map={tee:'\#0ea5e9',front:'\#22c55e',mid:'\#10b981',back:'\#059669',toilet:'\#8b5cf6',tree:'\#14532d',bush:'\#3f6212'}; return map[type]||'#111827'; }
 
-    function drawPoint(p){ const [x,y]=worldToScreen([p.coords.lat,p.coords.lng]); const color=pointColor(p.type); ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fillStyle=color; ctx.fill(); ctx.strokeStyle="#1f2937"; ctx.lineWidth=1; ctx.stroke(); }
-    function pointColor(type){ const all=[...Tools.pins,...Tools.pois]; const t=all.find(t=> (t.role||t.id)===type); return t?.color||'#111827'; }
+    // Input handlers
+    function onDown(state,e){ const [lat,lng]=screenToWorld(state,e.offsetX,e.offsetY); const tool=state.tool; const isPin = ['teePin','frontPin','midPin','backPin','toilet','tree','bush'].includes(tool);
+      if(isPin){ dropPoint(state, tool, lat, lng); return; }
+      // Area freehand
+      state.drawing=[{lat,lng}]; state.isDrawing=true; state._lastAdd=performance.now(); render(state);
+    }
+    function onMove(state,e){ const [lat,lng]=screenToWorld(state,e.offsetX,e.offsetY); document.getElementById('coords').textContent=`lat: ${lat.toFixed(6)}, lng: ${lng.toFixed(6)}`; if(!state.isDrawing) return; const now=performance.now(); if(now - (state._lastAdd||0) > 25){ state.drawing.push({lat,lng}); state._lastAdd=now; render(state);} }
+    function onUp(state,e){ if(!state.isDrawing) return; const tool=state.tool; const typeMap={teeArea:'teeArea',fairway:'fairway',green:'green',bunker:'bunker',rough:'rough',water:'water',rocks:'rocks'}; const t=typeMap[tool]; if(!t){ state.isDrawing=false; state.drawing=[]; return; } const coords=[...state.drawing]; state.drawing=[]; state.isDrawing=false; const style=currentStyle(); state.features.polygons.push({type:t, hole:+document.getElementById('holeNum').value, style, coords}); snapshot(state); render(state); }
 
-    function drawPreview(){ const area=currentAreaTool(); if(!area) return; const scr=state.drawing.map(c=>worldToScreen([c.lat,c.lng])); ctx.beginPath(); ctx.moveTo(scr[0][0], scr[0][1]); for(let i=1;i<scr.length;i++) ctx.lineTo(scr[i][0], scr[i][1]); ctx.strokeStyle=(area.style?.stroke||'#245a2c'); ctx.lineWidth=(area.style?.width||2); ctx.stroke(); }
+    function dropPoint(state, tool, lat, lng){ const roleMap={teePin:'tee',frontPin:'front',midPin:'mid',backPin:'back'}; const type=roleMap[tool] || tool; state.features.points.push({type, coords:{lat,lng}}); if(roleMap[tool]){ const h=state.holes[(+document.getElementById('holeNum').value)-1]; h.pins[type]={lat,lng}; tryElevation(state,type,lat,lng); }
+      snapshot(state); render(state); }
 
-    function toast(t){ const d=el('toast'); d.textContent=t; d.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>d.style.display='none', 1200); }
+    function currentStyle(){ const fill=document.getElementById('fill').value||'#6fbf73'; const stroke=document.getElementById('stroke').value||'#245a2c'; const width=+document.getElementById('strokeW').value||2; const stripe=(document.getElementById('stripe').value==='yes'); return {fill,stroke,width,stripe}; }
 
-    // ============== Google Maps basemap ==============
-    function loadGoogleMaps(){ if(state.gmaps){ el('gmaps').style.display='block'; el('gmaps').style.opacity=state.gmapsOpacity; return; } const s=document.createElement('script'); s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(state.gmapsKey)}&libraries=maps`; s.onload=()=>{ const div=el('gmaps'); div.style.display='block'; div.style.opacity=state.gmapsOpacity; state.gmaps=new google.maps.Map(div,{center:{lat:(state.bounds.north+state.bounds.south)/2,lng:(state.bounds.east+state.bounds.west)/2}, zoom:16, mapTypeId:'satellite', disableDefaultUI:true}); positionGMaps(); }; document.head.appendChild(s); }
-    function positionGMaps(){ if(!state.gmaps) return; const b=new google.maps.LatLngBounds( {lat:state.bounds.south, lng:state.bounds.west}, {lat:state.bounds.north, lng:state.bounds.east} ); state.gmaps.fitBounds(b); }
+    function fitTwoPoints(state,A,B){ const ax=lngToX(state,A.lng), ay=latToY(state,A.lat); const bx=lngToX(state,B.lng), by=latToY(state,B.lat); const pad=80; const w=state.canvas.width-2*pad, h=state.canvas.height-2*pad; const dx=Math.max(1,Math.abs(ax-bx)), dy=Math.max(1,Math.abs(ay-by)); const z=Math.max(1, Math.min(w/dx, h/dy)); state.zoom=z; const cx=(ax+bx)/2, cy=(ay+by)/2; state.panX= (state.canvas.width/2)/z - cx; state.panY=(state.canvas.height/2)/z - cy; render(state); }
 
-    // boot
-    buildToolbars(); sizeCanvas(); snapshot(); render();
+    function toast(t){ const d=document.getElementById('toast'); d.textContent=t; d.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>d.style.display='none', 1200); }
+
+    function snapshot(state){ state.undo.push(JSON.stringify({ meta:state.meta,bounds:state.bounds,holes:state.holes,features:state.features })); state.redo.length=0; }
+    function importJSON(state,obj){ state.meta=obj.meta||state.meta; state.bounds=obj.bounds||state.bounds; state.holes=obj.holes||state.holes; state.features=obj.features||state.features; ['bSouth','bWest','bNorth','bEast'].forEach(id=> document.getElementById(id).value = state.bounds[id.slice(1).toLowerCase()]); render(state); positionGMaps(state); }
+
+    // Basemap
+    function loadGoogleMaps(state){ if(state.gmaps){ document.getElementById('gmaps').style.display='block'; document.getElementById('gmaps').style.opacity=state.gmapsOpacity; return; } const s=document.createElement('script'); s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(state.gmapsKey)}`; s.onload=()=>{ const div=document.getElementById('gmaps'); div.style.display='block'; div.style.opacity=state.gmapsOpacity; state.gmaps=new google.maps.Map(div,{center:{lat:(state.bounds.north+state.bounds.south)/2,lng:(state.bounds.east+state.bounds.west)/2}, zoom:16, mapTypeId:'satellite', disableDefaultUI:true}); positionGMaps(state); }; document.head.appendChild(s); }
+    function positionGMaps(state){ if(!state.gmaps) return; const b=new google.maps.LatLngBounds( {lat:state.bounds.south, lng:state.bounds.west}, {lat:state.bounds.north, lng:state.bounds.east} ); state.gmaps.fitBounds(b); }
+
+    async function tryElevation(state, role, lat, lng){ const key=state.gmapsKey; if(!key) return; try{ const url=`https://maps.googleapis.com/maps/api/elevation/json?locations=${lat},${lng}&key=${key}`; const r=await fetch(url); const j=await r.json(); const elev=j.results?.[0]?.elevation; if(Number.isFinite(elev)){ const idx=(+document.getElementById('holeNum').value)-1; state.holes[idx].pins[role].elev_m=Math.round(elev*10)/10; const map={tee:'elevTee',front:'elevFront',mid:'elevMid',back:'elevBack'}; const fld=map[role]; if(fld) document.getElementById(fld).value=state.holes[idx].pins[role].elev_m; toast(`${role} elev ${Math.round(elev)}m`);} }catch(e){} }
   </script>
 </body>
 </html>
