@@ -6,34 +6,40 @@
   <title>TrackLinq — Login</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <style>
-    :root { color-scheme: light dark; }
-    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial; background: #0b1020; color: #e5f0ff; }
-    .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
-    .card { width: 100%; max-width: 560px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 20px; backdrop-filter: blur(6px); }
-    h1 { margin: 0 0 10px; font-size: 22px; }
-    p { margin: 4px 0 16px; color: #b8cbff; }
-    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-    .tabbtn { cursor: pointer; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #fff; text-align: center; font-weight: 600; }
-    .tabbtn.active { background: #1c2d58; border-color: #5e86ff; }
-    .group { margin: 12px 0; }
-    label { display: block; font-size: 12px; color: #cfe0ff; margin-bottom: 6px; }
-    input, select { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; background: rgba(13,17,27,0.6); color: #e7f0ff; }
-    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-    .btn { cursor: pointer; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: #2d7bff; color: #fff; font-weight: 700; }
-    .btn.secondary { background: rgba(255,255,255,0.08); }
-    .muted { color: #a7bbea; font-size: 12px; }
-    .hidden { display: none; }
+    :root {
+      --green:#16a34a; --green-d:#0f6b31;
+      --bg:#f7faf7; --card:#ffffff; --text:#0f172a; --muted:#4b5563; --border:#e5e7eb;
+    }
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica Neue,Arial;color:var(--text);background:var(--bg);}
+    .wrap{min-height:100%;display:grid;place-items:center;padding:24px;}
+    .card{width:100%;max-width:640px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,.06);}
+    h1{margin:0 0 10px;font-size:22px;}
+    p{margin:4px 0 16px;color:var(--muted);}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+    .tab{cursor:pointer;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#fff;text-align:center;font-weight:700;}
+    .tab.active{background:var(--green);color:#fff;border-color:var(--green);}
+    .group{margin:12px 0;}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+    input,select{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);}
+    .row{display:grid;grid-template-columns:1fr auto;gap:8px;}
+    .btn{cursor:pointer;padding:12px 14px;border-radius:12px;border:1px solid var(--green);background:var(--green);color:#fff;font-weight:800;}
+    .btn.secondary{background:#fff;color:var(--green);}
+    .muted{color:var(--muted);font-size:12px;}
+    .hidden{display:none;}
+    .foot{margin-top:10px;display:flex;justify-content:space-between;align-items:center;}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;}
+    .on{background:#16a34a}.off{background:#b91c1c}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>TrackLinq</h1>
-      <p>Select how you want to log in.</p>
+      <p>Login with your club PIN or continue as a guest.</p>
 
       <div class="tabs">
-        <button class="tabbtn active" id="tabClub">Club (PIN)</button>
-        <button class="tabbtn" id="tabGuest">Guest (Choose Course)</button>
+        <button id="tabClub" class="tab active">Club (PIN)</button>
+        <button id="tabGuest" class="tab">Guest (Choose Course)</button>
       </div>
 
       <!-- Club (PIN) -->
@@ -60,14 +66,31 @@
         </div>
         <div class="muted" style="margin-top:8px">Guest mode won’t ask for a PIN.</div>
       </div>
+
+      <div class="foot">
+        <div id="status"><span class="dot off" id="netDot"></span><span id="netTxt">Offline</span></div>
+        <div class="muted">v2.2</div>
+      </div>
     </div>
   </div>
 
   <script>
-    // Register SW to ensure caching works across app
+    // SW register
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
+
+    // Online/offline badge
+    const netDot = document.getElementById('netDot');
+    const netTxt = document.getElementById('netTxt');
+    function updateNet(){
+      const on = navigator.onLine;
+      netDot.className = 'dot ' + (on ? 'on':'off');
+      netTxt.textContent = on ? 'Online' : 'Offline';
+    }
+    window.addEventListener('online', updateNet);
+    window.addEventListener('offline', updateNet);
+    updateNet();
 
     // Tabs
     const tabClub = document.getElementById('tabClub');
@@ -75,28 +98,55 @@
     const clubPane = document.getElementById('clubPane');
     const guestPane = document.getElementById('guestPane');
 
-    function setTab(which) {
-      const isClub = which === 'club';
+    function setTab(which){
+      const isClub = which==='club';
       tabClub.classList.toggle('active', isClub);
       tabGuest.classList.toggle('active', !isClub);
       clubPane.classList.toggle('hidden', !isClub);
       guestPane.classList.toggle('hidden', isClub);
     }
-    tabClub.addEventListener('click', () => setTab('club'));
-    tabGuest.addEventListener('click', () => setTab('guest'));
+    tabClub.addEventListener('click', ()=>setTab('club'));
+    tabGuest.addEventListener('click', ()=>setTab('guest'));
 
-    // Load /courses/index.json (from cache or network)
-    async function getIndex() {
-      const cached = await caches.match('/courses/index.json');
-      let res = cached;
-      if (!res) res = await fetch('/courses/index.json', { cache: 'reload' });
+    // Cache-first fetch helpers for index + course JSON
+    async function getIndexCacheFirst() {
+      let res = await caches.match('/courses/index.json');
+      if (!res) {
+        try {
+          res = await fetch('/courses/index.json', { cache: 'reload' });
+          // save snapshot for deep-offline fallback
+          const txt = await res.clone().text();
+          localStorage.setItem('course_index_snapshot', txt);
+          return JSON.parse(txt);
+        } catch (_) {
+          // deep-offline fallback to snapshot
+          const snap = localStorage.getItem('course_index_snapshot');
+          if (snap) return JSON.parse(snap);
+          throw new Error('No index.json available');
+        }
+      }
+      try {
+        const json = await res.json();
+        localStorage.setItem('course_index_snapshot', JSON.stringify(json));
+        return json;
+      } catch(_) {
+        const snap = localStorage.getItem('course_index_snapshot');
+        if (snap) return JSON.parse(snap);
+        throw new Error('Bad index.json cache');
+      }
+    }
+
+    async function loadCourseJsonCacheFirst(id){
+      const url = `/courses/${id}.json`;
+      let res = await caches.match(url);
+      if (!res) res = await fetch(url, { cache: 'reload' });
       return res.json();
     }
 
-    // Fill guest dropdown
+    // Populate guest courses
     async function populateCourses() {
       try {
-        const idx = await getIndex();
+        const idx = await getIndexCacheFirst();
         const sel = document.getElementById('courseSelect');
         sel.innerHTML = '';
         (idx.courses || []).forEach(c => {
@@ -106,65 +156,44 @@
           sel.appendChild(opt);
         });
       } catch (e) {
-        alert('Could not load course list.');
+        alert('Could not load course list (online once to cache it).');
       }
     }
     populateCourses();
     document.getElementById('refreshBtn').addEventListener('click', populateCourses);
 
-    // Club login by PIN (10 chars) — primary source: index.json; fallback: per-course file
+    // Find a course by PIN (index.json primary, then per-course JSON fallback)
     async function findCourseByPin(pin) {
-      const idx = await getIndex();
-      // 1) Try index.json
-      const byIndex = (idx.courses || []).find(c =>
-        (c.pin || '').trim().toUpperCase() === pin
-      );
-      if (byIndex) return byIndex;
-
-      // 2) Fallback: open each course JSON and look at course.pin
-      const ids = (idx.courses || []).map(c => c.id);
-      for (const id of ids) {
+      const idx = await getIndexCacheFirst();
+      const inIndex = (idx.courses || []).find(c => (c.pin||'').trim().toUpperCase() === pin);
+      if (inIndex) return inIndex;
+      // fallback: scan each course.json
+      for (const c of (idx.courses || [])) {
         try {
-          const url = `/courses/${id}.json`;
-          const cached = await caches.match(url);
-          let res = cached;
-          if (!res) res = await fetch(url, { cache: 'reload' });
-          const json = await res.json();
-          const metaPin = (json?.course?.pin || '').trim().toUpperCase();
-          if (metaPin && metaPin === pin) {
-            return { id, name: json?.course?.name || id, pin: metaPin };
-          }
-        } catch (_) {}
+          const j = await loadCourseJsonCacheFirst(c.id);
+          const metaPin = (j?.course?.pin || '').trim().toUpperCase();
+          if (metaPin && metaPin === pin) return { id: c.id, name: j?.course?.name || c.id, pin: metaPin };
+        } catch(_) {}
       }
       return null;
     }
 
-    // Club login button
+    // Club login
     document.getElementById('clubLoginBtn').addEventListener('click', async () => {
-      const inEl = document.getElementById('clubPin');
-      const raw = (inEl.value || '').trim().toUpperCase();
+      const raw = (document.getElementById('clubPin').value || '').trim().toUpperCase();
       if (raw.length !== 10) { alert('PIN must be exactly 10 characters.'); return; }
-
       const course = await findCourseByPin(raw);
       if (!course) { alert('Invalid PIN for any known course.'); return; }
-
-      // Save for convenience (also used by gps.html)
       localStorage.setItem(`pin_${course.id}`, raw);
-
-      // Redirect straight to GPS with course + pin in URL
       location.href = `/gps.html?course=${encodeURIComponent(course.id)}&pin=${encodeURIComponent(raw)}`;
     });
+    document.getElementById('clubPin').addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('clubLoginBtn').click(); });
 
     // Guest login
     document.getElementById('guestLoginBtn').addEventListener('click', () => {
       const id = document.getElementById('courseSelect').value;
       if (!id) { alert('Pick a course'); return; }
       location.href = `/gps.html?course=${encodeURIComponent(id)}&guest=1`;
-    });
-
-    // Allow Enter key in PIN field
-    document.getElementById('clubPin').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('clubLoginBtn').click();
     });
   </script>
 </body>
