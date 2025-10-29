@@ -1,62 +1,171 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TrackLinq</title>
-    <style>
-      body {
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-        margin: 0;
-        display: grid;
-        place-items: center;
-        min-height: 100vh;
-        background: #f8fafc;
-      }
-      .card {
-        padding: 28px 32px;
-        border: 1px solid #e5e7eb;
-        border-radius: 14px;
-        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
-        background: white;
-        text-align: center;
-      }
-      h1 {
-        margin-top: 0;
-        color: #111827;
-        font-size: 24px;
-      }
-      p {
-        color: #374151;
-        margin: 8px 0 16px;
-      }
-      a.button {
-        display: inline-block;
-        padding: 12px 20px;
-        border-radius: 8px;
-        background-color: #14532d;
-        color: white;
-        font-weight: 600;
-        text-decoration: none;
-        transition: background 0.2s ease;
-      }
-      a.button:hover {
-        background-color: #166534;
-      }
-      code {
-        background: #f1f5f9;
-        padding: 3px 6px;
-        border-radius: 6px;
-      }
-    </style>
-  </head>
-  <body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>TrackLinq — Login</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial; background: #0b1020; color: #e5f0ff; }
+    .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+    .card { width: 100%; max-width: 560px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 20px; backdrop-filter: blur(6px); }
+    h1 { margin: 0 0 10px; font-size: 22px; }
+    p { margin: 4px 0 16px; color: #b8cbff; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .tabbtn { cursor: pointer; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #fff; text-align: center; font-weight: 600; }
+    .tabbtn.active { background: #1c2d58; border-color: #5e86ff; }
+    .group { margin: 12px 0; }
+    label { display: block; font-size: 12px; color: #cfe0ff; margin-bottom: 6px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; background: rgba(13,17,27,0.6); color: #e7f0ff; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .btn { cursor: pointer; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: #2d7bff; color: #fff; font-weight: 700; }
+    .btn.secondary { background: rgba(255,255,255,0.08); }
+    .muted { color: #a7bbea; font-size: 12px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
     <div class="card">
-      <h1>TrackLinq GPS</h1>
-      <p>Welcome to the TrackLinq server.</p>
-      <p>
-        <a class="button" href="/login.html">Open the PIN Login Screen</a>
-      </p>
+      <h1>TrackLinq</h1>
+      <p>Select how you want to log in.</p>
+
+      <div class="tabs">
+        <button class="tabbtn active" id="tabClub">Club (PIN)</button>
+        <button class="tabbtn" id="tabGuest">Guest (Choose Course)</button>
+      </div>
+
+      <!-- Club (PIN) -->
+      <div id="clubPane">
+        <div class="group">
+          <label>Enter 10-digit Club PIN</label>
+          <div class="row">
+            <input id="clubPin" maxlength="10" placeholder="e.g. SLK1234567"/>
+            <button class="btn" id="clubLoginBtn">Login</button>
+          </div>
+          <div class="muted">Carts: enter your club’s PIN to go straight to your course.</div>
+        </div>
+      </div>
+
+      <!-- Guest -->
+      <div id="guestPane" class="hidden">
+        <div class="group">
+          <label>Choose Course</label>
+          <select id="courseSelect"></select>
+        </div>
+        <div class="row">
+          <button class="btn" id="guestLoginBtn">Continue as Guest</button>
+          <button class="btn secondary" id="refreshBtn">Refresh List</button>
+        </div>
+        <div class="muted" style="margin-top:8px">Guest mode won’t ask for a PIN.</div>
+      </div>
     </div>
-  </body>
+  </div>
+
+  <script>
+    // Register SW to ensure caching works across app
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+    }
+
+    // Tabs
+    const tabClub = document.getElementById('tabClub');
+    const tabGuest = document.getElementById('tabGuest');
+    const clubPane = document.getElementById('clubPane');
+    const guestPane = document.getElementById('guestPane');
+
+    function setTab(which) {
+      const isClub = which === 'club';
+      tabClub.classList.toggle('active', isClub);
+      tabGuest.classList.toggle('active', !isClub);
+      clubPane.classList.toggle('hidden', !isClub);
+      guestPane.classList.toggle('hidden', isClub);
+    }
+    tabClub.addEventListener('click', () => setTab('club'));
+    tabGuest.addEventListener('click', () => setTab('guest'));
+
+    // Load /courses/index.json (from cache or network)
+    async function getIndex() {
+      const cached = await caches.match('/courses/index.json');
+      let res = cached;
+      if (!res) res = await fetch('/courses/index.json', { cache: 'reload' });
+      return res.json();
+    }
+
+    // Fill guest dropdown
+    async function populateCourses() {
+      try {
+        const idx = await getIndex();
+        const sel = document.getElementById('courseSelect');
+        sel.innerHTML = '';
+        (idx.courses || []).forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = `${c.name} (${c.id})`;
+          sel.appendChild(opt);
+        });
+      } catch (e) {
+        alert('Could not load course list.');
+      }
+    }
+    populateCourses();
+    document.getElementById('refreshBtn').addEventListener('click', populateCourses);
+
+    // Club login by PIN (10 chars) — primary source: index.json; fallback: per-course file
+    async function findCourseByPin(pin) {
+      const idx = await getIndex();
+      // 1) Try index.json
+      const byIndex = (idx.courses || []).find(c =>
+        (c.pin || '').trim().toUpperCase() === pin
+      );
+      if (byIndex) return byIndex;
+
+      // 2) Fallback: open each course JSON and look at course.pin
+      const ids = (idx.courses || []).map(c => c.id);
+      for (const id of ids) {
+        try {
+          const url = `/courses/${id}.json`;
+          const cached = await caches.match(url);
+          let res = cached;
+          if (!res) res = await fetch(url, { cache: 'reload' });
+          const json = await res.json();
+          const metaPin = (json?.course?.pin || '').trim().toUpperCase();
+          if (metaPin && metaPin === pin) {
+            return { id, name: json?.course?.name || id, pin: metaPin };
+          }
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    // Club login button
+    document.getElementById('clubLoginBtn').addEventListener('click', async () => {
+      const inEl = document.getElementById('clubPin');
+      const raw = (inEl.value || '').trim().toUpperCase();
+      if (raw.length !== 10) { alert('PIN must be exactly 10 characters.'); return; }
+
+      const course = await findCourseByPin(raw);
+      if (!course) { alert('Invalid PIN for any known course.'); return; }
+
+      // Save for convenience (also used by gps.html)
+      localStorage.setItem(`pin_${course.id}`, raw);
+
+      // Redirect straight to GPS with course + pin in URL
+      location.href = `/gps.html?course=${encodeURIComponent(course.id)}&pin=${encodeURIComponent(raw)}`;
+    });
+
+    // Guest login
+    document.getElementById('guestLoginBtn').addEventListener('click', () => {
+      const id = document.getElementById('courseSelect').value;
+      if (!id) { alert('Pick a course'); return; }
+      location.href = `/gps.html?course=${encodeURIComponent(id)}&guest=1`;
+    });
+
+    // Allow Enter key in PIN field
+    document.getElementById('clubPin').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('clubLoginBtn').click();
+    });
+  </script>
+</body>
 </html>
