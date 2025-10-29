@@ -1,18 +1,7 @@
 {
-  "courses": [
-    {
-      "id": "silverlakes",
-      "name": "Silverlakes Golf Club",
-      "short_code": "SLK",
-      "pin": "SLK1234567",
-      "active": true
-    },
-    {
-      "id": "blue-valley",
-      "name": "Blue Valley Golf Estate",
-      "short_code": "BLV",
-      "pin": "BLV1234567",
-      "active": true
-    }
-  ]
+  "id": "WGC",
+  "name": "Waterkloof Golf Club",
+  "short_code": "WGC",
+  "pin": "WGC1234567",
+  "active": true
 }
