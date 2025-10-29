@@ -1,928 +1,445 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <title>TrackLinq GPS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="theme-color" content="#14532d"/>
-  <link rel="icon" href="/icons/icon-192.png">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <title>TrackLinq GPS</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 
   <style>
     :root{
-      --brand:#14532d; --brand-2:#166534; --accent:#15803d;
-      --panel:#ffffffee; --text:#111827; --muted:#6b7280;
-      --chip:#e6f6ea; --chipText:#14532d;
-      --line:#e5e7eb; --soft:#f3f4f6;
+      --bg-dark:#0b1020; --glass:#111827cc; --muted:#aeb7c6; --panel:#ffffffe6; --border:#e5e7eb;
+      --btn:#1e293bcc; --btn-b:#ffffff22; --chip:#111827; --chip-t:#fff;
     }
-    html,body{height:100%;margin:0;overscroll-behavior:none}
-    body{touch-action:pan-x pan-y;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-    #map{height:100%;position:relative}
+    html, body { height: 100%; margin: 0; background:#000; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
+    #map { width: 100%; height: 100%; }
 
-    .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+    /* HUD bottom-left */
+    .hud { position: absolute; left: 12px; bottom: 12px; z-index: 1000; display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { cursor: pointer; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--btn-b); background: var(--btn); color: #fff; font-weight: 600; backdrop-filter: blur(4px); }
+    .btn:active { transform: translateY(1px); }
 
-    .holeWrap{position:fixed;z-index:10000;left:50%;transform:translateX(-50%);top:10px;display:flex;flex-direction:column;align-items:center;gap:8px}
-    .holeNav{background:var(--panel);padding:6px 10px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;min-width:220px}
-    .holeNav button{border:0;background:var(--accent);color:#fff;border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer}
-    .holeTitle{font-weight:600;text-align:center}
-    .scoreRow{display:flex;gap:8px}
-    .scoreBtn,.historyBtn{border:0;background:var(--brand-2);color:#fff;border-radius:8px;padding:6px 12px;font-size:14px;cursor:pointer;box-shadow:0 6px 12px rgba(0,0,0,.15)}
+    /* Info top-right */
+    .panel { position: absolute; right: 12px; top: 12px; z-index: 1000; background: var(--panel); border-radius: 12px; padding: 10px 12px; font-size: 12px; color: #111; border: 1px solid var(--border); min-width: 260px; max-width: 360px; }
+    .panel strong { font-weight: 800; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .holeCtrl { display: grid; grid-template-columns: auto 1fr auto auto; gap: 6px; margin-top: 8px; }
+    .holeCtrl input { width: 64px; padding: 6px 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    .muted { color:#374151; font-size:11px; }
 
-    .windBox{position:fixed;top:10px;right:10px;z-index:10000;background:var(--panel);padding:6px 8px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);display:flex;align-items:center;gap:8px;min-width:140px}
-    .windLeft{display:flex;align-items:center;gap:6px}
-    .windSock{width:22px;height:22px}
-    .windData{display:flex;flex-direction:column;line-height:1.05}
-    .windSpeed{font-weight:600;font-size:13px}
-    .windDirTxt{font-size:11px;color:var(--muted)}
-    .windArrow{width:18px;height:18px;transform-origin:50% 50%;opacity:.85}
+    /* Distances mid-right */
+    .distPanel { position: absolute; right: 12px; top: 140px; z-index:1000; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:10px 12px; min-width: 260px; }
+    .distHeader { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+    .seg { display:flex; align-items:center; gap:8px; margin:6px 0; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:var(--chip); color:var(--chip-t); font-weight:700; font-size:12px; }
+    .seg .chip { background:#0f172acc; }
 
-    .distBox{position:fixed;top:10px;left:10px;z-index:10000;background:var(--panel);padding:10px 12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);width:190px}
-    .row{display:flex;justify-content:space-between;margin:4px 0;font-size:14px;gap:6px}
-    .col{display:flex;flex-direction:column;align-items:flex-end}
-    .label{color:var(--muted)}
-    .value{font-weight:700}
-    .midValue{font-weight:800;font-size:18px;line-height:1}
-    .delta{font-size:12px;color:var(--muted)}
-    .muted{font-size:12px;color:var(--muted);margin-top:4px}
+    .small { font-size:11px; color:#334155; }
+    .seg label { min-width:56px; font-weight:700; }
 
-    .footer{position:fixed;left:10px;right:10px;bottom:10px;z-index:10000;background:var(--panel);padding:8px 12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);display:flex;justify-content:center;gap:18px;font-size:14px}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--chipText);font-weight:700}
+    /* Toast bottom-center */
+    .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 1000; background: var(--glass); color:#fff; border:1px solid #ffffff22; padding:8px 12px; border-radius:10px; font-size:12px; display:none; }
 
-    .panel{position:fixed;top:80px;right:10px;z-index:10000;background:var(--panel);padding:10px 12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,0,0,.15);width:330px;max-width:calc(100% - 20px);max-height:75vh;overflow:auto;transition:transform .25s ease, opacity .2s ease}
-    .panel.hidden{transform:translateY(16px);opacity:0;pointer-events:none}
-    .grid{display:grid;grid-template-columns:1fr auto;gap:8px}
-    select,button,input{width:100%;padding:8px;font-size:14px}
-
-    .fab{position:fixed;right:12px;bottom:12px;z-index:10001;width:52px;height:52px;border-radius:50%;border:0;font-size:22px;background:var(--accent);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);cursor:pointer}
-    .fab-left{position:fixed;left:12px;z-index:10001;width:52px;height:52px;border-radius:50%;border:0;font-size:22px;background:var(--brand);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.2);cursor:pointer}
-    .fab-left svg{width:22px;height:22px}
-    #recenterBtn{display:none}
-
-    #clearLayupBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:10001;background:#111827;color:#fff;border:0;border-radius:999px;padding:10px 14px;font-size:14px;box-shadow:0 6px 16px rgba(0,0,0,.25);display:none}
-
-    .dd-measure{pointer-events:auto}
-    .dd-measure .anchor-dot{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:#111827;border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.25)}
-    .dd-measure .bubble{position:absolute;transform:translate(8px,-28px)}
-    .measure-bubble{background:rgba(17,24,39,.95);color:#fff;padding:6px 8px;border-radius:8px;font-size:12px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 12px rgba(0,0,0,.25);user-select:none}
-    .measure-close{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);border-radius:6px;cursor:pointer;font-weight:700}
-
-    .scorecard{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);width:min(980px,calc(100% - 20px));max-height:70vh;overflow:auto;background:var(--panel);color:var(--text);border-radius:12px;box-shadow:0 14px 30px rgba(0,0,0,.25);padding:12px;z-index:10002;display:none;box-sizing:border-box}
-    .scorecard.show{display:block}
-    .sc-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-    .sc-title{font-weight:700}
-    .sc-actions{display:flex;gap:8px}
-    .sc-button{background:var(--brand-2);color:#fff;border:0;border-radius:8px;padding:6px 10px;cursor:pointer}
-    .sc-button.danger{background:#b91c1c}
-    .sc-muted{font-size:12px;color:var(--muted)}
-    .sc-setup{background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
-    .sc-row2{display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:6px}
-    .sc-row3{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:6px}
-    .sc-toggle-line{display:flex;align-items:center;gap:10px;margin:8px 0}
-    .switch{position:relative;width:44px;height:24px;background:#d1d5db;border-radius:999px;cursor:pointer}
-    .switch::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s ease;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-    .switch.on{background:#16a34a}
-    .switch.on::after{transform:translateX(20px)}
-    .sc-table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-sizing:border-box}
-    .sc-table th,.sc-table td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;text-align:center;vertical-align:middle}
-    .sc-table th:first-child,.sc-table td:first-child{text-align:left;white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1}
-    .sc-table thead th{background:var(--soft);font-weight:700}
-    .sc-hole-col{min-width:52px}
-    .sc-total-col{min-width:62px;font-weight:700;background:#fafafa}
-    .sc-cell{display:flex;flex-direction:column;align-items:center;gap:2px}
-    .sc-score-input{width:48px;padding:6px 6px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;text-align:center}
-    .sc-points{font-size:12px;font-weight:700;background:#eef2ff;color:#3730a3;border-radius:6px;padding:1px 6px}
-    .chip{display:inline-block;min-width:30px;border-radius:999px;padding:2px 6px;font-weight:700;font-size:12px}
-    .chip.under{background:#dcfce7;color:#065f46}
-    .chip.over{background:#fee2e2;color:#7f1d1d}
-    .chip.even{background:#e5e7eb;color:#111827}
-    .sc-summary{margin-top:10px;font-weight:600;text-align:center;background:#f3f4f6;border-radius:8px;padding:8px}
-
-    /* Offline badge + prompt */
-    .inline-pill{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:#e7f7ec;color:#14532d;font-weight:700;font-size:12px;border:1px solid #bfe7cc}
-    .fine{font-size:12px;color:var(--muted)}
-    .dlRow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}
-    .progressWrap{display:none;margin-top:6px}
-    .progressBar{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden}
-    .progressFill{height:100%;width:0;background:#16a34a}
-
-    /* History modal fix (no overflow) */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10003;display:flex;align-items:center;justify-content:center;padding:12px}
-    .modal-card{background:#fff;max-width:980px;width:calc(100% - 24px);max-height:80vh;overflow:auto;border-radius:12px;padding:14px;box-shadow:0 14px 30px rgba(0,0,0,.3);box-sizing:border-box}
-    .table-wrap{overflow:auto}
+    @media (max-width: 920px){
+      .panel, .distPanel { right: 8px; left: 8px; max-width: unset; }
+      .panel { top: 8px; }
+      .distPanel { top: 140px; }
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <div class="holeWrap">
-    <div class="holeNav">
-      <button id="prevHole">◀</button>
-      <div class="holeTitle" id="holeTitle">Hole –</div>
-      <button id="nextHole">▶</button>
-    </div>
-    <div class="scoreRow">
-      <button id="scoreToggle" class="scoreBtn">Scorecard</button>
-      <button id="historyBtn" class="historyBtn" style="display:none">History</button>
-    </div>
+  <!-- Bottom-left controls -->
+  <div class="hud">
+    <button class="btn" id="holeViewBtn">Hole View (TEE↔BACK)</button>
+    <button class="btn" id="cartViewBtn">Cart View (CART↔BACK)</button>
+    <button class="btn" id="locBtn">My Location</button>
   </div>
 
-  <div class="windBox" id="windBox" title="10 m wind at 10 m height">
-    <div class="windLeft">
-      <svg class="windSock" viewBox="0 0 64 64" aria-hidden="true">
-        <rect x="8" y="8" width="6" height="48" rx="3" fill="#1f2937"></rect>
-        <polygon points="14,14 54,20 54,28 14,34" fill="#e11d48"></polygon>
-        <line x1="14" y1="14" x2="14" y2="34" stroke="#111827" stroke-width="2"></line>
-        <line x1="24" y1="16" x2="24" y2="32" stroke="#fff" stroke-width="3" opacity="0.7"></line>
-        <line x1="36" y1="18" x2="36" y2="30" stroke="#fff" stroke-width="3" opacity="0.7"></line>
-      </svg>
-      <div class="windData">
-        <div class="windSpeed" id="windSpeed">– m/s</div>
-        <div class="windDirTxt" id="windDirTxt">–</div>
-      </div>
+  <!-- Top-right info panel -->
+  <div class="panel" id="infoPanel">
+    <div class="row">
+      <div><strong id="courseName">Course</strong> • <span id="courseId">ID</span></div>
+      <div class="small" id="onlineState">•</div>
     </div>
-    <svg class="windArrow" id="windArrow" viewBox="0 0 24 24" aria-hidden="true">
-      <polygon points="12,3 6,12 10,12 10,21 14,21 14,12 18,12" fill="#111827"></polygon>
-    </svg>
+    <div>Hole <span id="holeNo">1</span> • Par <span id="par">4</span> • Stroke <span id="stroke">1</span></div>
+
+    <div class="holeCtrl">
+      <button class="btn" id="prevHole">Prev</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span>Hole</span>
+        <input id="holeInput" type="number" min="1" max="36" value="1"/>
+      </div>
+      <button class="btn" id="holeGo">Go</button>
+      <button class="btn" id="nextHole">Next</button>
+    </div>
+    <div class="muted" id="courseMetaNote"></div>
   </div>
 
-  <div class="distBox">
-    <div class="row"><span class="label">Front</span><span class="col"><span class="value" id="dFront">–</span><span class="delta" id="eFront">–</span></span></div>
-    <div class="row"><span class="label">Mid</span><span class="col"><span class="value midValue" id="dMid">–</span><span class="delta" id="eMid">–</span></span></div>
-    <div class="row"><span class="label">Back</span><span class="col"><span class="value" id="dBack">–</span><span class="delta" id="eBack">–</span></span></div>
-    <div class="muted" id="status">Getting GPS…</div>
+  <!-- Mid-right distances -->
+  <div class="distPanel" id="distPanel">
+    <div class="distHeader">
+      <div><strong>Distances</strong> <span class="small" id="unitLabel">(m)</span></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="fromSelect" title="Measure from">
+          <option value="CART" selected>From: CART</option>
+          <option value="TEE">From: TEE</option>
+        </select>
+        <select id="units" title="Units">
+          <option value="m" selected>m</option>
+          <option value="yd">yd</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="seg">
+      <span class="dot" style="background:#ffffff"></span>
+      <label>FRONT</label>
+      <span class="chip" id="dFront">–</span>
+    </div>
+    <div class="seg">
+      <span class="dot" style="background:#fbbf24"></span>
+      <label>MID</label>
+      <span class="chip" id="dMid">–</span>
+    </div>
+    <div class="seg">
+      <span class="dot" style="background:#ef4444"></span>
+      <label>BACK</label>
+      <span class="chip" id="dBack">–</span>
+    </div>
+    <div class="small" id="elevNote"></div>
   </div>
 
-  <div class="footer">
-    <div>Par <span class="badge" id="par">–</span></div>
-    <div>Stroke <span class="badge" id="stroke">–</span></div>
-  </div>
+  <!-- Bottom-center toast -->
+  <div class="toast" id="toast"></div>
 
-  <!-- Right panel (course controls) -->
-  <div class="panel hidden" id="panel">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <strong>Select course</strong>
-      <span id="offlinePill" class="inline-pill" style="display:none">Available Offline</span>
-    </div>
-    <div class="grid" style="margin-top:6px;">
-      <select id="courseSelect"></select>
-      <button id="btnLoadCourse">Load</button>
-    </div>
-    <div class="dlRow">
-      <div class="fine">Make this course available without internet.</div>
-      <button id="btnDownload" type="button">Download for offline</button>
-    </div>
-    <div class="progressWrap" id="dlProgressWrap" aria-live="polite">
-      <div class="fine" id="dlLabel">Preparing…</div>
-      <div class="progressBar"><div id="dlFill" class="progressFill"></div></div>
-    </div>
-
-    <div class="muted" style="margin-top:10px">Open with <code>?course=&lt;id&gt;</code> as well.</div>
-    <div style="margin-top:10px;"><strong>Hole</strong></div>
-    <div class="grid" style="margin-top:6px;">
-      <select id="holes"></select><button id="btnGoHole">Go</button>
-    </div>
-  </div>
-
-  <!-- View buttons -->
-  <button id="holeViewBtn" class="fab-left" title="Fit hole (tee→green)" style="bottom:140px">
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill="#ffffff">
-      <path d="M6 3a1 1 0 0 0-1 1v16H3v2h4V4a1 1 0 0 0-1-1z"></path>
-      <path d="M7 5h9l-2 3 2 3H7z"></path>
-    </svg>
-  </button>
-  <button id="cartViewBtn" class="fab-left" title="Auto-fit (you + green)" style="bottom:76px">
-    <svg viewBox="0 0 40 32" aria-hidden="true" fill="#ffffff">
-      <rect x="5" y="10" width="24" height="10" rx="2" ry="2"></rect>
-      <polygon points="5,10 15,4 29,4 29,10"></polygon>
-      <circle cx="13" cy="24" r="4"></circle>
-      <circle cx="27" cy="24" r="4"></circle>
-    </svg>
-  </button>
-  <button id="recenterBtn" class="fab-left" title="Recenter" style="bottom:12px;display:none">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="2" fill="#ffffff"/>
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="12" cy="12" r="7" fill="none" stroke="#ffffff" stroke-width="1.5" opacity=".7"/>
-    </svg>
-  </button>
-
-  <button id="clearLayupBtn">Clear layup</button>
-
-  <!-- Club selector toggle (hidden for clubs) -->
-  <button id="panelToggle" class="fab" title="Clubs" style="display:none">☰</button>
-
-  <!-- SCORECARD -->
-  <div id="scorecard" class="scorecard" aria-live="polite">
-    <div class="sc-header">
-      <div class="sc-title">Scorecard</div>
-      <div class="sc-actions">
-        <button id="scSave" class="sc-button" title="Save round">Save</button>
-        <button id="scEndRound" class="sc-button danger" title="End Round (clear scores)">End Round</button>
-        <button id="scClear" class="sc-button danger" title="Clear inputs">Clear</button>
-        <button id="scClose" class="sc-button">Close</button>
-      </div>
-    </div>
-
-    <div class="sc-setup" id="scSetup">
-      <div class="sc-row2">
-        <label><strong>Players</strong> (1–4)</label>
-        <select id="scCount"><option>1</option><option>2</option><option>3</option><option>4</option></select>
-      </div>
-      <div class="sc-toggle-line">
-        <span>Include handicaps</span>
-        <div id="scHcapSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"></div>
-      </div>
-      <div class="sc-row3">
-        <input id="p1" placeholder="Player 1"/>
-        <input id="p2" placeholder="Player 2"/>
-        <input id="p3" placeholder="Player 3"/>
-        <input id="p4" placeholder="Player 4"/>
-      </div>
-      <div class="sc-row3" id="hcapRow">
-        <input id="h1" type="number" min="0" max="54" placeholder="Hcap 1"/>
-        <input id="h2" type="number" min="0" max="54" placeholder="Hcap 2"/>
-        <input id="h3" type="number" min="0" max="54" placeholder="Hcap 3"/>
-        <input id="h4" type="number" min="0" max="54" placeholder="Hcap 4"/>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button id="scCreate" class="sc-button">Create scorecard</button>
-      </div>
-      <div class="sc-muted">Stableford points auto-calc per hole from par, stroke index and handicaps.</div>
-    </div>
-
-    <div id="scTableWrap" style="display:none;overflow:auto">
-      <table class="sc-table" id="scTable"></table>
-      <div class="sc-summary" id="scTotals">Totals…</div>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script>
-    /* ---------- Session mode: club vs guest ---------- */
-    const session = {
-      mode: localStorage.getItem('tl_mode') || (new URLSearchParams(location.search).get('mode')) || 'guest', // 'club' | 'guest'
-      clubId: localStorage.getItem('tl_club_id') || null,
-      courseId: localStorage.getItem('tl_course_id') || new URLSearchParams(location.search).get('course') || null,
-      deviceId: localStorage.getItem('tl_device_id') || null
+    // --- Service Worker register (offline tiles & JSON) ---
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+    }
+
+    // --- Utilities ---
+    const $ = sel => document.querySelector(sel);
+    function q(name){ return new URL(location.href).searchParams.get(name); }
+    function showToast(msg, ms=2000){
+      const t = $('#toast'); t.textContent = msg; t.style.display='block';
+      setTimeout(()=>{ t.style.display='none'; }, ms);
+    }
+    function isOnline(){ return navigator.onLine; }
+    function updateOnlineBadge(){
+      const el = $('#onlineState');
+      el.textContent = isOnline() ? 'Online' : 'Offline';
+      el.style.color = isOnline() ? '#15803d' : '#b91c1c';
+    }
+    window.addEventListener('online', updateOnlineBadge);
+    window.addEventListener('offline', updateOnlineBadge);
+
+    // --- Icons (no borders on dots; larger signs for toilet/taps) ---
+    function dotIcon(color = '#ffffff', size = 12) {
+      const r = Math.floor(size / 2);
+      const svg = encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>
+          <circle cx='${r}' cy='${r}' r='${r}' fill='${color}' />
+        </svg>`);
+      return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [size, size], iconAnchor: [r, r] });
+    }
+    function largeSymbolIcon(svgPath, size = 44) {
+      const svg = encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>
+          ${svgPath}
+        </svg>`);
+      return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [size, size], iconAnchor: [size/2, size/2] });
+    }
+    const TOILET_SVG = `
+      <rect x='2' y='2' width='36' height='36' rx='8' fill='#6b7280'/>
+      <path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>
+    `;
+    const TAP_SVG = `
+      <rect x='2' y='2' width='36' height='36' rx='8' fill='#0ea5e9'/>
+      <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
+    `;
+
+    const ICONS = {
+      TEE: dotIcon('#16a34a', 14),
+      FRONT: dotIcon('#ffffff', 12),
+      MID: dotIcon('#fbbf24', 12),
+      BACK: dotIcon('#ef4444', 12),
+      TOILET: largeSymbolIcon(TOILET_SVG, 44),
+      TAPS: largeSymbolIcon(TAP_SVG, 44),
+      STAKE_WHITE: dotIcon('#ffffff', 10),
+      STAKE_RED: dotIcon('#ef4444', 10),
+      STAKE_YELLOW: dotIcon('#fbbf24', 10),
+      CART: dotIcon('#60a5fa', 12)
     };
 
-    // UI elements
-    const panel = document.getElementById('panel');
-    const panelToggle = document.getElementById('panelToggle');
-    const historyBtn = document.getElementById('historyBtn');
-    const offlinePill = document.getElementById('offlinePill');
-    const btnDownload = document.getElementById('btnDownload');
-    const dlWrap = document.getElementById('dlProgressWrap');
-    const dlFill = document.getElementById('dlFill');
-    const dlLabel = document.getElementById('dlLabel');
-
-    function setPanelHidden(h){ panel.classList.toggle('hidden', h); panelToggle.textContent = h ? '☰' : '✕'; }
-    setPanelHidden(true); // start hidden always
-
-    // Visibility rules
-    if (session.mode === 'guest') {
-      // Guests: can open club picker, can see history
-      panelToggle.style.display = 'block';
-      historyBtn.style.display = 'inline-block';
-      panelToggle.onclick = () => setPanelHidden(!panel.classList.contains('hidden'));
-    } else {
-      // Clubs: no club picker, ensure panel stays hidden and we don't auto-open
-      panelToggle.style.display = 'none';
-      setPanelHidden(true);
-    }
-
-    /* ---------- Base map ---------- */
-    let map, holes=[], currentIndex=0, courseList=[];
-    let lastPos=null, movedOnce=false, viewMode='cart';
-    const ACCURACY_MAX=25;
-
-    const esriImagery = L.tileLayer(
+    // --- Map (Esri satellite default; OSM optional) ---
+    const map = L.map('map', { zoomControl: true }).setView([-25.746, 28.229], 17);
+    const esriWorldImagery = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: '&copy; Esri, Maxar, Earthstar Geographics' }
+      { maxZoom: 19, attribution: 'Imagery © Esri' }
+    ).addTo(map);
+    const osmStreets = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom: 19, attribution: '&copy; OpenStreetMap' }
     );
-    map = L.map('map', { zoomControl:false, layers:[esriImagery] });
-    map.setView([-25.7542, 28.2322], 15);
+    L.control.layers(
+      { 'Satellite (Esri)': esriWorldImagery, 'Streets (OSM)': osmStreets },
+      {},
+      { position: 'topright', collapsed: true }
+    ).addTo(map);
 
-    // Helpers
-    const toRad = d => d*Math.PI/180;
-    function meters(a,b){
+    // --- Data loading helpers ---
+    async function getIndex() {
+      const cached = await caches.match('/courses/index.json');
+      let res = cached;
+      if (!res) res = await fetch('/courses/index.json', { cache: 'reload' });
+      return res.json();
+    }
+    async function pickCourseFromIndex(idx) {
+      const want = q('course');
+      if (want) {
+        const c = (idx.courses || []).find(x => x.id.toUpperCase() === want.toUpperCase());
+        if (c) return c;
+      }
+      return (idx.courses || [])[0] || null;
+    }
+    async function loadCourseJson(courseId) {
+      const url = `/courses/${courseId}.json`;
+      const cached = await caches.match(url);
+      let res = cached;
+      if (!res) res = await fetch(url, { cache: 'reload' });
+      return res.json();
+    }
+
+    // --- PIN validation (club carts or guest) ---
+    async function validatePinFlow(courseId, courseJson) {
+      if ((q('guest') || '').trim() === '1') return true; // guests bypass PIN
+      const pinFromUrl = (q('pin') || '').trim().toUpperCase();
+      if (pinFromUrl.length === 10) {
+        localStorage.setItem(`pin_${courseId}`, pinFromUrl);
+        return await isPinValidForCourse(courseId, courseJson, pinFromUrl);
+      }
+      const stored = (localStorage.getItem(`pin_${courseId}`) || '').trim().toUpperCase();
+      if (stored.length === 10 && await isPinValidForCourse(courseId, courseJson, stored)) return true;
+      const entered = (prompt(`Enter PIN for ${courseJson?.course?.name || courseId}:`) || '').trim().toUpperCase();
+      if (entered.length !== 10) return false;
+      const ok = await isPinValidForCourse(courseId, courseJson, entered);
+      if (ok) localStorage.setItem(`pin_${courseId}`, entered); else alert('Invalid PIN');
+      return ok;
+    }
+    async function isPinValidForCourse(courseId, courseJson, candidate) {
+      if (!candidate || candidate.length !== 10) return false;
+      try {
+        const idx = await getIndex();
+        const c = (idx.courses || []).find(x => x.id === courseId);
+        if (c?.pin && c.pin.trim().toUpperCase() === candidate) return true;
+      } catch(_) {}
+      const metaPin = (courseJson?.course?.pin || '').trim().toUpperCase();
+      if (metaPin && metaPin === candidate) return true;
+      return false;
+    }
+
+    // --- State ---
+    const state = {
+      meta: null,           // from index.json (id, name, pin?)
+      course: null,         // full course json { course, holes }
+      hole: 1,
+      markers: [],
+      cartMarker: null,
+      unit: 'm',            // 'm' | 'yd'
+      from: 'CART'          // 'CART' | 'TEE'
+    };
+
+    // --- Marker helpers ---
+    function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers = []; }
+    function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
+
+    // --- Distance helpers ---
+    function toRadians(d){ return d*Math.PI/180; }
+    function haversine(a,b){ // meters
       const R=6371000;
-      const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+      const dLat=toRadians(b.lat-a.lat);
+      const dLng=toRadians(b.lng-a.lng);
       const s1=Math.sin(dLat/2), s2=Math.sin(dLng/2);
-      const q=s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
-      return 2*R*Math.asin(Math.sqrt(q));
+      const aa=s1*s1 + Math.cos(toRadians(a.lat))*Math.cos(toRadians(b.lat))*s2*s2;
+      const c=2*Math.atan2(Math.sqrt(aa),Math.sqrt(1-aa));
+      return R*c;
     }
-    function latLngBoundsFrom(a,b){ return L.latLngBounds(L.latLng(a.lat,a.lng), L.latLng(b.lat,b.lng)); }
+    function fmtDist(m){ return state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m); }
+    function updateUnitLabel(){ $('#unitLabel').textContent = state.unit==='yd' ? '(yd)' : '(m)'; }
 
-    // Course directories support
-    const COURSE_DIRS = ['/course', '/courses'];
-    async function fetchJsonFromCourseDirs(relPath){
-      for(const base of COURSE_DIRS){
-        try{ const r=await fetch(`${base}/${relPath}`); if(r.ok) return await r.json(); }catch{}
+    function currentFromLatLng(pins){
+      if (state.from==='TEE' && pins.TEE) return { lat:pins.TEE.lat, lng:pins.TEE.lng, label:'TEE' };
+      if (state.cartMarker) {
+        const ll = state.cartMarker.getLatLng(); return { lat: ll.lat, lng: ll.lng, label:'CART' };
       }
-      throw new Error(`Not found in ${COURSE_DIRS.join(' or ')}: ${relPath}`);
-    }
-
-    // Markers
-    function mstyle(n){ const p={front:['#059669','#10b981'],mid:['#b45309','#f59e0b'],back:['#b91c1c','#ef4444']}[n]||['#111827','#374151']; return {radius:7,weight:2,opacity:1,fillOpacity:.9,color:p[0],fillColor:p[1]}; }
-    const markers={front:null,mid:null,back:null,tee:null};
-    function setMarker(key,pos,label,styleName){
-      if(!pos) return;
-      const style = styleName ? mstyle(styleName) : { radius:6, weight:2, color:'#374151', fillColor:'#374151', fillOpacity:.9 };
-      if(markers[key]){ markers[key].setLatLng([pos.lat,pos.lng]); }
-      else{ markers[key]=L.circleMarker([pos.lat,pos.lng], style).addTo(map); if(label) markers[key].bindTooltip(label); }
-    }
-    function clearTee(){ if(markers.tee){ map.removeLayer(markers.tee); markers.tee=null; } }
-    function clearMarkers(){ ['front','mid','back'].forEach(k=>{ if(markers[k]){ map.removeLayer(markers[k]); markers[k]=null; }}); clearTee(); }
-
-    const cartSvg=encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32"><rect x="5" y="10" width="24" height="10" rx="2" ry="2" fill="#1f2937"/><polygon points="5,10 15,4 29,4 29,10" fill="#0ea5b7"/><circle cx="13" cy="24" r="4" fill="#111827"/><circle cx="13" cy="24" r="2" fill="#e5e7eb"/><circle cx="27" cy="24" r="4" fill="#111827"/><circle cx="27" cy="24" r="2" fill="#e5e7eb"/><rect x="30" y="12" width="6" height="2" rx="1" fill="#111827"/><circle cx="34" cy="16" r="2" fill="#14b8a6"/></svg>`);
-    const cartIcon=L.icon({iconUrl:`data:image/svg+xml;utf8,${cartSvg}`,iconSize:[28,22],iconAnchor:[14,11]});
-    const you=L.marker([0,0],{icon:cartIcon}).addTo(map);
-
-    // UI refs
-    const statusEl=document.getElementById('status');
-    const dFront=document.getElementById('dFront'), dMid=document.getElementById('dMid'), dBack=document.getElementById('dBack');
-    const eFront=document.getElementById('eFront'), eMid=document.getElementById('eMid'), eBack=document.getElementById('eBack');
-    const parEl=document.getElementById('par'), strokeEl=document.getElementById('stroke');
-    const holeTitle=document.getElementById('holeTitle');
-    const courseSel=document.getElementById('courseSelect'), holesSel=document.getElementById('holes');
-    const holeViewBtn=document.getElementById('holeViewBtn'), cartViewBtn=document.getElementById('cartViewBtn');
-
-    // Wind
-    const windSpeedEl=document.getElementById('windSpeed'), windDirTxtEl=document.getElementById('windDirTxt'), windArrowEl=document.getElementById('windArrow');
-    let windCache={ts:0,lat:null,lng:null,speed:null,dir:null}; const WIND_TTL=10*60*1000;
-    function degToCompass(d){ const dirs=['N','NE','E','SE','S','SW','W','NW','N']; return dirs[Math.round(((d%360)/45))]; }
-    async function fetchWind(lat,lng){ try{ const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&windspeed_unit=ms`); const j=await r.json(); const cw=j?.current_weather; if(typeof cw?.windspeed==='number'&&typeof cw?.winddirection==='number') return {speed:cw.windspeed,dir:cw.winddirection}; }catch{} return {speed:null,dir:null}; }
-    async function ensureWind(){ if(!lastPos) return; const now=Date.now(); if(now-windCache.ts>WIND_TTL){ const {speed,dir}=await fetchWind(lastPos.lat,lastPos.lng); windCache={ts:now,lat:lastPos.lat,lng:lastPos.lng,speed,dir}; } renderWind(); }
-    function renderWind(){ const {speed,dir}=windCache; windSpeedEl.textContent=(typeof speed==='number')?`${speed.toFixed(1)} m/s`:'– m/s'; windDirTxtEl.textContent=(typeof dir==='number')?`${degToCompass(dir)} (${Math.round(dir)}°)`:'–'; windArrowEl.style.transform=`rotate(${(typeof dir==='number'?dir:0)}deg)`; }
-
-    // Elevation
-    let lastElev=null, lastElevAt=0;
-    async function fetchCurrentElevation(p){
-      const now=Date.now();
-      if(lastElev!==null && (now-lastElevAt)<30000) return lastElev;
-      try{ const r=await fetch(`/elevation?lat=${p.lat}&lng=${p.lng}`); const js=await r.json(); const v=js?.results?.[0]?.elevation; if(typeof v==='number'){ lastElev=v; lastElevAt=now; return v; } }catch{}
       return null;
     }
-    function fmtDelta(d){ if(d==null) return '–'; if(Math.abs(d)<0.5) return '±0 m'; return d>0?`↑ ${Math.round(d)} m`:`↓ ${Math.round(Math.abs(d))} m`; }
 
-    function getGreenAnchor(h){ return h.green?.back || h.green?.mid || h.green?.center || null; }
-    function cartFit(){ const h=holes[currentIndex]; if(!h||!lastPos) return; const g=getGreenAnchor(h); if(!g) return; map.fitBounds(latLngBoundsFrom(lastPos,g),{padding:[60,60,60,60]}); }
-    function holeFit(){ const h=holes[currentIndex]; if(!h) return; const back=getGreenAnchor(h); if(h.tee && back) map.fitBounds(latLngBoundsFrom(h.tee,back),{padding:[60,60,60,60]}); else if(back){ const ref=lastPos||back; map.fitBounds(latLngBoundsFrom(ref,back),{padding:[60,60,60,60]}); } }
-    function setViewMode(mode){ viewMode=mode; if(mode==='hole') holeFit(); else cartFit(); }
+    function updateDistances(pins){
+      const dF = $('#dFront'), dM = $('#dMid'), dB = $('#dBack');
+      dF.textContent = dM.textContent = dB.textContent = '–';
+      $('#elevNote').textContent = '';
 
-    // Layup measure
-    const clearLayupBtn=document.getElementById('clearLayupBtn');
-    let measureTarget=null, measureMarker=null, measureMarker2=null, measureLine=null, measureLine2=null;
-    function bubbleEl(initial='– m'){
-      const el=document.createElement('div');
-      el.className='dd-measure';
-      el.innerHTML=`<div class="anchor-dot"></div>
-        <div class="bubble"><div class="measure-bubble"><span class="measure-text">${initial}</span><span class="measure-close" aria-label="Clear">×</span></div></div>`;
-      el.querySelector('.measure-close').addEventListener('click',(ev)=>{ ev.stopPropagation(); clearMeasure(); });
-      L.DomEvent.disableClickPropagation(el); return el;
-    }
-    function setMeasure(p){
-      measureTarget=p;
-      if(measureLine){ map.removeLayer(measureLine); }
-      if(lastPos){ measureLine=L.polyline([[lastPos.lat,lastPos.lng],[p.lat,p.lng]],{color:'#111827',weight:3,opacity:.95}).addTo(map); }
-      if(measureMarker) map.removeLayer(measureMarker);
-      measureMarker=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'', html:bubbleEl().outerHTML, iconSize:[0,0], iconAnchor:[0,0]}), interactive:true, zIndexOffset:10000}).addTo(map);
-      refreshMeasureSecondSegment(true);
-      updateMeasureBubbles();
-      clearLayupBtn.style.display='inline-block';
-    }
-    function refreshMeasureSecondSegment(force=false){
-      const h=holes[currentIndex]; const mid=h?.green?.mid||h?.green?.center||null;
-      if(!measureTarget||!mid){
-        if(measureLine2){ map.removeLayer(measureLine2); measureLine2=null; }
-        if(measureMarker2){ map.removeLayer(measureMarker2); measureMarker2=null; }
-        return;
+      const from = currentFromLatLng(pins);
+      if (!from) return;
+
+      if (pins.FRONT){
+        dF.textContent = fmtDist(haversine(from, pins.FRONT));
       }
-      if(measureLine2){ map.removeLayer(measureLine2); }
-      measureLine2=L.polyline([[measureTarget.lat,measureTarget.lng],[mid.lat,mid.lng]],{color:'#374151',weight:3,opacity:.9,dashArray:'4,4'}).addTo(map);
-      const midPt={ lat:(measureTarget.lat+mid.lat)/2, lng:(measureTarget.lng+mid.lng)/2 };
-      if(measureMarker2 && !force){ measureMarker2.setLatLng([midPt.lat, midPt.lng]); }
-      else { if(measureMarker2) map.removeLayer(measureMarker2);
-        measureMarker2=L.marker([midPt.lat,midPt.lng],{icon:L.divIcon({className:'', html:bubbleEl().outerHTML, iconSize:[0,0], iconAnchor:[0,0]}), interactive:true, zIndexOffset:10000}).addTo(map);
+      if (pins.MID){
+        dM.textContent = fmtDist(haversine(from, pins.MID));
+      }
+      if (pins.BACK){
+        dB.textContent = fmtDist(haversine(from, pins.BACK));
+      }
+
+      // If elevation data exists, show a note (no profile, just delta info)
+      const elevs=[];
+      if (typeof pins.FRONT?.elev_m === 'number') elevs.push(['F', pins.FRONT.elev_m]);
+      if (typeof pins.MID?.elev_m === 'number') elevs.push(['M', pins.MID.elev_m]);
+      if (typeof pins.BACK?.elev_m === 'number') elevs.push(['B', pins.BACK.elev_m]);
+      if (elevs.length){
+        const txt = elevs.map(([k,v])=>`${k}:${v}m`).join('  ');
+        $('#elevNote').textContent = `Elevations  ${txt}`;
       }
     }
-    function updateMeasureBubbles(){
-      if(measureMarker && lastPos && measureTarget){
-        const el=measureMarker.getElement(); const span=el.querySelector('.measure-text');
-        span.textContent=`${Math.round(meters(lastPos,measureTarget))} m`;
-      }
-      if(measureMarker2 && measureTarget){
-        const h=holes[currentIndex]; const mid=h?.green?.mid||h?.green?.center||null;
-        const el2=measureMarker2.getElement(); const span2=el2.querySelector('.measure-text');
-        span2.textContent = mid ? `${Math.round(meters(measureTarget,mid))} m` : '– m';
-      }
-    }
-    function clearMeasure(){
-      measureTarget=null;
-      if(measureLine){ map.removeLayer(measureLine); measureLine=null; }
-      if(measureLine2){ map.removeLayer(measureLine2); measureLine2=null; }
-      if(measureMarker){ map.removeLayer(measureMarker); measureMarker=null; }
-      if(measureMarker2){ map.removeLayer(measureMarker2); measureMarker2=null; }
-      clearLayupBtn.style.display='none';
-    }
-    map.on('click',(e)=> setMeasure({lat:e.latlng.lat,lng:e.latlng.lng}) );
-    clearLayupBtn.addEventListener('click',(e)=>{ e.preventDefault(); e.stopPropagation(); clearMeasure(); });
 
-    // GPS
-    if('geolocation' in navigator){
-      navigator.geolocation.watchPosition(async pos=>{
-        const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
-        lastPos=p; you.setLatLng([p.lat,p.lng]);
-        statusEl.textContent=`Accuracy: ${Math.round(pos.coords.accuracy||0)} m`;
-        if(!movedOnce){ movedOnce=true; if(viewMode==='hole') holeFit(); else cartFit(); }
-        if(viewMode==='cart' && (pos.coords.accuracy||999) <= ACCURACY_MAX) cartFit();
-        await updateDistancesAndDeltas(); ensureWind(); updateMeasureBubbles();
-      }, err=>{ statusEl.textContent=err.message; }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
-    } else { statusEl.textContent='Geolocation not supported'; }
-
-    document.getElementById('recenterBtn').onclick=()=>{ if(viewMode==='hole') holeFit(); else cartFit(); };
-    document.getElementById('holeViewBtn').onclick = ()=> setViewMode('hole');
-    document.getElementById('cartViewBtn').onclick = ()=> setViewMode('cart');
-
-    async function loadCourseList(){
-      try{
-        const js = await fetchJsonFromCourseDirs('index.json');
-        courseList=js.courses||[];
-        courseSel.innerHTML='';
-        courseList.forEach(c=>{
-          const o=document.createElement('option');
-          o.value=c.id;o.textContent=c.name||c.id;
-          courseSel.appendChild(o);
-        });
-      }catch{ courseSel.innerHTML=''; }
+    // --- Render a hole ---
+    function fitBetween(a,b){
+      const bounds = L.latLngBounds(L.latLng(a[0],a[1]), L.latLng(b[0],b[1]));
+      map.fitBounds(bounds, { padding: [60,60] });
     }
 
-    async function updateOfflineBadge(courseId){
-      offlinePill.style.display='none';
-      if(!navigator.serviceWorker?.controller) return;
-      const ch = await sendSw('CHECK_COURSE', {courseId});
-      if(ch?.cached){ offlinePill.style.display='inline-flex'; }
-    }
-
-    async function loadCourse(id){
-      holes=[]; currentIndex=0; holesSel.innerHTML=''; clearMarkers(); holeTitle.textContent='Hole –'; parEl.textContent='–'; strokeEl.textContent='–';
-      try{
-        const raw = await fetchJsonFromCourseDirs(`${encodeURIComponent(id)}.json`);
-        const root = raw.course || raw;
-        holes=(root.holes||[]).map(h=>({
-          number:(h.number??h.hole??h.holeNumber??null)*1,
-          par:(h.par!=null?Number(h.par):null),
-          strokeIndex:(h.strokeIndex??h.stroke??h.si??null)*1||null,
-          tee:(h.tee&&h.tee.lat!=null&&h.tee.lng!=null)?{lat:Number(h.tee.lat),lng:Number(h.tee.lng)}:null,
-          green:{center:h.green?.center||h.green?.mid||null,front:h.green?.front||null,mid:h.green?.mid||null,back:h.green?.back||null},
-          elevation:{front:h.elevation?.front??null,mid:h.elevation?.mid??null,back:h.elevation?.back??null}
-        })).filter(h=>Number.isFinite(h.number)).sort((a,b)=>a.number-b.number);
-
-        holesSel.innerHTML='';
-        holes.forEach(h=>{const o=document.createElement('option');o.value=h.number;o.textContent=`Hole ${h.number}`;holesSel.appendChild(o);});
-        if(holes.length){ currentIndex=0; updateHoleUI(true); }
-        statusEl.textContent=`Loaded course: ${root.name||id}`;
-
-        await autofillElevationsForCourse(id);
-        buildScorecard(); loadSavedScores(id);
-        if(viewMode==='hole') holeFit(); else cartFit();
-
-        // Update offline badge state
-        updateOfflineBadge(id);
-      }catch(e){ statusEl.textContent=`Failed to load course ${id}`; console.error(e); }
-    }
-
-    document.getElementById('btnLoadCourse').onclick=()=>{ const id=courseSel.value; if(!id)return; loadCourse(id); };
-    document.getElementById('btnGoHole').onclick=()=>{ const n=Number(holesSel.value); const idx=holes.findIndex(h=>h.number===n); if(idx>=0){ currentIndex=idx; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); } };
-    document.getElementById('prevHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex-1+holes.length)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
-    document.getElementById('nextHole').onclick=()=>{ if(!holes.length)return; currentIndex=(currentIndex+1)%holes.length; updateHoleUI(true); if(viewMode==='hole') holeFit(); else cartFit(); };
-
-    const ELEV_CACHE_TTL=1000*60*60*24*30;
-    function loadElevCache(courseId){ try{ const raw=localStorage.getItem('tl_elev_'+courseId); const obj=raw?JSON.parse(raw):null; if(!obj||!obj.ts||(Date.now()-obj.ts)>ELEV_CACHE_TTL) return {ts:Date.now(),holes:{}}; return obj; }catch{return {ts:Date.now(),holes:{}};} }
-    function saveElevCache(courseId,cache){ try{ cache.ts=Date.now(); localStorage.setItem('tl_elev_'+courseId, JSON.stringify(cache)); }catch{} }
-    async function fetchElevPoint(lat,lng){
-      try{ const r=await fetch(`/elevation?lat=${lat}&lng=${lng}`); if(r.ok){ const j=await r.json(); const v=j?.results?.[0]?.elevation; if(typeof v==='number') return v; } }catch{}
-      return null;
-    }
-    async function autofillElevationsForCourse(courseId){
-      if(!holes.length) return;
-      const cache=loadElevCache(courseId);
-      holes.forEach(h=>{ const ch=cache.holes?.[h.number]; if(ch){ h.elevation=h.elevation||{}; if(ch.front!=null && h.elevation.front==null) h.elevation.front=ch.front; if(ch.mid!=null && h.elevation.mid==null) h.elevation.mid=ch.mid; if(ch.back!=null && h.elevation.back==null) h.elevation.back=ch.back; } });
-      const jobs=[];
-      for(const h of holes){
-        const pts=[['front',h.green.front],['mid',h.green.mid||h.green.center],['back',h.green.back]];
-        for(const [key,pt] of pts){ if(!pt) continue; if(h.elevation?.[key]==null) jobs.push({hole:h,key,lat:pt.lat,lng:pt.lng}); }
-      }
-      if(!jobs.length){ updateHoleUI(false); return; }
-      for(const job of jobs){
-        const v=await fetchElevPoint(job.lat,job.lng);
-        if(!job.hole.elevation) job.hole.elevation={};
-        if(v!=null) job.hole.elevation[job.key]=v;
-        const entry=cache.holes[job.hole.number]||{}; if(v!=null) entry[job.key]=v; cache.holes[job.hole.number]=entry;
-        if(job.hole===holes[currentIndex]) updateDistancesAndDeltas();
-      }
-      saveElevCache(courseId,cache); updateHoleUI(false);
-    }
-
-    function updateHoleUI(center=true){
-      if(!holes.length) return;
-      const h=holes[currentIndex];
+    function renderHole(){
       clearMarkers();
-      setMarker('front',h.green.front||h.green.center,'Front','front');
-      setMarker('mid',  h.green.mid  ||h.green.center,'Mid','mid');
-      setMarker('back', h.green.back ||h.green.center,'Back','back');
-      if(h.tee) setMarker('tee',h.tee,'Tee'); else clearTee();
+      const holeObj = state.course.holes[String(state.hole)];
+      $('#holeNo').textContent = state.hole;
+      $('#par').textContent = holeObj?.par ?? '-';
+      $('#stroke').textContent = holeObj?.stroke ?? '-';
+      if (!holeObj) return;
 
-      holeTitle.textContent=`Hole ${h.number}`;
-      parEl.textContent=h.par??'–'; strokeEl.textContent=h.strokeIndex??'–';
-      holesSel.value=String(h.number);
+      const p = holeObj.pins || {};
+      if (p.TEE) addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
+      if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
+      if (p.MID) addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
+      if (p.BACK) addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
 
-      if(center){ if(viewMode==='hole') holeFit(); else cartFit(); }
-      if(lastPos) updateDistancesAndDeltas();
-      refreshMeasureSecondSegment();
-    }
+      if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
+      (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
 
-    async function updateDistancesAndDeltas(){
-      if(!lastPos||!holes.length) return;
-      const h=holes[currentIndex]; const f=h.green.front||h.green.center, m=h.green.mid||h.green.center, b=h.green.back||h.green.center;
-      dFront.textContent=Math.round(meters(lastPos,f));
-      dMid.textContent  =Math.round(meters(lastPos,m));
-      dBack.textContent =Math.round(meters(lastPos,b));
-      const curElev=await fetchCurrentElevation(lastPos);
-      const df=h.elevation?.front??null, dm=h.elevation?.mid??null, db=h.elevation?.back??null;
-      eFront.textContent=(curElev!=null&&df!=null)?fmtDelta(df-curElev):'–';
-      eMid.textContent  =(curElev!=null&&dm!=null)?fmtDelta(dm-curElev):'–';
-      eBack.textContent =(curElev!=null&&db!=null)?fmtDelta(db-curElev):'–';
-    }
+      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
+      (p.STAKE_RED || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
+      (p.STAKE_YELLOW || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
-    /* ================= SCORECARD (with auto-advance) ================= */
-    const scoreToggle=document.getElementById('scoreToggle'), scorecard=document.getElementById('scorecard');
-    const scSetup=document.getElementById('scSetup'), scTableWrap=document.getElementById('scTableWrap'), scTable=document.getElementById('scTable'), scTotals=document.getElementById('scTotals');
-    const scCount=document.getElementById('scCount'), scHcapSwitch=document.getElementById('scHcapSwitch');
-    const nameEls=[document.getElementById('p1'),document.getElementById('p2'),document.getElementById('p3'),document.getElementById('p4')];
-    const hcapEls=[document.getElementById('h1'),document.getElementById('h2'),document.getElementById('h3'),document.getElementById('h4')];
-    const hcapRow=document.getElementById('hcapRow');
-    const scCreate=document.getElementById('scCreate'), scClose=document.getElementById('scClose'), scClear=document.getElementById('scClear'), scEndRound=document.getElementById('scEndRound'), scSave=document.getElementById('scSave');
-
-    let playerCount=1, scores=[], handicaps=[0,0,0,0], useHcap=false, courseIdForScores=null;
-
-    function setSwitch(on){ scHcapSwitch.classList.toggle('on',!!on); scHcapSwitch.setAttribute('aria-checked', on ? 'true' : 'false'); }
-    function showSetup(flag){ scSetup.style.display = flag ? '' : 'none'; scTableWrap.style.display = flag ? 'none' : ''; }
-    function applySetupVisibility(){
-      for(let i=0;i<4;i++){
-        nameEls[i].style.display=(i<playerCount)?'':'none';
-        hcapEls[i].style.display=(i<playerCount && useHcap)?'':'none';
-      }
-      hcapRow.style.display = useHcap ? '' : 'none';
-    }
-
-    scoreToggle.onclick=()=>{ scorecard.classList.toggle('show'); };
-    scClose.onclick=()=>scorecard.classList.remove('show');
-    scClear.onclick=()=>{ if(!confirm('Clear all entered scores?')) return; clearScoresOnly(); };
-    scEndRound.onclick=()=>{ if(!confirm('End round? This clears players, handicaps and scores for this course.')) return; endRoundFull(); };
-    scSave.onclick=()=>{ saveRoundSummary(); alert('Round saved. View it in History.'); };
-
-    scCount.onchange=()=>{ playerCount=Number(scCount.value); applySetupVisibility(); persistMeta(); rebuildAndRender(); };
-    scHcapSwitch.addEventListener('click',()=>{ useHcap=!useHcap; setSwitch(useHcap); applySetupVisibility(); persistMeta(); rebuildAndRender(); });
-    scHcapSwitch.addEventListener('keydown',(e)=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); scHcapSwitch.click(); } });
-    nameEls.forEach(inp=>{ inp.addEventListener('input',()=>{ persistMeta(); rebuildAndRender(false); }); });
-    hcapEls.forEach((inp,idx)=>{ inp.addEventListener('input',()=>{ handicaps[idx]=Math.max(0,Math.min(54, Number(inp.value)||0)); persistMeta(); renderScores(); }); });
-    scCreate.onclick=()=>{ showSetup(false); rebuildAndRender(true); };
-
-    function buildScorecard(){ showSetup(true); setSwitch(useHcap); applySetupVisibility(); scTable.innerHTML=''; scTotals.textContent='Totals…'; }
-
-    function relationToPar(score,par){ if(score==null||par==null) return {cls:'even',txt:'–'}; const d=score-par; if(d===0) return {cls:'even',txt:'E'}; if(d<0) return {cls:'under',txt:(d===-1?'−1':`−${Math.abs(d)}`)}; return {cls:'over',txt:(d===1?'+1':`+${d}`)}; }
-    function shotsReceivedForHole(hcap,si){ if(!useHcap||!Number.isFinite(hcap)||!Number.isFinite(si)) return 0; const base=Math.floor(hcap/18); const rem=hcap%18; return base + (si>=1 && si<=rem ? 1 : 0); }
-    function stablefordFor(score,par,shots){ if(score==null||par==null) return 0; const netRelative=(par+shots)-score; return Math.max(0, 2 + netRelative); }
-
-    function rebuildAndRender(resetMissingMatrix=true){
-      const nHoles=holes.length; scTable.innerHTML=''; const thead=document.createElement('thead');
-
-      const trTop=document.createElement('tr'); const thCorner=document.createElement('th'); thCorner.textContent='Hole'; trTop.appendChild(thCorner);
-      const makeHeaderCells=(start,end,labelAfter)=>{ for(let i=start;i<=end;i++){ const th=document.createElement('th'); th.className='sc-hole-col'; th.textContent=String(i); trTop.appendChild(th); } if(labelAfter){ const th=document.createElement('th'); th.className='sc-total-col'; th.textContent=labelAfter; trTop.appendChild(th); } };
-      const frontEnd=Math.min(9,nHoles); makeHeaderCells(1,frontEnd,'Out'); if(nHoles>9) makeHeaderCells(10,nHoles,'In'); else { const thPad=document.createElement('th'); thPad.className='sc-total-col'; thPad.textContent='In'; trTop.appendChild(thPad); }
-      const thTotal=document.createElement('th'); thTotal.className='sc-total-col'; thTotal.textContent='Total'; trTop.appendChild(thTotal);
-      const thNet=document.createElement('th'); thNet.className='sc-total-col'; thNet.textContent='Net'; trTop.appendChild(thNet);
-      thead.appendChild(trTop);
-
-      const trPar=document.createElement('tr'); const thPar=document.createElement('th'); thPar.textContent='Par'; trPar.appendChild(thPar);
-      for(let i=1;i<=frontEnd;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.par??'–'); trPar.appendChild(td); }
-      const tdParOut=document.createElement('td'); tdParOut.className='sc-total-col'; tdParOut.textContent=sumPar(1,frontEnd); trPar.appendChild(tdParOut);
-      if(nHoles>9){ for(let i=10;i<=nHoles;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.par??'–'); trPar.appendChild(td);} }
-      const tdParIn=document.createElement('td'); tdParIn.className='sc-total-col'; tdParIn.textContent=(nHoles>9?sumPar(10,nHoles):'–'); trPar.appendChild(tdParIn);
-      const tdParTotal=document.createElement('td'); tdParTotal.className='sc-total-col'; tdParTotal.textContent=sumPar(1,nHoles); trPar.appendChild(tdParTotal);
-      const tdParNet=document.createElement('td'); tdParNet.className='sc-total-col'; tdParNet.textContent='–'; trPar.appendChild(tdParNet);
-      thead.appendChild(trPar);
-
-      const trSi=document.createElement('tr'); const thSi=document.createElement('th'); thSi.textContent='SI'; trSi.appendChild(thSi);
-      for(let i=1;i<=frontEnd;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.strokeIndex??'–'); trSi.appendChild(td); }
-      const tdSiOut=document.createElement('td'); tdSiOut.className='sc-total-col'; tdSiOut.textContent=''; trSi.appendChild(tdSiOut);
-      if(nHoles>9){ for(let i=10;i<=nHoles;i++){ const h=holes[i-1]; const td=document.createElement('td'); td.textContent=(h?.strokeIndex??'–'); trSi.appendChild(td); } }
-      const tdSiIn=document.createElement('td'); tdSiIn.className='sc-total-col'; tdSiIn.textContent=''; trSi.appendChild(tdSiIn);
-      const tdSiTot=document.createElement('td'); tdSiTot.className='sc-total-col'; tdSiTot.textContent=''; trSi.appendChild(tdSiTot);
-      const tdSiNet=document.createElement('td'); tdSiNet.className='sc-total-col'; tdSiNet.textContent=''; trSi.appendChild(tdSiNet);
-      scTable.appendChild(thead);
-
-      if(resetMissingMatrix && (!scores.length || scores[0].length!==nHoles)){
-        scores=Array.from({length:4},()=>Array(nHoles).fill(null));
+      if (p.TEE && p.BACK) fitBetween([p.TEE.lat, p.TEE.lng], [p.BACK.lat, p.BACK.lng]);
+      else {
+        const latlngs = state.markers.map(m => m.getLatLng());
+        if (latlngs.length) map.fitBounds(L.latLngBounds(latlngs), { padding: [40,40] });
       }
 
-      const tbody=document.createElement('tbody');
-      for(let p=0;p<playerCount;p++){
-        const tr=document.createElement('tr');
-        const nameCell=document.createElement('th'); nameCell.textContent=nameEls[p].value||`P${p+1}`; tr.appendChild(nameCell);
-
-        for(let i=1;i<=frontEnd;i++){ const idx=i-1; tr.appendChild(makeHoleCell(p, idx)); }
-        const tdOut=document.createElement('td'); tdOut.className='sc-total-col'; tdOut.id=`out-${p}`; tdOut.textContent='0'; tr.appendChild(tdOut);
-
-        if(nHoles>9){ for(let i=10;i<=nHoles;i++){ const idx=i-1; tr.appendChild(makeHoleCell(p, idx)); } }
-        const tdIn=document.createElement('td'); tdIn.className='sc-total-col'; tdIn.id=`in-${p}`; tdIn.textContent=(nHoles>9?'0':'–'); tr.appendChild(tdIn);
-
-        const tdTotal=document.createElement('td'); tdTotal.className='sc-total-col'; tdTotal.id=`tot-${p}`; tdTotal.textContent='0'; tr.appendChild(tdTotal);
-        const tdNet=document.createElement('td'); tdNet.className='sc-total-col'; tdNet.id=`net-${p}`; tdNet.textContent='0'; tr.appendChild(tdNet);
-
-        tbody.appendChild(tr);
-      }
-      scTable.appendChild(tbody);
-
-      renderScores();
+      updateDistances(p);
     }
 
-    function sumPar(start,end){ let s=0; for(let i=start;i<=end;i++){ const h=holes[i-1]; if(h?.par!=null) s+=Number(h.par)||0; } return s||'–'; }
-
-    function makeHoleCell(p, idx){
-      const td=document.createElement('td'); td.className='sc-hole-col';
-      const wrap=document.createElement('div'); wrap.className='sc-cell';
-
-      const input=document.createElement('input'); input.type='number'; input.min='1'; input.placeholder='–'; input.className='sc-score-input'; input.value=(scores[p]?.[idx] ?? '');
-      const chip=document.createElement('span'); chip.className='chip even'; chip.textContent='E';
-      const pts=document.createElement('span'); pts.className='sc-points'; pts.textContent='0';
-
-      input.addEventListener('input', ()=>{
-        const val=input.value?Number(input.value):null;
-        onScoreChange(p, idx, val);
-        maybeAdvanceAfterHole(idx); // auto-advance once hole done for all
-      });
-
-      wrap.appendChild(input); wrap.appendChild(chip); wrap.appendChild(pts); td.appendChild(wrap); return td;
-    }
-
-    function renderScores(){
-      const nHoles=holes.length, frontEnd=Math.min(9,nHoles);
-      for(let p=0;p<playerCount;p++){
-        let out=0,inSum=0,total=0,stab=0;
-        for(let i=0;i<nHoles;i++){
-          const v=scores[p][i]; const par=holes[i]?.par??null; const si=holes[i]?.strokeIndex??null;
-
-          const row=scTable.tBodies[0].rows[p];
-          const holeCellIndex=1 + i + (i>=frontEnd ? 1 : 0);
-          const cell=row.cells[holeCellIndex];
-          const input=cell.querySelector('.sc-score-input');
-          const chip=cell.querySelector('.chip');
-          const ptsEl=cell.querySelector('.sc-points');
-          input.value = v ?? '';
-
-          const rel=relationToPar(v,par); chip.className=`chip ${rel.cls}`; chip.textContent=rel.txt;
-          const shots=shotsReceivedForHole(handicaps[p]||0, si);
-          const pts=stablefordFor(v,par,shots); ptsEl.textContent=String(pts);
-
-          if(v!=null){ total+=v; if(i<frontEnd) out+=v; else inSum+=v; }
-          stab+=pts;
-        }
-        const row=scTable.tBodies[0].rows[p];
-        row.querySelector(`#out-${p}`).textContent=out||0;
-        row.querySelector(`#in-${p}`).textContent=(holes.length>9?(inSum||0):'–');
-        row.querySelector(`#tot-${p}`).textContent=total||0;
-        const nett=total-(useHcap?(handicaps[p]||0):0);
-        row.querySelector(`#net-${p}`).textContent=nett||0;
-      }
-
-      const parts=[];
-      for(let p=0;p<playerCount;p++){
-        let gross=0, stab=0;
-        for(let i=0;i<holes.length;i++){
-          const v=scores[p][i]; const par=holes[i]?.par??null; const si=holes[i]?.strokeIndex??null;
-          if(v!=null) gross+=v;
-          stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
-        }
-        const nett=gross-(useHcap?(handicaps[p]||0):0);
-        const nm=(nameEls[p].value||`P${p+1}`);
-        parts.push(`${nm}: Gross ${gross||0}  •  Net ${nett||0}  •  Stableford ${stab||0}`);
-      }
-      scTotals.textContent=parts.join('   •   ');
-    }
-
-    function onScoreChange(p,i,val){
-      if(!scores[p]) scores[p]=[];
-      scores[p][i]=(typeof val==='number'&&!Number.isNaN(val))?val:null;
-      persistScores(); renderScores();
-    }
-
-    // Auto-advance once all players have a value for THIS hole
-    function maybeAdvanceAfterHole(holeIdx){
-      if(currentIndex!==holeIdx) return;
-      for(let p=0;p<playerCount;p++){
-        const v=scores[p]?.[holeIdx];
-        if(v==null || Number.isNaN(v)){ return; }
-      }
-      if(holes.length){
-        currentIndex=(currentIndex+1)%holes.length;
-        updateHoleUI(true);
-        if(viewMode==='hole') holeFit(); else cartFit();
-      }
-    }
-
-    function persistMeta(){
-      if(!courseIdForScores) return;
-      const meta={
-        count: playerCount,
-        useHcap,
-        names: nameEls.map((el,i)=> (i<playerCount ? (el.value||`P${i+1}`) : null)),
-        handicaps: hcapEls.map((el,i)=> (i<playerCount ? Math.max(0,Math.min(54, Number(el.value)||0)) : null))
-      };
-      localStorage.setItem(`tl_sc2_meta_${courseIdForScores}`, JSON.stringify(meta));
-    }
-    function persistScores(){ if(!courseIdForScores) return; localStorage.setItem(`tl_sc2_scores_${courseIdForScores}`, JSON.stringify(scores)); }
-    function loadSavedScores(id){
-      courseIdForScores=id;
-      try{
-        const meta=JSON.parse(localStorage.getItem(`tl_sc2_meta_${id}`)||'null');
-        if(meta){
-          scCount.value=String(meta.count||1);
-          playerCount=Number(scCount.value);
-          useHcap=!!meta.useHcap; setSwitch(useHcap);
-          nameEls.forEach((el,i)=>{ const nm=meta.names?.[i]; el.value=(nm!=null?nm:''); });
-          hcapEls.forEach((el,i)=>{ const hv=meta.handicaps?.[i]; if(hv!=null){ el.value=hv; handicaps[i]=hv; } else { el.value=''; } });
-        }else{
-          playerCount=1; scCount.value='1'; useHcap=false; setSwitch(false); handicaps=[0,0,0,0];
-          nameEls.forEach(el=>el.value=''); hcapEls.forEach(el=>el.value='');
-        }
-      }catch{}
-      applySetupVisibility();
-
-      try{
-        const saved=JSON.parse(localStorage.getItem(`tl_sc2_scores_${id}`)||'null');
-        if(saved&&Array.isArray(saved)&&saved.length===4&&saved[0].length===holes.length){
-          scores=saved;
-        } else {
-          scores=Array.from({length:4},()=>Array(holes.length).fill(null));
-        }
-      }catch{ scores=Array.from({length:4},()=>Array(holes.length).fill(null)); }
-
-      buildScorecard();
-    }
-    function clearScoresOnly(){ scores=Array.from({length:4},()=>Array(holes.length).fill(null)); persistScores(); renderScores(); }
-    function endRoundFull(){
-      if(!courseIdForScores) return;
-      localStorage.removeItem(`tl_sc2_meta_${courseIdForScores}`);
-      localStorage.removeItem(`tl_sc2_scores_${courseIdForScores}`);
-      scCount.value='1'; playerCount=1; setSwitch(false); useHcap=false;
-      nameEls.forEach(el=>el.value=''); hcapEls.forEach(el=>el.value='');
-      applySetupVisibility(); buildScorecard();
-    }
-
-    // Guest history (modal from localStorage) — summary saves
-    function saveRoundSummary(){
-      if(session.mode!=='guest') return; // only guests track local history
-      const id = courseIdForScores || (session.courseId||'unknown');
-      const courseName = (courseList.find(c=>c.id===id)?.name) || id;
-      const date = new Date().toISOString();
-
-      const perPlayer = [];
-      for(let p=0;p<playerCount;p++){
-        let gross=0, stab=0;
-        for(let i=0;i<holes.length;i++){
-          const v=scores[p][i]; const par=holes[i]?.par??null; const si=holes[i]?.strokeIndex??null;
-          if(v!=null) gross+=v;
-          stab+=stablefordFor(v,par,shotsReceivedForHole(handicaps[p]||0, si));
-        }
-        const nett=gross-(useHcap?(handicaps[p]||0):0);
-        perPlayer.push({
-          name: nameEls[p].value||`P${p+1}`,
-          handicap: useHcap?(handicaps[p]||0):0,
-          gross, nett, stab
-        });
-      }
-
-      const record={courseId:id, courseName, date, perPlayer};
-      const key='tl_guest_rounds';
-      const arr=JSON.parse(localStorage.getItem(key)||'[]');
-      arr.unshift(record);
-      while(arr.length>10) arr.pop();
-      localStorage.setItem(key, JSON.stringify(arr));
-    }
-
-    historyBtn.addEventListener('click', ()=>{
-      const key='tl_guest_rounds';
-      const arr=JSON.parse(localStorage.getItem(key)||'[]');
-
-      const wrap=document.createElement('div'); wrap.className='modal-backdrop';
-      const card=document.createElement('div'); card.className='modal-card';
-
-      const h=document.createElement('div'); h.style.display='flex'; h.style.justifyContent='space-between'; h.style.alignItems='center';
-      h.innerHTML = `<div style="font-weight:700;font-size:18px">History (last 10)</div><button id="hClose" class="sc-button">Close</button>`;
-      card.appendChild(h);
-
-      if(!arr.length){
-        const p=document.createElement('p'); p.textContent='No saved rounds yet.'; p.style.color='#6b7280'; p.style.marginTop='8px'; card.appendChild(p);
-      } else {
-        const tw=document.createElement('div'); tw.className='table-wrap';
-        const table=document.createElement('table'); table.className='sc-table'; table.style.marginTop='10px';
-        const thead=document.createElement('thead'); const tr=document.createElement('tr');
-        ['Course','Date','Player','Hcap','Gross','Net','Stableford'].forEach(t=>{ const th=document.createElement('th'); th.textContent=t; tr.appendChild(th);});
-        thead.appendChild(tr); table.appendChild(thead);
-
-        const tbody=document.createElement('tbody');
-        arr.forEach(rec=>{
-          rec.perPlayer.forEach((pp,idx)=>{
-            const tr=document.createElement('tr');
-            const courseTd=document.createElement('td'); courseTd.textContent = idx===0 ? (rec.courseName || rec.courseId) : '';
-            const dateTd=document.createElement('td'); dateTd.textContent = idx===0 ? new Date(rec.date).toLocaleString() : '';
-            const nameTd=document.createElement('td'); nameTd.textContent = pp.name;
-            const hcTd=document.createElement('td'); hcTd.textContent = pp.handicap;
-            const grossTd=document.createElement('td'); grossTd.textContent = pp.gross;
-            const netTd=document.createElement('td'); netTd.textContent = pp.nett;
-            const stabTd=document.createElement('td'); stabTd.textContent = pp.stab;
-            [courseTd,dateTd,nameTd,hcTd,grossTd,netTd,stabTd].forEach(td=>tr.appendChild(td));
-            tbody.appendChild(tr);
-          });
-        });
-        table.appendChild(tbody);
-        tw.appendChild(table);
-        card.appendChild(tw);
-      }
-
-      wrap.appendChild(card); document.body.appendChild(wrap);
-      wrap.querySelector('#hClose').onclick=()=>document.body.removeChild(wrap);
-      wrap.addEventListener('click',(e)=>{ if(e.target===wrap) document.body.removeChild(wrap); });
+    // --- Buttons ---
+    $('#holeViewBtn').addEventListener('click', ()=>{
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     });
 
-    /* ===================== Offline Download (PWA) ===================== */
-    function swReady(){ return new Promise(res=> {
-      if(navigator.serviceWorker?.controller) return res(true);
-      navigator.serviceWorker?.addEventListener('controllerchange', ()=>res(true), {once:true});
-      // If still no controller after short delay, resolve anyway (non-fatal)
-      setTimeout(()=>res(!!navigator.serviceWorker?.controller), 1200);
-    });}
-    function sendSw(type, payload={}){
-      return new Promise(async (resolve)=>{
-        await swReady();
-        if(!navigator.serviceWorker?.controller) return resolve(null);
-        const chan=new MessageChannel();
-        chan.port1.onmessage = (ev)=> resolve(ev.data);
-        navigator.serviceWorker.controller.postMessage({type, ...payload}, [chan.port2]);
-      });
-    }
-
-    btnDownload.addEventListener('click', async ()=>{
-      const id = session.courseId || courseSel.value;
-      if(!id) return alert('Load a course first.');
-      if(!navigator.serviceWorker?.controller) return alert('Service worker not ready yet. Try again in a moment.');
-
-      dlWrap.style.display='block'; dlFill.style.width='0%'; dlLabel.textContent='Preparing…';
-
-      // Ask SW to cache course JSON + current hole tiles. The SW (sw.js) should:
-      // - fetch `/courses/<id>.json`
-      // - prefetch a sensible set of map tiles for each hole bbox & zoom range
-      // - stream back PROGRESS {done,total} and finally COURSE_CACHED {courseId}
-      navigator.serviceWorker.controller.postMessage({ type:'CACHE_COURSE', courseId:id });
-
-      // Listen for progress
-      navigator.serviceWorker.addEventListener('message', (ev)=>{
-        const d=ev.data||{};
-        if(d.type==='CACHE_PROGRESS' && d.courseId===id){
-          const pct = Math.max(0, Math.min(100, Math.round((d.done/d.total)*100 || 0)));
-          dlFill.style.width = pct + '%';
-          dlLabel.textContent = `Downloading… ${pct}% (${d.done}/${d.total})`;
-        }
-        if(d.type==='COURSE_CACHED' && d.courseId===id){
-          dlFill.style.width='100%'; dlLabel.textContent='Ready for offline';
-          offlinePill.style.display='inline-flex';
-          setTimeout(()=>{ dlWrap.style.display='none'; }, 800);
-        }
-        if(d.type==='CACHE_ERROR' && d.courseId===id){
-          dlLabel.textContent='Download failed. Try again on Wi-Fi.'; 
-        }
-      }, {once:false});
+    $('#cartViewBtn').addEventListener('click', ()=>{
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      if (!p.BACK || !state.cartMarker) return;
+      const cart = state.cartMarker.getLatLng();
+      fitBetween([cart.lat, cart.lng], [p.BACK.lat, p.BACK.lng]);
     });
 
-    // Init
-    async function init(){
-      // SW registration (idempotent; safe if already registered)
-      if('serviceWorker' in navigator){
-        try{ await navigator.serviceWorker.register('/sw.js'); }catch{}
-      }
+    $('#locBtn').addEventListener('click', ()=>{
+      if (!navigator.geolocation) return alert('Geolocation not available.');
+      navigator.geolocation.getCurrentPosition((pos)=>{
+        const {latitude, longitude} = pos.coords;
+        if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude],{icon:ICONS.CART,title:'CART'}).addTo(map);
+        else state.cartMarker.setLatLng([latitude,longitude]);
+        map.setView([latitude,longitude], 18);
+        const p = state.course.holes[String(state.hole)]?.pins || {};
+        updateDistances(p);
+      }, ()=> alert('Could not get location.'));
+    });
 
-      await loadCourseList();
-      const cid = session.courseId || new URLSearchParams(location.search).get('course');
-      if(cid){
-        loadCourse(cid).then(()=>{ setTimeout(()=>{ const f=courseList.find(c=>c.id===cid); if(f) courseSel.value=cid; },300); });
-      } else {
-        if(session.mode==='guest'){ setPanelHidden(false); }
-      }
-    }
-    init();
+    // Hole navigation
+    $('#holeGo').addEventListener('click', ()=>{
+      const n = parseInt($('#holeInput').value,10);
+      if (!Number.isFinite(n)) return;
+      state.hole = n; renderHole();
+    });
+    $('#prevHole').addEventListener('click', ()=>{
+      const minHole = 1;
+      state.hole = Math.max(minHole, state.hole - 1);
+      $('#holeInput').value = String(state.hole);
+      renderHole();
+    });
+    $('#nextHole').addEventListener('click', ()=>{
+      const maxHole = Math.max(
+        ...Object.keys(state.course.holes || {}).map(k => parseInt(k,10)).filter(Number.isFinite)
+      );
+      state.hole = Math.min(maxHole || state.hole+1, state.hole + 1);
+      $('#holeInput').value = String(state.hole);
+      renderHole();
+    });
+
+    // Distance controls
+    $('#units').addEventListener('change', (e)=>{ state.unit = e.target.value; updateUnitLabel(); const p=state.course.holes[String(state.hole)]?.pins||{}; updateDistances(p); });
+    $('#fromSelect').addEventListener('change', (e)=>{ state.from = e.target.value; const p=state.course.holes[String(state.hole)]?.pins||{}; updateDistances(p); });
+
+    // --- Boot ---
+    (async function boot(){
+      updateOnlineBadge();
+
+      const idx = await getIndex();
+      const meta = await pickCourseFromIndex(idx);
+      if (!meta) { alert('No courses in index.json'); return; }
+
+      const course = await loadCourseJson(meta.id);
+
+      // PIN validation (club carts or guest)
+      const ok = await validatePinFlow(meta.id, course);
+      if (!ok) return;
+
+      state.meta = meta;
+      state.course = course;
+
+      // Top panel
+      $('#courseName').textContent = course.course?.name || meta.name || 'Course';
+      $('#courseId').textContent   = course.course?.id   || meta.id   || '-';
+      $('#courseMetaNote').textContent = `Holes: ${course.course?.holes || '—'} • PIN set: ${ (course.course?.pin ? 'Yes' : (meta.pin ? 'Yes' : 'No')) }`;
+
+      const startHole = parseInt(q('hole') || '1', 10);
+      state.hole = startHole;
+      $('#holeInput').value = String(startHole);
+
+      renderHole();
+
+      // small UX nicety
+      showToast('Course loaded' + (isOnline() ? ' (online)' : ' (offline cached)'));
+    })();
   </script>
 </body>
 </html>
