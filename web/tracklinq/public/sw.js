@@ -1,171 +1,216 @@
-/* TrackLinq Service Worker — offline courses + shell
-   Scope: / (registered from /web/tracklinq/public/*) */
+/* TrackLinq Service Worker
+   v2.0 (Leaflet + OSM offline, course JSON caching, PWA shell)
 
-const VERSION = 'tl-v5';
-const SHELL = [
-  '/login.html',
-  '/gps.html',
+   What it does:
+   - Pre-caches app shell (gps.html, mapper.html, index.html, manifest, icons)
+   - Caches Leaflet JS/CSS from CDN for offline use
+   - Caches /courses/index.json and each /courses/{ID}.json listed inside it
+   - Runtime cache for OpenStreetMap tiles (a/b/c.tile.openstreetmap.org)
+   - Stale-while-revalidate for static assets & course JSON
+   - Network-first for everything else with offline fallback to gps.html
+*/
+
+const VERSION = 'v2.0';
+const STATIC_CACHE = `static-${VERSION}`;
+const RUNTIME_CACHE = `runtime-${VERSION}`;
+const TILE_CACHE = `tiles-${VERSION}`;
+
+const COURSE_INDEX = '/courses/index.json';
+
+// Adjust these to your actual files if paths differ
+const CORE = [
+  '/',                   // optional redirect to index.html (if you serve it)
   '/index.html',
-  '/offline.html',
+  '/gps.html',
+  '/mapper.html',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  COURSE_INDEX,
+
+  // Leaflet CDN (for offline)
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
 
-// Caches
-const CACHE_SHELL   = `shell-${VERSION}`;
-const CACHE_COURSES = `courses-${VERSION}`;
-const CACHE_RUNTIME = `runtime-${VERSION}`;
+// ---- Helpers ---------------------------------------------------------------
 
-// Helper: safe fetch and cache
-async function cachePut(cacheName, req, res) {
-  try {
-    const cache = await caches.open(cacheName);
-    await cache.put(req, res.clone());
-  } catch {}
-  return res;
+async function cacheAddAll(cacheName, urls) {
+  const cache = await caches.open(cacheName);
+  await cache.addAll(urls);
 }
 
-self.addEventListener('install', (e) => {
-  e.waitUntil((async () => {
-    const c = await caches.open(CACHE_SHELL);
-    await c.addAll(SHELL);
+async function preCacheCoursesFromIndex(cacheName) {
+  try {
+    // Try cache first then network for index (so install works offline if previously cached)
+    const cached = await caches.match(COURSE_INDEX);
+    let idxRes = cached;
+    if (!idxRes) {
+      idxRes = await fetch(COURSE_INDEX, { cache: 'no-cache' });
+      const sc = await caches.open(cacheName);
+      await sc.put(COURSE_INDEX, idxRes.clone());
+    }
+    const idx = await idxRes.json();
+    const files = (idx.courses || []).map(c => `/courses/${c.id}.json`);
+    if (files.length) {
+      const sc = await caches.open(cacheName);
+      await Promise.all(files.map(async (u) => {
+        try {
+          const r = await fetch(u, { cache: 'no-cache' });
+          await sc.put(u, r.clone());
+        } catch (_) { /* ignore */ }
+      }));
+    }
+  } catch (_) {
+    // no index yet, or offline first install – ignore
+  }
+}
+
+// ---- Install ---------------------------------------------------------------
+
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    await cacheAddAll(STATIC_CACHE, CORE);
+    await preCacheCoursesFromIndex(STATIC_CACHE);
     self.skipWaiting();
   })());
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil((async () => {
-    // cleanup old caches
-    const keep = new Set([CACHE_SHELL, CACHE_COURSES, CACHE_RUNTIME]);
-    const names = await caches.keys();
-    await Promise.all(names.map(n => keep.has(n) ? null : caches.delete(n)));
-    await self.clients.claim();
+// ---- Activate --------------------------------------------------------------
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.map((k) => {
+        if (![STATIC_CACHE, RUNTIME_CACHE, TILE_CACHE].includes(k)) {
+          return caches.delete(k);
+        }
+      })
+    );
+    self.clients.claim();
   })());
 });
 
-const ESRI_RE = /server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile/;
-const UNPKG_RE = /^(https:\/\/)?unpkg\.com\//;
-const COURSES_RE = /^\/courses\/.+\.json$/;
+// Allow page to trigger an immediate SW update if desired
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
 
-// Network strategies
-self.addEventListener('fetch', (e) => {
-  const { request } = e;
-  const url = new URL(request.url);
+// ---- Fetch strategy --------------------------------------------------------
+// Rules (top to bottom):
+// 1) OSM tiles -> cache-first (refresh in bg), store in TILE_CACHE
+// 2) Leaflet CDN -> cache-first SWR (STATIC_CACHE)
+// 3) Same-origin static (html/js/css/img/font) & course JSON -> cache-first SWR (STATIC_CACHE)
+// 4) Everything else -> network-first, fallback to cache, then offline page
 
-  // Navigation fallback
-  if (request.mode === 'navigate') {
-    e.respondWith((async () => {
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // 1) OSM tiles (subdomains a/b/c)
+  if (url.hostname.endsWith('tile.openstreetmap.org')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(TILE_CACHE);
+      const cached = await cache.match(req);
+      if (cached) {
+        // Try to refresh in background
+        event.waitUntil((async () => {
+          try {
+            const fresh = await fetch(req);
+            await cache.put(req, fresh.clone());
+          } catch (_) { /* offline */ }
+        })());
+        return cached;
+      }
+      // No cache: try network then store
       try {
-        const res = await fetch(request);
-        // cache a copy of navigations to shell cache (best effort)
-        cachePut(CACHE_SHELL, request, res.clone());
-        return res;
-      } catch {
-        return caches.match('/offline.html');
+        const fresh = await fetch(req);
+        await cache.put(req, fresh.clone());
+        return fresh;
+      } catch (_) {
+        // No tile available offline
+        return new Response('', { status: 503 });
       }
     })());
     return;
   }
 
-  // Courses JSON: cache-first (after cached)
-  if (COURSES_RE.test(url.pathname)) {
-    e.respondWith((async () => {
-      const cached = await caches.match(request);
-      if (cached) return cached;
-      try {
-        const res = await fetch(request, { cache: 'no-store' });
-        return cachePut(CACHE_COURSES, request, res);
-      } catch {
-        // last resort: any cached course index
-        return cached || new Response('{"error":"offline"}', { status: 503, headers: { 'Content-Type':'application/json' } });
-      }
-    })());
+  // 2) Leaflet CDN assets
+  if (url.hostname === 'unpkg.com' && url.pathname.includes('/leaflet@')) {
+    event.respondWith(cacheFirstSWR(req, STATIC_CACHE, /*fallback*/ null));
     return;
   }
 
-  // Leaflet from unpkg — stale-while-revalidate
-  if (UNPKG_RE.test(request.url)) {
-    e.respondWith((async () => {
-      const cached = await caches.match(request);
-      const fetchPromise = fetch(request).then(res => cachePut(CACHE_RUNTIME, request, res));
-      return cached || fetchPromise;
-    })());
+  const isOwnOrigin = url.origin === self.location.origin;
+
+  // 3) Same-origin static + course JSON
+  const isStatic = isOwnOrigin && (
+    req.destination === 'document' ||
+    req.destination === 'script' ||
+    req.destination === 'style' ||
+    req.destination === 'image' ||
+    req.destination === 'font'
+  );
+
+  const isCourseJson =
+    isOwnOrigin && (
+      url.pathname === COURSE_INDEX ||
+      (url.pathname.startsWith('/courses/') && url.pathname.endsWith('.json'))
+    );
+
+  if (isStatic || isCourseJson) {
+    event.respondWith(cacheFirstSWR(req, STATIC_CACHE, /*fallback*/ isStatic && req.mode === 'navigate' ? '/gps.html' : null));
     return;
   }
 
-  // Esri tiles — cache-first with cap
-  if (ESRI_RE.test(request.url)) {
-    e.respondWith((async () => {
-      const cache = await caches.open(CACHE_RUNTIME);
-      const cached = await cache.match(request);
-      if (cached) return cached;
-      try {
-        const res = await fetch(request, { mode: 'no-cors' }); // opaque ok
-        await cache.put(request, res.clone());
-        // simple cap to ~400 tiles
-        const keys = await cache.keys();
-        if (keys.length > 400) await cache.delete(keys[0]);
-        return res;
-      } catch {
-        return cached || Response.error();
-      }
-    })());
-    return;
-  }
+  // 4) Default network-first
+  event.respondWith(networkFirst(req, RUNTIME_CACHE));
+});
 
-  // Default: try network, fallback cache
-  e.respondWith((async () => {
+// ---- Strategies ------------------------------------------------------------
+
+async function cacheFirstSWR(request, cacheName, navigationFallbackPath = null) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+
+  if (cached) {
+    // Refresh in background
     try {
-      const res = await fetch(request);
-      return res;
-    } catch {
-      const cached = await caches.match(request);
-      return cached || Response.error();
+      const fresh = await fetch(request, { cache: 'no-cache' });
+      await cache.put(request, fresh.clone());
+    } catch (_) { /* offline */ }
+    return cached;
+  }
+
+  try {
+    const res = await fetch(request);
+    await cache.put(request, res.clone());
+    return res;
+  } catch (_) {
+    if (navigationFallbackPath && request.destination === 'document') {
+      const fallback = await cache.match(navigationFallbackPath);
+      if (fallback) return fallback;
     }
-  })());
-});
-
-// Message API: cache a course json now (+progress)
-self.addEventListener('message', (e) => {
-  const msg = e.data || {};
-  if (msg.type === 'cacheCourse' && msg.courseId) {
-    cacheCourseJson(msg.courseId).then(() => {
-      postToAllClients({ type: 'cacheDone', courseId: msg.courseId });
-    }).catch(() => {
-      postToAllClients({ type: 'cacheDone', courseId: msg.courseId, error: true });
-    });
+    return new Response('Offline', { status: 503 });
   }
-  if (msg.type === 'listCachedCourses') {
-    listCachedCourses().then(list => {
-      e.source?.postMessage({ type: 'cachedCourses', list });
-    });
-  }
-});
-
-async function cacheCourseJson(courseId) {
-  const url = `/courses/${encodeURIComponent(courseId)}.json`;
-  // basic progress: 0 -> 100 (single asset)
-  postToAllClients({ type: 'cacheCourseProgress', courseId, percent: 5, label: 'Requesting' });
-  const res = await fetch(url, { cache: 'no-store' });
-  postToAllClients({ type: 'cacheCourseProgress', courseId, percent: 60, label: 'Saving' });
-  await cachePut(CACHE_COURSES, new Request(url), res);
-  postToAllClients({ type: 'cacheCourseProgress', courseId, percent: 100, label: 'Done' });
 }
 
-async function listCachedCourses() {
-  const cache = await caches.open(CACHE_COURSES);
-  const keys = await cache.keys();
-  return keys
-    .map(k => {
-      const m = k.url.match(/\/courses\/(.+)\.json$/);
-      return m ? decodeURIComponent(m[1]) : null;
-    })
-    .filter(Boolean);
-}
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const res = await fetch(request);
+    cache.put(request, res.clone());
+    return res;
+  } catch (_) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
 
-function postToAllClients(payload) {
-  self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
-    .then(clients => clients.forEach(c => c.postMessage(payload)))
-    .catch(() => {});
+    // If it's a navigation/doc, try gps.html as a shell
+    if (request.destination === 'document') {
+      const shell = await (await caches.open(STATIC_CACHE)).match('/gps.html');
+      if (shell) return shell;
+    }
+    return new Response('Offline', { status: 503 });
+  }
 }
