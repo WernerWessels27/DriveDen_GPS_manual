@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Course Mapper</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <style>
     html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial; }
     .app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
@@ -27,7 +28,9 @@
     .section-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .json-box { white-space: pre; background: #0b1020; color: #c7e1ff; padding: 8px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: 220px; }
     .hr { height: 1px; background: #e5e7eb; margin: 10px 0; }
+    .legend { position: absolute; z-index: 1000; right: 10px; top: 10px; background: #fff; border-radius: 8px; padding: 6px 8px; border:1px solid #e5e7eb; }
   </style>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 <body>
   <div class="app">
@@ -55,8 +58,11 @@
             </select>
           </div>
           <div>
-            <label>Google Maps API Key</label>
-            <input id="gmapKey" placeholder="YOUR_GOOGLE_MAPS_API_KEY" />
+            <label>Elevation (online)</label>
+            <select id="elevMode">
+              <option value="on">On (OpenTopo/online)</option>
+              <option value="off">Off (offline)</option>
+            </select>
           </div>
         </div>
       </fieldset>
@@ -79,14 +85,15 @@
             <input id="holeStroke" type="number" min="1" max="18" value="7" />
           </div>
           <div>
-            <label>Elevation sampling</label>
-            <select id="elevMode">
-              <option value="on">On (recommended)</option>
-              <option value="off">Off</option>
+            <label>Center</label>
+            <select id="startCenter">
+              <option value="-25.746,28.229">Pretoria</option>
+              <option value="-25.938,28.198">Johannesburg</option>
+              <option value="-25.936,28.182">Blue Valley</option>
             </select>
           </div>
         </div>
-        <div class="minor">Click the map to drop the currently selected pin. Elevation (m) is auto-filled.</div>
+        <div class="minor">Click the map to drop the selected pin. Works fully offline (no API key needed). Elevation only when online.</div>
       </fieldset>
 
       <fieldset>
@@ -111,211 +118,178 @@
         <div class="json-box" id="preview"></div>
       </fieldset>
 
-      <div class="minor">Notes:
-        <ul>
-          <li>Pin keys match <span class="pill">gps.html</span> expectations: <b>TEE</b>, <b>FRONT</b>, <b>MID</b>, <b>BACK</b>, <b>TOILET</b>, <b>TAPS</b>, <b>STAKE_WHITE</b>, <b>STAKE_RED</b>, <b>STAKE_YELLOW</b>.</li>
-          <li>Enable <b>Maps JavaScript API</b> and <b>Elevation API</b> for elevation sampling.</li>
-        </ul>
-      </div>
+      <div class="minor">Pins: <b>TEE</b>, <b>FRONT</b>, <b>MID</b>, <b>BACK</b>, <b>TOILET</b>, <b>TAPS</b>, <b>STAKE WHITE/RED/YELLOW</b>. JSON matches gps.html.</div>
     </aside>
-    <main id="map"></main>
+    <main>
+      <div id="map"></div>
+      <div class="legend minor">Leaflet • OpenStreetMap tiles (cached by SW)</div>
+    </main>
   </div>
 
   <script>
-    // --- Marker icon factory (simple SVG data URIs) ---
-    const pinSVG = (fill = '#2563eb', glyph = '') => {
-      const encoded = encodeURIComponent(`<?xml version="1.0"?>
-        <svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
-          <defs>
-            <filter id='s' x='-50%' y='-50%' width='200%' height='200%'>
-              <feDropShadow dx='0' dy='2' stdDeviation='2' flood-color='rgba(0,0,0,0.25)' />
-            </filter>
-          </defs>
-          <path filter='url(#s)' d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='${fill}'/>
-          ${glyph}
+    // --- Leaflet Map ---
+    let map, activeTool = 'TEE', markers = [], courseData = { meta: { name:"", id:"", pin:"", holes:18 }, holes:{} };
+
+    const ICONS = (()=>{
+      const mk = (fill, label=null)=>{
+        const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
+          <path d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='${fill}' stroke='rgba(0,0,0,0.2)'/>
+          ${label?`<circle cx='20' cy='20' r='9' fill='white'/><text x='20' y='24' text-anchor='middle' font-family='Arial' font-size='12' font-weight='700' fill='#111'>${label}</text>`:''}
         </svg>`);
-      return `data:image/svg+xml;charset=UTF-8,${encoded}`;
-    };
+        return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [28,40], iconAnchor: [14,40] });
+      };
+      const wc = ()=>{
+        const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
+          <path d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='#6b7280' stroke='rgba(0,0,0,0.2)'/>
+          <path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>
+        </svg>`);
+        return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [28,40], iconAnchor: [14,40] });
+      };
+      const tap = ()=>{
+        const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
+          <path d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='#0ea5e9' stroke='rgba(0,0,0,0.2)'/>
+          <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
+        </svg>`);
+        return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [28,40], iconAnchor: [14,40] });
+      };
+      return {
+        TEE: mk('#16a34a','T'), FRONT: mk('#05b6d3','F'), MID: mk('#22c55e','M'), BACK: mk('#ef4444','B'),
+        TOILET: wc(), TAPS: tap(),
+        STAKE_WHITE: mk('#ffffff'), STAKE_RED: mk('#ef4444'), STAKE_YELLOW: mk('#fbbf24')
+      };
+    })();
 
-    const glyphCircle = (char) => `<circle cx='20' cy='20' r='9' fill='white'/>
-      <text x='20' y='24' text-anchor='middle' font-family='Arial' font-size='12' font-weight='700' fill='#111'>${char}</text>`;
-    const glyphWC = () => `<path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>`;
-    const glyphTap = () => `<path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>`;
+    const TOOL_ORDER = ['TEE','FRONT','MID','BACK','TOILET','TAPS','STAKE_WHITE','STAKE_RED','STAKE_YELLOW'];
 
-    const ICONS = {
-      TEE: pinSVG('#16a34a', glyphCircle('T')),
-      FRONT: pinSVG('#05b6d3', glyphCircle('F')),
-      MID: pinSVG('#22c55e', glyphCircle('M')),
-      BACK: pinSVG('#ef4444', glyphCircle('B')),
-      TOILET: pinSVG('#6b7280', glyphWC()),
-      TAPS: pinSVG('#0ea5e9', glyphTap()),
-      STAKE_WHITE: pinSVG('#ffffff', ''),
-      STAKE_RED: pinSVG('#ef4444', ''),
-      STAKE_YELLOW: pinSVG('#fbbf24', ''),
-    };
-
-    const TOOL_ORDER = [
-      'TEE','FRONT','MID','BACK','TOILET','TAPS','STAKE_WHITE','STAKE_RED','STAKE_YELLOW'
-    ];
-
-    // Maintain state
-    let map, elevService, activeTool = 'TEE', markers = [], holeData = {}, courseData = {
-      meta: { name:"", id:"", pin:"", holes:18 },
-      holes: {}
-    };
-
-    // Build tool buttons
+    // Tool buttons
     const toolsEl = document.getElementById('tools');
     TOOL_ORDER.forEach(key => {
       const btn = document.createElement('button');
       btn.className = 'tool';
       btn.dataset.tool = key;
-      btn.innerHTML = `<img alt='' width='18' height='24' src='${ICONS[key]}'/> <span>${key.replace('STAKE_','STAKE ')}</span>`;
+      btn.innerHTML = `<img alt='' width='18' height='24' src='${ICONS[key].options.iconUrl}'/> <span>${key.replace('STAKE_','STAKE ')}</span>`;
       btn.addEventListener('click', () => setActiveTool(key));
       toolsEl.appendChild(btn);
     });
     function setActiveTool(tool){ activeTool = tool; [...toolsEl.children].forEach(b=>b.classList.toggle('active', b.dataset.tool===tool)); }
     setActiveTool('TEE');
 
-    // Map init on demand so we can inject key from UI
-    let mapsLoaded = false;
-    function ensureGoogleLoaded(){
-      if (mapsLoaded) return Promise.resolve();
-      const key = document.getElementById('gmapKey').value.trim();
-      if(!key){ alert('Enter your Google Maps API key, then click on map area to load.'); throw new Error('No key'); }
-      return new Promise((resolve, reject)=>{
-        const s = document.createElement('script');
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=maps,marker&v=weekly`;
-        s.async = true; s.defer = true;
-        s.onload = ()=>{ mapsLoaded=true; initMap(); resolve(); };
-        s.onerror = (e)=> reject(e);
-        document.head.appendChild(s);
-      });
-    }
-
+    // Initialize Leaflet
     function initMap(){
-      map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: -25.746, lng: 28.229 }, // Pretoria default
-        zoom: 15,
-        mapTypeId: 'satellite',
-        tilt: 0,
+      const def = document.getElementById('startCenter').value.split(',').map(Number);
+      map = L.map('map', { zoomControl: true }).setView(def, 16);
+      const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap'
       });
-      elevService = new google.maps.ElevationService();
+      tiles.addTo(map);
 
-      map.addListener('click', async (e) => {
-        const pos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-        const elevOn = document.getElementById('elevMode').value === 'on';
+      map.on('click', async (e)=>{
+        const pos = e.latlng;
         let elevation = null;
-        if (elevOn && elevService){
+        if(document.getElementById('elevMode').value==='on'){
           try{
-            const res = await elevService.getElevationForLocations({ locations: [pos] });
-            elevation = res.results?.[0]?.elevation ?? null;
-          }catch(err){ console.warn('Elevation failed', err); }
+            const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${pos.lat},${pos.lng}`);
+            const j = await r.json();
+            elevation = Math.round(j?.results?.[0]?.elevation ?? null);
+          }catch(err){ elevation = null; }
         }
         addPinToHole(activeTool, pos, elevation);
       });
     }
 
-    // Add/Remove Pins
-    function addPinToHole(kind, position, elevation){
+    initMap();
+
+    // Data helpers
+    function addPinToHole(kind, position, elev){
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
       const par = parseInt(document.getElementById('holePar').value,10);
       const stroke = parseInt(document.getElementById('holeStroke').value,10);
-
       if(!courseData.holes[holeNo]) courseData.holes[holeNo] = { par, stroke, pins: {} };
-      courseData.holes[holeNo].par = par; // keep updated
-      courseData.holes[holeNo].stroke = stroke;
+      courseData.holes[holeNo].par = par; courseData.holes[holeNo].stroke = stroke;
 
-      const pin = { kind, lat: position.lat, lng: position.lng, elev_m: elevation!==null? Math.round(elevation): null, ts: Date.now() };
-
-      // Unique pins (TEE/FRONT/MID/BACK/TOILET) -> single item; others allow multiple
+      const pin = { kind, lat: position.lat, lng: position.lng, elev_m: elev, ts: Date.now() };
       const singular = ['TEE','FRONT','MID','BACK','TOILET'];
-      if(singular.includes(kind)){
-        courseData.holes[holeNo].pins[kind] = pin;
-      } else {
-        if(!courseData.holes[holeNo].pins[kind]) courseData.holes[holeNo].pins[kind] = [];
-        courseData.holes[holeNo].pins[kind].push(pin);
-      }
+      if(singular.includes(kind)) courseData.holes[holeNo].pins[kind] = pin;
+      else { (courseData.holes[holeNo].pins[kind] ||= []).push(pin); }
 
-      // Render marker
-      const m = new google.maps.marker.AdvancedMarkerElement({
-        map,
-        position,
-        content: (()=>{ const img = document.createElement('img'); img.src = ICONS[kind]; img.style.width='28px'; img.style.height='40px'; return img; })(),
-        title: kind
+      const marker = L.marker([position.lat, position.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
+      marker.__meta = { holeNo, kind };
+      marker.on('dragend', (ev)=>{
+        const ll = ev.target.getLatLng();
+        if(Array.isArray(courseData.holes[holeNo].pins[kind])){
+          // update the last one (approx), in real use we’d track ids
+          const arr = courseData.holes[holeNo].pins[kind];
+          arr[arr.length-1].lat = ll.lat; arr[arr.length-1].lng = ll.lng;
+        } else if(courseData.holes[holeNo].pins[kind]){
+          courseData.holes[holeNo].pins[kind].lat = ll.lat; courseData.holes[holeNo].pins[kind].lng = ll.lng;
+        }
+        refreshPreview();
       });
-      m.__meta = { holeNo, kind };
-      markers.push(m);
-
-      refreshPinsUI();
-      refreshPreview();
+      markers.push(marker);
+      refreshPinsUI(); refreshPreview();
     }
 
     function refreshPinsUI(){
-      const el = document.getElementById('currentPins');
-      el.innerHTML = '';
+      const el = document.getElementById('currentPins'); el.innerHTML='';
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      const hole = courseData.holes[holeNo];
-      if(!hole){ return; }
+      const hole = courseData.holes[holeNo]; if(!hole) return;
       const pins = hole.pins || {};
-      const entries = Object.entries(pins);
-      entries.forEach(([k,v])=>{
+      Object.entries(pins).forEach(([k,v])=>{
         const count = Array.isArray(v) ? v.length : (v?1:0);
-        const chip = document.createElement('div');
-        chip.className = 'chip';
-        chip.textContent = `${k}: ${count}`;
-        el.appendChild(chip);
+        const chip = document.createElement('div'); chip.className='chip'; chip.textContent = `${k}: ${count}`; el.appendChild(chip);
       });
     }
 
     function refreshPreview(){
-      // meta
       courseData.meta.name = document.getElementById('courseName').value.trim();
       courseData.meta.id = document.getElementById('courseId').value.trim();
       courseData.meta.pin = document.getElementById('clubPin').value.trim();
       courseData.meta.holes = parseInt(document.getElementById('holesCount').value,10);
-
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      // lightly sort keys for stability
       const sorted = JSON.parse(JSON.stringify(courseData));
       sorted.holes = Object.fromEntries(Object.entries(sorted.holes).sort((a,b)=>a[0]-b[0]));
-      document.getElementById('preview').textContent = JSON.stringify({
-        course: sorted.meta,
-        holes: sorted.holes,
-      }, null, 2);
+      document.getElementById('preview').textContent = JSON.stringify({ course: sorted.meta, holes: sorted.holes }, null, 2);
     }
 
-    // Buttons
+    function redrawHoleMarkers(){
+      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
+      markers.forEach(m=>m.remove()); markers=[];
+      const hole = courseData.holes[holeNo]; if(!hole) { refreshPinsUI(); return; }
+      for(const [k,v] of Object.entries(hole.pins||{})){
+        if(Array.isArray(v)) v.forEach(p=>renderMarker(k,p,holeNo)); else if(v) renderMarker(k,v,holeNo);
+      }
+      refreshPinsUI();
+    }
+
+    function renderMarker(kind, p, holeNo){
+      const marker = L.marker([p.lat, p.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
+      marker.__meta = { holeNo, kind };
+      markers.push(marker);
+    }
+
     document.getElementById('undoBtn').addEventListener('click', ()=>{
       // remove last marker for current hole
       for(let i=markers.length-1;i>=0;i--){
         const m = markers[i];
         const holeNo = parseInt(document.getElementById('holeNumber').value,10);
         if(m.__meta?.holeNo === holeNo){
-          const kind = m.__meta.kind;
-          m.map = null; // remove from map
-          markers.splice(i,1);
+          const kind = m.__meta.kind; m.remove(); markers.splice(i,1);
           const pins = courseData.holes[holeNo]?.pins || {};
           if(Array.isArray(pins[kind])) pins[kind].pop(); else pins[kind] = undefined;
-          refreshPinsUI(); refreshPreview();
-          break;
+          refreshPinsUI(); refreshPreview(); break;
         }
       }
     });
 
     document.getElementById('clearHole').addEventListener('click', ()=>{
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      markers = markers.filter(m=>{
-        if(m.__meta?.holeNo === holeNo){ m.map = null; return false; }
-        return true;
-      });
+      markers = markers.filter(m=>{ if(m.__meta?.holeNo===holeNo){ m.remove(); return false; } return true; });
       if(courseData.holes[holeNo]) courseData.holes[holeNo].pins = {};
       refreshPinsUI(); refreshPreview();
     });
 
     document.getElementById('exportBtn').addEventListener('click', ()=>{
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      const hole = courseData.holes[holeNo] || { par: null, stroke: null, pins:{} };
+      const hole = courseData.holes[holeNo] || { par:null, stroke:null, pins:{} };
       const payload = { course: courseData.meta, hole: { number: holeNo, ...hole } };
       downloadJSON(payload, `${courseData.meta.id || 'COURSE'}-H${holeNo}.json`);
     });
@@ -326,73 +300,28 @@
     });
 
     document.getElementById('importFile').addEventListener('change', async (e)=>{
-      const file = e.target.files?.[0]; if(!file) return;
-      const txt = await file.text();
+      const file = e.target.files?.[0]; if(!file) return; const txt = await file.text();
       try{
         const json = JSON.parse(txt);
-        if(json.course && json.holes){
-          courseData.meta = json.course;
-          courseData.holes = json.holes;
-        } else if(json.course && json.hole){
-          // merge single-hole import
-          courseData.meta = json.course;
-          courseData.holes[json.hole.number] = { par: json.hole.par, stroke: json.hole.stroke, pins: json.hole.pins };
-        } else {
-          alert('Unrecognized JSON shape');
-          return;
-        }
-        // update form fields
+        if(json.course && json.holes){ courseData.meta = json.course; courseData.holes = json.holes; }
+        else if(json.course && json.hole){ courseData.meta = json.course; courseData.holes[json.hole.number] = { par: json.hole.par, stroke: json.hole.stroke, pins: json.hole.pins }; }
+        else { alert('Unrecognized JSON'); return; }
         document.getElementById('courseName').value = courseData.meta.name || '';
         document.getElementById('courseId').value = courseData.meta.id || '';
         document.getElementById('clubPin').value = courseData.meta.pin || '';
         document.getElementById('holesCount').value = String(courseData.meta.holes || 18);
-        // clear markers then re-render current hole
-        markers.forEach(m=>m.map=null); markers=[];
-        refreshPinsUI(); refreshPreview();
-        alert('Import successful. Switch holes to view/edit specific hole pins.');
-      }catch(err){
-        console.error(err); alert('Invalid JSON');
-      }
+        markers.forEach(m=>m.remove()); markers=[]; refreshPinsUI(); refreshPreview(); alert('Import OK. Switch holes to view/edit.');
+      }catch(err){ console.error(err); alert('Invalid JSON'); }
     });
 
-    // Update JSON preview on inputs change
-    ['courseName','courseId','clubPin','holesCount','holeNumber','holePar','holeStroke'].forEach(id=>{
+    ['courseName','courseId','clubPin','holesCount','holeNumber','holePar','holeStroke','startCenter'].forEach(id=>{
       document.getElementById(id).addEventListener('input', ()=>{ refreshPreview(); redrawHoleMarkers(); });
     });
 
-    function redrawHoleMarkers(){
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      // remove all then add for selected hole
-      markers.forEach(m=>m.map=null); markers=[];
-      const hole = courseData.holes[holeNo]; if(!hole) { refreshPinsUI(); return; }
-      const pins = hole.pins || {};
-      for(const [k,v] of Object.entries(pins)){
-        if(Array.isArray(v)) v.forEach(p=>renderMarker(k,p, holeNo));
-        else if(v) renderMarker(k,v, holeNo);
-      }
-      refreshPinsUI();
-    }
-
-    function renderMarker(kind, p, holeNo){
-      const m = new google.maps.marker.AdvancedMarkerElement({
-        map,
-        position: { lat: p.lat, lng: p.lng },
-        content: (()=>{ const img=document.createElement('img'); img.src=ICONS[kind]; img.style.width='28px'; img.style.height='40px'; return img; })(),
-        title: kind
-      });
-      m.__meta = { holeNo, kind };
-      markers.push(m);
-    }
-
     function downloadJSON(obj, filename){
       const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
     }
-
-    // Lazy-load Maps when the user first interacts with the map pane
-    document.getElementById('map').addEventListener('click', ()=>{ if(!mapsLoaded) ensureGoogleLoaded().catch(()=>{}); }, { once: true });
   </script>
 </body>
 </html>
