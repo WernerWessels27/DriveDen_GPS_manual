@@ -4,7 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Course Mapper</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
   <style>
     html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial; }
     .app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
@@ -17,7 +30,6 @@
     .toolbar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .tool { cursor: pointer; padding: 8px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 8px; justify-content: center; }
     .tool.active { outline: 2px solid #2563eb; box-shadow: 0 0 0 2px #93c5fd inset; }
-    .pill { font-size: 12px; background: #eef2ff; color: #3730a3; padding: 2px 6px; border-radius: 999px; border: 1px solid #c7d2fe; }
     .minor { font-size: 12px; color: #6b7280; }
     #map { width: 100%; height: 100%; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -30,7 +42,6 @@
     .hr { height: 1px; background: #e5e7eb; margin: 10px 0; }
     .legend { position: absolute; z-index: 1000; right: 10px; top: 10px; background: #fff; border-radius: 8px; padding: 6px 8px; border:1px solid #e5e7eb; }
   </style>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 <body>
   <div class="app">
@@ -53,8 +64,10 @@
           <div>
             <label>Total Holes</label>
             <select id="holesCount">
-              <option>18</option>
               <option>9</option>
+              <option selected>18</option>
+              <option>27</option>
+              <option>36</option>
             </select>
           </div>
           <div>
@@ -72,7 +85,7 @@
         <div class="row">
           <div>
             <label>Hole #</label>
-            <input id="holeNumber" type="number" min="1" max="18" value="1" />
+            <input id="holeNumber" type="number" min="1" max="36" value="1" />
           </div>
           <div>
             <label>Par</label>
@@ -82,18 +95,18 @@
         <div class="row">
           <div>
             <label>Stroke</label>
-            <input id="holeStroke" type="number" min="1" max="18" value="7" />
+            <input id="holeStroke" type="number" min="1" max="36" value="7" />
           </div>
           <div>
-            <label>Center</label>
+            <label>Start Center</label>
             <select id="startCenter">
               <option value="-25.746,28.229">Pretoria</option>
-              <option value="-25.938,28.198">Johannesburg</option>
+              <option value="-26.204,28.047">Johannesburg</option>
               <option value="-25.936,28.182">Blue Valley</option>
             </select>
           </div>
         </div>
-        <div class="minor">Click the map to drop the selected pin. Works fully offline (no API key needed). Elevation only when online.</div>
+        <div class="minor">Click the satellite map to drop the selected pin. Elevation only when online.</div>
       </fieldset>
 
       <fieldset>
@@ -120,115 +133,219 @@
 
       <div class="minor">Pins: <b>TEE</b>, <b>FRONT</b>, <b>MID</b>, <b>BACK</b>, <b>TOILET</b>, <b>TAPS</b>, <b>STAKE WHITE/RED/YELLOW</b>. JSON matches gps.html.</div>
     </aside>
+
     <main>
       <div id="map"></div>
-      <div class="legend minor">Leaflet • OpenStreetMap tiles (cached by SW)</div>
+      <div class="legend minor">Satellite: Esri World Imagery • Streets: OpenStreetMap (both cacheable)</div>
     </main>
   </div>
 
   <script>
-    // --- Leaflet Map ---
-    let map, activeTool = 'TEE', markers = [], courseData = { meta: { name:"", id:"", pin:"", holes:18 }, holes:{} };
+    // ---------------------------
+    // Marker Icon Helpers
+    // ---------------------------
+    // Small dot (for FRONT/MID/BACK and STAKE_*). Slight outer stroke to stand out on satellite.
+    function dotIcon(color = '#ffffff', size = 12, stroke = '#111', strokeWidth = 2) {
+      const r = Math.floor(size / 2);
+      const svg = encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>
+          <circle cx='${r}' cy='${r}' r='${r - strokeWidth/2}' fill='${color}' stroke='${stroke}' stroke-width='${strokeWidth}' />
+        </svg>`);
+      return L.icon({
+        iconUrl: `data:image/svg+xml;utf8,${svg}`,
+        iconSize: [size, size],
+        iconAnchor: [r, r]
+      });
+    }
 
-    const ICONS = (()=>{
-      const mk = (fill, label=null)=>{
-        const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
-          <path d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='${fill}' stroke='rgba(0,0,0,0.2)'/>
-          ${label?`<circle cx='20' cy='20' r='9' fill='white'/><text x='20' y='24' text-anchor='middle' font-family='Arial' font-size='12' font-weight='700' fill='#111'>${label}</text>`:''}
+    // Large icon-only (no pin body) for Toilet and Taps
+    function largeSymbolIcon(svgPath, size = 40) {
+      const svg = encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>
+          <circle cx='20' cy='20' r='20' fill='rgba(17,24,39,0.15)' />
+          ${svgPath}
         </svg>`);
-        return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [28,40], iconAnchor: [14,40] });
-      };
-      const wc = ()=>{
-        const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
-          <path d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='#6b7280' stroke='rgba(0,0,0,0.2)'/>
-          <path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>
-        </svg>`);
-        return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [28,40], iconAnchor: [14,40] });
-      };
-      const tap = ()=>{
-        const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='40' height='56' viewBox='0 0 40 56'>
-          <path d='M20 2c9.39 0 17 7.61 17 17 0 12.75-17 33-17 33S3 31.75 3 19C3 9.61 10.61 2 20 2Z' fill='#0ea5e9' stroke='rgba(0,0,0,0.2)'/>
-          <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
-        </svg>`);
-        return L.icon({ iconUrl: `data:image/svg+xml;utf8,${svg}`, iconSize: [28,40], iconAnchor: [14,40] });
-      };
-      return {
-        TEE: mk('#16a34a','T'), FRONT: mk('#05b6d3','F'), MID: mk('#22c55e','M'), BACK: mk('#ef4444','B'),
-        TOILET: wc(), TAPS: tap(),
-        STAKE_WHITE: mk('#ffffff'), STAKE_RED: mk('#ef4444'), STAKE_YELLOW: mk('#fbbf24')
-      };
-    })();
+      return L.icon({
+        iconUrl: `data:image/svg+xml;utf8,${svg}`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2]
+      });
+    }
+
+    const TOILET_SVG = `
+      <rect x='8' y='8' width='24' height='24' rx='5' fill='#6b7280'/>
+      <path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>
+    `;
+    const TAP_SVG = `
+      <rect x='8' y='8' width='24' height='24' rx='5' fill='#0ea5e9'/>
+      <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
+    `;
+
+    // Icon set
+    const ICONS = {
+      // Tee (keep as a small green dot but larger than F/M/B for visibility)
+      TEE: dotIcon('#16a34a', 14),
+
+      // Front/Mid/Back small dots (Front white, Mid yellow, Back red)
+      FRONT: dotIcon('#ffffff', 12),
+      MID: dotIcon('#fbbf24', 12),
+      BACK: dotIcon('#ef4444', 12),
+
+      // Toilet / Taps: icon-only (no pin), larger
+      TOILET: largeSymbolIcon(TOILET_SVG, 44),
+      TAPS: largeSymbolIcon(TAP_SVG, 44),
+
+      // Boundary stakes: tiny dots
+      STAKE_WHITE: dotIcon('#ffffff', 10),
+      STAKE_RED: dotIcon('#ef4444', 10),
+      STAKE_YELLOW: dotIcon('#fbbf24', 10)
+    };
 
     const TOOL_ORDER = ['TEE','FRONT','MID','BACK','TOILET','TAPS','STAKE_WHITE','STAKE_RED','STAKE_YELLOW'];
 
-    // Tool buttons
+    // ---------------------------
+    // App State
+    // ---------------------------
+    let map, activeTool = 'TEE', markers = [];
+    const courseData = { meta: { name:"", id:"", pin:"", holes:18 }, holes:{} };
+
+    // ---------------------------
+    // UI: Tools
+    // ---------------------------
     const toolsEl = document.getElementById('tools');
     TOOL_ORDER.forEach(key => {
       const btn = document.createElement('button');
       btn.className = 'tool';
       btn.dataset.tool = key;
-      btn.innerHTML = `<img alt='' width='18' height='24' src='${ICONS[key].options.iconUrl}'/> <span>${key.replace('STAKE_','STAKE ')}</span>`;
+      btn.innerHTML = `<img alt='' width='18' height='18' src='${ICONS[key].options.iconUrl}'/> <span>${key.replace('STAKE_','STAKE ')}</span>`;
       btn.addEventListener('click', () => setActiveTool(key));
       toolsEl.appendChild(btn);
     });
     function setActiveTool(tool){ activeTool = tool; [...toolsEl.children].forEach(b=>b.classList.toggle('active', b.dataset.tool===tool)); }
     setActiveTool('TEE');
 
-    // Initialize Leaflet
+    // ---------------------------
+    // Map init (Satellite + Streets)
+    // ---------------------------
     function initMap(){
       const def = document.getElementById('startCenter').value.split(',').map(Number);
-      map = L.map('map', { zoomControl: true }).setView(def, 16);
-      const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '&copy; OpenStreetMap'
-      });
-      tiles.addTo(map);
+      map = L.map('map', { zoomControl: true }).setView(def, 17);
 
-      map.on('click', async (e)=>{
-        const pos = e.latlng;
-        let elevation = null;
-        if(document.getElementById('elevMode').value==='on'){
-          try{
-            const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${pos.lat},${pos.lng}`);
-            const j = await r.json();
-            elevation = Math.round(j?.results?.[0]?.elevation ?? null);
-          }catch(err){ elevation = null; }
-        }
-        addPinToHole(activeTool, pos, elevation);
-      });
+      const esriWorldImagery = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { maxZoom: 19, attribution: 'Imagery © Esri' }
+      ).addTo(map);
+
+      const osmStreets = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { maxZoom: 19, attribution: '&copy; OpenStreetMap' }
+      );
+
+      L.control.layers(
+        { 'Satellite (Esri)': esriWorldImagery, 'Streets (OSM)': osmStreets },
+        {},
+        { position: 'topright', collapsed: true }
+      ).addTo(map);
+
+      map.on('click', handleMapClick);
     }
-
     initMap();
 
-    // Data helpers
+    async function handleMapClick(e){
+      const pos = e.latlng;
+      let elevation = null;
+      if(document.getElementById('elevMode').value==='on'){
+        try{
+          const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${pos.lat},${pos.lng}`);
+          const j = await r.json();
+          elevation = Math.round(j?.results?.[0]?.elevation ?? null);
+        }catch(_){ elevation = null; }
+      }
+      addPinToHole(activeTool, pos, elevation);
+    }
+
+    // ---------------------------
+    // Data + Markers
+    // ---------------------------
+    function ensureHole(holeNo){
+      if(!courseData.holes[holeNo]) courseData.holes[holeNo] = { par: 4, stroke: 1, pins: {} };
+      return courseData.holes[holeNo];
+    }
+
     function addPinToHole(kind, position, elev){
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
       const par = parseInt(document.getElementById('holePar').value,10);
       const stroke = parseInt(document.getElementById('holeStroke').value,10);
-      if(!courseData.holes[holeNo]) courseData.holes[holeNo] = { par, stroke, pins: {} };
-      courseData.holes[holeNo].par = par; courseData.holes[holeNo].stroke = stroke;
 
-      const pin = { kind, lat: position.lat, lng: position.lng, elev_m: elev, ts: Date.now() };
+      const hole = ensureHole(holeNo);
+      hole.par = par; hole.stroke = stroke;
+
+      const pinObj = { kind, lat: position.lat, lng: position.lng, elev_m: elev, ts: Date.now() };
+
+      // Singular pins vs arrays
       const singular = ['TEE','FRONT','MID','BACK','TOILET'];
-      if(singular.includes(kind)) courseData.holes[holeNo].pins[kind] = pin;
-      else { (courseData.holes[holeNo].pins[kind] ||= []).push(pin); }
+      if(singular.includes(kind)) {
+        hole.pins[kind] = pinObj;
+      } else {
+        (hole.pins[kind] ||= []).push(pinObj);
+      }
 
+      // Render marker; store reference so dragging updates the exact object
       const marker = L.marker([position.lat, position.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
-      marker.__meta = { holeNo, kind };
-      marker.on('dragend', (ev)=>{
+      marker.__pinRef = { holeNo, kind, pinObj, index: singular.includes(kind) ? null : hole.pins[kind].length - 1 };
+      marker.on('dragend', (ev) => {
         const ll = ev.target.getLatLng();
-        if(Array.isArray(courseData.holes[holeNo].pins[kind])){
-          // update the last one (approx), in real use we’d track ids
-          const arr = courseData.holes[holeNo].pins[kind];
-          arr[arr.length-1].lat = ll.lat; arr[arr.length-1].lng = ll.lng;
-        } else if(courseData.holes[holeNo].pins[kind]){
-          courseData.holes[holeNo].pins[kind].lat = ll.lat; courseData.holes[holeNo].pins[kind].lng = ll.lng;
+        const ref = ev.target.__pinRef;
+        const h = courseData.holes[ref.holeNo];
+        if (!h) return;
+        if (Array.isArray(h.pins[ref.kind]) && ref.index != null) {
+          h.pins[ref.kind][ref.index].lat = ll.lat;
+          h.pins[ref.kind][ref.index].lng = ll.lng;
+        } else if (h.pins[ref.kind]) {
+          h.pins[ref.kind].lat = ll.lat;
+          h.pins[ref.kind].lng = ll.lng;
         }
         refreshPreview();
       });
+
       markers.push(marker);
       refreshPinsUI(); refreshPreview();
     }
 
+    function renderMarker(kind, p, holeNo, index=null){
+      const marker = L.marker([p.lat, p.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
+      marker.__pinRef = { holeNo, kind, pinObj: p, index };
+      marker.on('dragend', (ev) => {
+        const ll = ev.target.getLatLng();
+        const ref = ev.target.__pinRef;
+        const h = courseData.holes[ref.holeNo];
+        if (!h) return;
+        if (Array.isArray(h.pins[ref.kind]) && ref.index != null) {
+          h.pins[ref.kind][ref.index].lat = ll.lat;
+          h.pins[ref.kind][ref.index].lng = ll.lng;
+        } else if (h.pins[ref.kind]) {
+          h.pins[ref.kind].lat = ll.lat;
+          h.pins[ref.kind].lng = ll.lng;
+        }
+        refreshPreview();
+      });
+      markers.push(marker);
+    }
+
+    function redrawHoleMarkers(){
+      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
+      markers.forEach(m=>m.remove()); markers=[];
+      const hole = courseData.holes[holeNo]; if(!hole) { refreshPinsUI(); return; }
+      for (const [k, v] of Object.entries(hole.pins || {})) {
+        if (Array.isArray(v)) v.forEach((p,i)=>renderMarker(k,p,holeNo,i));
+        else if (v) renderMarker(k, v, holeNo, null);
+      }
+      refreshPinsUI();
+    }
+
+    // ---------------------------
+    // UI: Pins summary + JSON preview
+    // ---------------------------
     function refreshPinsUI(){
       const el = document.getElementById('currentPins'); el.innerHTML='';
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
@@ -250,29 +367,18 @@
       document.getElementById('preview').textContent = JSON.stringify({ course: sorted.meta, holes: sorted.holes }, null, 2);
     }
 
-    function redrawHoleMarkers(){
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      markers.forEach(m=>m.remove()); markers=[];
-      const hole = courseData.holes[holeNo]; if(!hole) { refreshPinsUI(); return; }
-      for(const [k,v] of Object.entries(hole.pins||{})){
-        if(Array.isArray(v)) v.forEach(p=>renderMarker(k,p,holeNo)); else if(v) renderMarker(k,v,holeNo);
-      }
-      refreshPinsUI();
-    }
-
-    function renderMarker(kind, p, holeNo){
-      const marker = L.marker([p.lat, p.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
-      marker.__meta = { holeNo, kind };
-      markers.push(marker);
-    }
-
+    // ---------------------------
+    // Buttons & Inputs
+    // ---------------------------
     document.getElementById('undoBtn').addEventListener('click', ()=>{
       // remove last marker for current hole
       for(let i=markers.length-1;i>=0;i--){
         const m = markers[i];
         const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-        if(m.__meta?.holeNo === holeNo){
-          const kind = m.__meta.kind; m.remove(); markers.splice(i,1);
+        if(m.__pinRef?.holeNo === holeNo){
+          const kind = m.__pinRef.kind;
+          const ref = m.__pinRef;
+          m.remove(); markers.splice(i,1);
           const pins = courseData.holes[holeNo]?.pins || {};
           if(Array.isArray(pins[kind])) pins[kind].pop(); else pins[kind] = undefined;
           refreshPinsUI(); refreshPreview(); break;
@@ -282,7 +388,7 @@
 
     document.getElementById('clearHole').addEventListener('click', ()=>{
       const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      markers = markers.filter(m=>{ if(m.__meta?.holeNo===holeNo){ m.remove(); return false; } return true; });
+      markers = markers.filter(m=>{ if(m.__pinRef?.holeNo===holeNo){ m.remove(); return false; } return true; });
       if(courseData.holes[holeNo]) courseData.holes[holeNo].pins = {};
       refreshPinsUI(); refreshPreview();
     });
