@@ -184,7 +184,7 @@
     <button class="bubbleBtn" id="historyBtn">History</button>
   </div>
 
-  <!-- Scorecard modal (v2) -->
+  <!-- Scorecard modal -->
   <div class="modalBack" id="scoreModal">
     <div class="modal">
       <h2 id="scoreTitle">Scorecard</h2>
@@ -247,7 +247,7 @@
     function q(name){ return new URL(location.href).searchParams.get(name); }
     function toast(msg, ms=1600){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', ms); }
 
-    // Icons (dots; toilet/taps larger)
+    // Icons
     function dotIcon(color='#ffffff', size=12){
       const r=Math.floor(size/2);
       const svg=encodeURIComponent(`<?xml version="1.0"?>
@@ -256,7 +256,7 @@
         </svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] });
     }
-    function largeSymbolIcon(svgPath, size=44){
+    function largeSymbolIcon(svgPath, size=36){
       const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
@@ -269,6 +269,15 @@
       <rect x='2' y='2' width='36' height='36' rx='8' fill='#0ea5e9'/>
       <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
     `;
+    const CART_SVG = `
+      <circle cx='20' cy='20' r='19' fill='#111' stroke='#60a5fa' stroke-width='2'/>
+      <g transform='translate(8,10)' fill='#60a5fa'>
+        <rect x='2' y='8' width='18' height='6' rx='2'></rect>
+        <rect x='6' y='4' width='10' height='4' rx='2'></rect>
+        <circle cx='6' cy='17' r='2' fill='#fff'></circle>
+        <circle cx='18' cy='17' r='2' fill='#fff'></circle>
+      </g>
+    `;
 
     const ICONS = {
       TEE: dotIcon('#16a34a', 14),
@@ -280,7 +289,7 @@
       STAKE_WHITE: dotIcon('#ffffff', 10),
       STAKE_RED: dotIcon('#ef4444', 10),
       STAKE_YELLOW: dotIcon('#fbbf24', 10),
-      CART: dotIcon('#60a5fa', 12),
+      CART: largeSymbolIcon(CART_SVG, 30),
       LAYUP: dotIcon('#ffffff', 12)
     };
 
@@ -344,7 +353,8 @@
     const state = {
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
-      layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null
+      layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
+      initialFramed:false
     };
 
     // Distance helpers
@@ -357,12 +367,12 @@
     }
     const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
-
     function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
     function labelAt(ll, text){
       const div = L.divIcon({ className:'', html:`<div style="background:#000;color:#fff;border:1px solid #ffffff22;padding:4px 6px;border-radius:10px;font-size:12px;font-weight:800;">${text}</div>` });
       return L.marker([ll.lat, ll.lng], { icon: div, interactive:false });
     }
+
     function fromPoint(pins, pref='CART'){
       if(pref==='TEE' && pins.TEE) return { lat:pins.TEE.lat, lng:pins.TEE.lng };
       return fromCart();
@@ -376,13 +386,29 @@
       if(pins.MID)   m.textContent=fmt(haversine(from, pins.MID));
       if(pins.BACK)  b.textContent=fmt(haversine(from, pins.BACK));
       $('#unitChip').textContent = state.unit;
-      updateLayupBox(); // keep layup distances in sync with unit toggles, etc.
+      updateLayupUI(); // keep layup distances/labels in sync
     }
 
     // Markers & fitting
     function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
     function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
+
+    function doHoleView(){
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
+    }
+    function doCartView(){
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      const cart = fromCart();
+      if (cart && p.BACK){ fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
+      else if (p.TEE && p.BACK){ fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); } // fallback
+    }
+    function ensureInitialFraming(){
+      if (state.initialFramed) return;
+      state.initialFramed = true;
+      doCartView();
+    }
 
     function renderHole(){
       clearMarkers();
@@ -404,38 +430,22 @@
       (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
       (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
-      const cartLL = state.cartMarker ? state.cartMarker.getLatLng() : null;
-      if (cartLL && p.BACK) { fitBetween([cartLL.lat,cartLL.lng],[p.BACK.lat,p.BACK.lng]); }
-      else if (p.TEE && p.BACK) { fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); }
-      else {
-        const latlngs = state.markers.map(m => m.getLatLng());
-        if (latlngs.length) map.fitBounds(L.latLngBounds(latlngs), { padding: [40,40] });
-      }
       updateChips(p);
-      updateLayupBox();
+      ensureInitialFraming();
+      updateLayupUI();
     }
 
     // View buttons
-    $('#holeViewBtn').addEventListener('click', ()=>{
-      const p = state.course.holes[String(state.hole)]?.pins || {};
-      const cartLL = state.cartMarker ? state.cartMarker.getLatLng() : null;
-      if (cartLL && p.BACK) { fitBetween([cartLL.lat,cartLL.lng],[p.BACK.lat,p.BACK.lng]); }
-      else if (p.TEE && p.BACK) { fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); }
-    });
-    $('#cartViewBtn').addEventListener('click', ()=>{
-      const p = state.course.holes[String(state.hole)]?.pins || {};
-      if (!p.BACK || !state.cartMarker) return;
-      const ll = state.cartMarker.getLatLng();
-      fitBetween([ll.lat,ll.lng],[p.BACK.lat,p.BACK.lng]);
-    });
+    $('#holeViewBtn').addEventListener('click', doHoleView);
+    $('#cartViewBtn').addEventListener('click', doCartView);
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
-      const min=1; state.hole=Math.max(min, state.hole-1); renderHole();
+      const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole();
     });
     $('#nextHole').addEventListener('click', ()=>{
       const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
-      state.hole=Math.min(max||state.hole+1, state.hole+1); renderHole();
+      state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole();
     });
 
     // Units
@@ -452,6 +462,7 @@
     function updateCartAndChips(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
+      updateLayupUI();
     }
     if (navigator.geolocation){
       navigator.geolocation.watchPosition((pos)=>{
@@ -462,38 +473,60 @@
       }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
     }
 
-    // LAYUP: click map to drop a layup marker + distances CART→Layup and Layup→MID
+    // LAYUP with lines and labels (works even without GPS by falling back to TEE)
+    function clearLayupGraphics(){
+      if (state.layupSolid){ state.layupSolid.remove(); state.layupSolid=null; }
+      if (state.layupDash){ state.layupDash.remove(); state.layupDash=null; }
+      if (state.layupLabel1){ state.layupLabel1.remove(); state.layupLabel1=null; }
+      if (state.layupLabel2){ state.layupLabel2.remove(); state.layupLabel2=null; }
+    }
+    function updateLayupUI(){
+      const box = $('#layupBox');
+      const text = $('#layupText');
+      const h = state.course?.holes?.[String(state.hole)];
+      const p = h?.pins || {};
+      const mid = p.MID || null;
+
+      clearLayupGraphics();
+      if (!state.layupMarker){ box.style.display='none'; return; }
+
+      const ll = state.layupMarker.getLatLng();
+      const P = { lat: ll.lat, lng: ll.lng };
+
+      let cartSrc = fromCart();
+      if (!cartSrc && p.TEE) cartSrc = { lat:p.TEE.lat, lng:p.TEE.lng }; // fallback when GPS not available
+
+      let cartDist = '—', midDist = '—';
+      if (cartSrc){
+        cartDist = fmt(haversine(cartSrc, P));
+        state.layupSolid = L.polyline([[cartSrc.lat,cartSrc.lng],[P.lat,P.lng]], { color:'#fff', weight:3, opacity:1 }).addTo(map);
+        state.layupLabel1 = labelAt(midPoint(cartSrc,P), `${cartDist} ${state.unit}`).addTo(map);
+      }
+      if (mid){
+        midDist  = fmt(haversine(P, mid));
+        state.layupDash = L.polyline([[P.lat,P.lng],[mid.lat,mid.lng]], { color:'#fff', weight:3, opacity:1, dashArray:'6,6' }).addTo(map);
+        state.layupLabel2 = labelAt(midPoint(P,mid), `${midDist} ${state.unit}`).addTo(map);
+      }
+
+      text.textContent = `Layup: CART→P ${cartDist} ${state.unit}   •   P→MID ${midDist} ${state.unit}`;
+      box.style.display='grid';
+    }
     map.on('click', (e)=>{
       const { lat, lng } = e.latlng;
       if (state.layupMarker) state.layupMarker.remove();
       state.layupMarker = L.marker([lat,lng], { icon: ICONS.LAYUP, title:'LAYUP' }).addTo(map);
-      updateLayupBox();
+      updateLayupUI();
     });
-    function updateLayupBox(){
-      const box = $('#layupBox');
-      const text = $('#layupText');
-      const h = state.course?.holes?.[String(state.hole)];
-      const mid = h?.pins?.MID || null;
-      if (!state.layupMarker){ box.style.display='none'; return; }
-      const ll = state.layupMarker.getLatLng();
-      const P = { lat: ll.lat, lng: ll.lng };
-      let cartDist = '—', midDist = '—';
-      const cart = fromCart();
-      if (cart) cartDist = fmt(haversine(cart, P));
-      if (mid)  midDist  = fmt(haversine(P, mid));
-      text.textContent = `Layup: CART→P ${cartDist} ${state.unit}   •   P→MID ${midDist} ${state.unit}`;
-      box.style.display='grid';
-    }
     $('#clearLayupBtn').addEventListener('click', ()=>{
       if (state.layupMarker){ state.layupMarker.remove(); state.layupMarker=null; }
-      updateLayupBox();
+      clearLayupGraphics();
+      updateLayupUI();
     });
 
-    // ---------- Scorecard v2 (players, handicaps, stableford) ----------
+    // ---------- Scorecard (classic) ----------
     function scoreKey(){ return `score_${state.course?.course?.id || state.meta?.id || 'course'}`; }
     function histKey(){ return `history_${state.course?.course?.id || state.meta?.id || 'course'}`; }
 
-    // Build players setup inputs
     function rebuildPlayersGrid(){
       const grid = $('#playersGrid');
       const count = parseInt($('#playerCount').value,10);
@@ -512,10 +545,7 @@
     }
     $('#playerCount').addEventListener('change', rebuildPlayersGrid);
 
-    // Stableford calculation helpers
     function strokesReceived(hcap, holeStrokeIndex){
-      // Allocate 1 stroke to every hole up to hcap; 2nd stroke to the hardest (hcap-18), etc.
-      // Implementation: number of strokes on this hole = floor(hcap/18) + ( (holeStrokeIndex <= (hcap % 18)) ? 1 : 0 )
       const base = Math.floor(hcap / 18);
       const rem = hcap % 18;
       return base + (holeStrokeIndex <= rem ? 1 : 0);
@@ -523,52 +553,99 @@
     function stablefordPoints(par, gross, recv){
       if (!Number.isFinite(par) || !Number.isFinite(gross)) return 0;
       const net = gross - (recv||0);
-      const diff = net - par; // net vs par
-      // Standard Stableford: dbl bogey or worse=0, bogey=1, par=2, birdie=3, eagle=4, albatross=5
+      const diff = net - par;
       if (diff >= 2) return 0;
       if (diff === 1) return 1;
       if (diff === 0) return 2;
       if (diff === -1) return 3;
       if (diff === -2) return 4;
-      return 5; // <= -3
+      return 5;
     }
 
-    // Build scorecard table
     function buildScoreTable(players, useHcaps){
       const holes = state.course?.holes || {};
       const ordered = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
+      const front9 = ordered.filter(n => n <= 9);
+      const back9  = ordered.filter(n => n > 9);
       const tbl = $('#scoreTable');
-      let html = '<tr><th>Hole</th>';
-      ordered.forEach(n=> html += `<th>${n}</th>`);
-      html += '</tr><tr><th>Par</th>';
-      ordered.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += '</tr><tr><th>Stroke</th>';
-      ordered.forEach(n=> html += `<td>${holes[n]?.stroke ?? ''}</td>`);
-      html += '</tr>';
+
+      let html = '<tr><th style="text-align:left;padding-left:12px;">Player</th>';
+      front9.forEach(n=> html += `<th>${n}</th>`);
+      html += `<th>OUT</th>`;
+      back9.forEach(n=> html += `<th>${n}</th>`);
+      html += `<th>IN</th><th>TOTAL</th><th>NET</th><th>PTS</th></tr>`;
+
+      html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
+      front9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
+      html += `<td>–</td>`;
+      back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
+      html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
 
       players.forEach((p, idx)=>{
-        html += `<tr><th>${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
-        ordered.forEach(n=>{
-          html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" value=""></td>`;
-        });
-        html += '</tr>';
+        html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
+        front9.forEach(n=>{ html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric"></td>`; });
+        html += `<td class="outCell" data-player="${idx}">0</td>`;
+        back9.forEach(n=>{ html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric"></td>`; });
+        html += `<td class="inCell" data-player="${idx}">0</td>`;
+        html += `<td class="totCell" data-player="${idx}">0</td>`;
+        html += `<td class="netCell" data-player="${idx}">0</td>`;
+        html += `<td class="ptsCell" data-player="${idx}">0</td>`;
+        html += `</tr>`;
       });
 
-      // Totals rows placeholders
-      html += '<tr><th>Gross</th>' + ordered.map(()=>'<td class="grossCell">–</td>').join('') + '</tr>';
-      html += '<tr><th>Net</th>'   + ordered.map(()=>'<td class="netCell">–</td>').join('')   + '</tr>';
-      html += '<tr><th>Points</th>'+ ordered.map(()=>'<td class="ptsCell">–</td>').join('')   + '</tr>';
-
       tbl.innerHTML = html;
+      $$('#scoreTable input.strokes').forEach(inp=>{
+        inp.addEventListener('input', ()=>recalcLive(players, useHcaps));
+      });
     }
 
-    // Recalc totals display (per hole per player -> we show final totals on Save; inline cells keep dashes)
+    function recalcLive(players, useHcaps){
+      const holes = state.course?.holes || {};
+      const ordered = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
+      const front9 = ordered.filter(n => n <= 9);
+      const back9  = ordered.filter(n => n > 9);
+
+      const agg = players.map(p => ({ gross:0, net:0, points:0, out:0, inn:0 }));
+
+      $$('#scoreTable input.strokes').forEach(inp=>{
+        const playerIdx = parseInt(inp.dataset.player,10);
+        const holeNo = parseInt(inp.dataset.hole,10);
+        const v = parseInt(inp.value,10);
+        if (!Number.isFinite(v)) return;
+        const par = holes[holeNo]?.par ?? null;
+        const strokeIdx = holes[holeNo]?.stroke ?? null;
+        const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, strokeIdx||18) : 0;
+        const pts = stablefordPoints(par, v, recv);
+
+        agg[playerIdx].gross += v;
+        agg[playerIdx].net   += (Number.isFinite(v - recv) ? (v - recv) : 0);
+        agg[playerIdx].points+= pts;
+        if (front9.includes(holeNo)) agg[playerIdx].out += v;
+        else agg[playerIdx].inn += v;
+      });
+
+      agg.forEach((a, idx)=>{
+        const outCell = document.querySelector(`.outCell[data-player="${idx}"]`);
+        const inCell  = document.querySelector(`.inCell[data-player="${idx}"]`);
+        const totCell = document.querySelector(`.totCell[data-player="${idx}"]`);
+        const netCell = document.querySelector(`.netCell[data-player="${idx}"]`);
+        const ptsCell = document.querySelector(`.ptsCell[data-player="${idx}"]`);
+        if (outCell) outCell.textContent = a.out || 0;
+        if (inCell)  inCell.textContent  = a.inn || 0;
+        if (totCell) totCell.textContent = (a.out + a.inn) || 0;
+        if (netCell) netCell.textContent = a.net || 0;
+        if (ptsCell) ptsCell.textContent = a.points || 0;
+      });
+    }
+
     function collectRound(players, useHcaps){
       const holes = state.course?.holes || {};
       const ordered = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
-      // Prepare structure per player
-      const round = players.map(p => ({ name:p.name, hcap:p.hcap, gross:0, net:0, points:0 }));
-      // Sum across holes
+      const front9 = ordered.filter(n => n <= 9);
+      const back9  = ordered.filter(n => n > 9);
+
+      const round = players.map(p => ({ name:p.name, hcap:p.hcap, gross:0, net:0, points:0, out:0, inn:0 }));
+
       $$('#scoreTable input.strokes').forEach(inp=>{
         const playerIdx = parseInt(inp.dataset.player,10);
         const holeNo = parseInt(inp.dataset.hole,10);
@@ -577,17 +654,17 @@
         const par = holes[holeNo]?.par ?? null;
         const strokeIdx = holes[holeNo]?.stroke ?? null;
         const recv = useHcaps ? strokesReceived(round[playerIdx].hcap, strokeIdx||18) : 0;
-        const net = v - recv;
         const pts = stablefordPoints(par, v, recv);
         round[playerIdx].gross += v;
-        round[playerIdx].net   += Number.isFinite(net) ? net : 0;
+        round[playerIdx].net   += Number.isFinite(v - recv) ? (v - recv) : 0;
         round[playerIdx].points+= pts;
+        if (front9.includes(holeNo)) round[playerIdx].out += v;
+        else round[playerIdx].inn += v;
       });
       return round;
     }
 
     function openScore(){
-      // Setup UI
       $('#scoreTitle').textContent = `Scorecard — ${state.course?.course?.name || 'Course'}`;
       $('#scoreSetup').style.display = 'block';
       $('#scoreBody').style.display  = 'none';
@@ -608,12 +685,9 @@
         if (!Number.isFinite(hcap) || hcap<0) hcap = 0;
         ps.push({ name, hcap });
       }
-      // Build table
       buildScoreTable(ps, useH);
-      // Persist current setup for save
       $('#scoreBody').dataset.players = JSON.stringify(ps);
       $('#scoreBody').dataset.useH = useH ? '1' : '0';
-      // Show table
       $('#scoreSetup').style.display = 'none';
       $('#scoreBody').style.display  = 'block';
     });
@@ -629,7 +703,7 @@
         id    : state.course?.course?.id   || state.meta?.id || 'course',
         ts    : Date.now(),
         useHandicaps: useH,
-        players: results // [{name,hcap,gross,net,points}]
+        players: results
       };
       const key = histKey();
       const arr = JSON.parse(localStorage.getItem(key) || '[]');
@@ -648,9 +722,11 @@
         const out = arr.map(r=>{
           const dt = new Date(r.ts).toLocaleString();
           const rows = r.players.map(p=>`
-            <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:10px;">
+            <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;">
               <div><strong>${p.name}</strong>${r.useHandicaps?` <span style="color:#9ca3af;">(H${p.hcap})</span>`:''}</div>
-              <div>Gross: <strong>${p.gross}</strong></div>
+              <div>Out: <strong>${p.out||0}</strong></div>
+              <div>In: <strong>${p.inn||0}</strong></div>
+              <div>Total: <strong>${(p.out||0)+(p.inn||0)}</strong></div>
               <div>Net: <strong>${p.net}</strong></div>
               <div>Pts: <strong>${p.points}</strong></div>
             </div>
@@ -700,4 +776,4 @@
     })();
   </script>
 </body>
-</html> 
+</html>
