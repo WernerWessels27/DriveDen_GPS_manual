@@ -5,13 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TrackLinq Mapper</title>
 
-  <!-- Leaflet core -->
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
-  <!-- Leaflet.draw for polygon & freehand shapes -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
   <style>
     :root{
@@ -32,7 +28,7 @@
     .row4 { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
     .row > * , .row3 > *, .row4 > * { width:100%; }
 
-    input, select, button, textarea {
+    input, select, button {
       border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:#fff; color:var(--text);
     }
     button { cursor:pointer; font-weight:800; }
@@ -46,9 +42,10 @@
     .muted { color:var(--muted); font-size:12px; }
 
     .saveRow { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .nogobar { display:none; gap:8px; margin-top:8px; }
+    .nogobar.show { display:flex; flex-wrap:wrap; }
 
-    /* Drawn polygon style */
-    .no-go { color:#ef4444; fill:#ef4444; fill-opacity:0.25; stroke:#ef4444; }
+    .status { margin-top:8px; font-size:12px; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -113,7 +110,15 @@
       <div class="tool" data-tool="MOVE"><span>✥</span><span>Move/Select</span></div>
       <div class="tool" data-tool="ERASE"><span>🗑️</span><span>Erase</span></div>
     </div>
-    <div class="muted" style="margin-top:6px;">Click a tool, then click the map to place. For <strong>No‑Go Zone</strong>, draw a polygon.</div>
+    <div class="muted" style="margin-top:6px;">
+      Click a tool, then click the map to place. For <strong>No‑Go Zone</strong>, click to add vertices, then double‑click or press “Finish Zone” to complete.
+    </div>
+
+    <div class="nogobar" id="nogobar">
+      <button id="finishNoGo">Finish Zone</button>
+      <button id="undoNoGo">Undo Point</button>
+      <button id="cancelNoGo">Cancel Zone</button>
+    </div>
 
     <div class="saveRow">
       <button id="saveHole">Save Hole</button>
@@ -122,18 +127,18 @@
       <button id="loadLocal">Load Saved (Local)</button>
       <button id="saveLocal">Save (Local)</button>
     </div>
-    <div id="status" class="muted" style="margin-top:6px;"></div>
+    <div id="status" class="status"></div>
   </div>
 
   <script>
-    // --- Map & Icons ---
+    // --- Map & Tiles ---
     const map = L.map('map', { zoomControl:true, attributionControl:false }).setView([-25.746, 28.229], 17);
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 20 }
     ).addTo(map);
 
-    // Small, clean dots (no border)
+    // --- Icon Helpers ---
     function dotIcon(color='#ffffff', size=10){
       const r=Math.floor(size/2);
       const svg=encodeURIComponent(`<?xml version="1.0"?>
@@ -143,19 +148,26 @@
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] });
     }
 
-    function flagMidIcon(size=18){
-      // Yellow dot with a small flagstick
+    // Emoji icons for taps/toilet that look exactly like the toolbar previews
+    function emojiIcon(char='🚻', size=22){
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>
+          <text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='${size*0.9}px'>${char}</text>
+        </svg>`);
+      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
+    }
+
+    function flagMidIcon(size=30){
       const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24'>
           <circle cx='12' cy='12' r='5' fill='#fbbf24'/>
-          <rect x='11.5' y='4' width='1' height='8' fill='#374151'/>
-          <path d='M12 5 L17 7 L12 9 Z' fill='#16a34a'/>
+          <rect x='11.5' y='3' width='1' height='10' fill='#374151'/>
+          <path d='M12 4 L18 7 L12 10 Z' fill='#16a34a'/>
         </svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[12,12] });
     }
 
     function teeIcon(size=18){
-      // Simple tee marker icon
       const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24'>
           <circle cx='12' cy='8' r='4' fill='#16a34a'/>
@@ -164,47 +176,22 @@
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[12,12] });
     }
 
-    function smallSymbol(svgPath,size=18){
-      const svg=encodeURIComponent(`<?xml version="1.0"?>
-        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24'>${svgPath}</svg>`);
-      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[12,12] });
-    }
-    const TOILET_SVG = `<rect x='3' y='3' width='18' height='18' rx='4' fill='#6b7280'/><path d='M8 16h2l1-5 1 5h2l-2-8h-2l-2 8Zm6 0h2v-3h2v3h2V8h-2v3h-2V8h-2v8Z' fill='white'/>`;
-    const TAP_SVG = `<rect x='3' y='3' width='18' height='18' rx='4' fill='#0ea5e9'/><path d='M6 11h6V9h2V7h6v2h-5v2h-3v3h3v2H9v-2h2v-3H6v-2Z' fill='white'/>`;
-
     const ICONS = {
       TEE: teeIcon(18),
-      FRONT: dotIcon('#ffffff', 10),
-      MID: flagMidIcon(18),
-      BACK: dotIcon('#ef4444', 10),
-      TOILET: smallSymbol(TOILET_SVG, 18),
-      TAPS: smallSymbol(TAP_SVG, 18),
+      FRONT: dotIcon('#ffffff', 8),
+      MID: flagMidIcon(34),        // larger for visibility when viewing entire hole
+      BACK: dotIcon('#ef4444', 8),
+      TOILET: emojiIcon('🚻', 22), // same style as toolbar
+      TAPS: emojiIcon('🚰', 22),   // same style as toolbar
       STAKE_WHITE: dotIcon('#ffffff', 6),
       STAKE_RED: dotIcon('#ef4444', 6),
       STAKE_YELLOW: dotIcon('#fbbf24', 6)
     };
 
-    // Draw layer for no-go zones
-    const drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    const drawControl = new L.Control.Draw({
-      draw: {
-        polygon: {
-          shapeOptions: { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.25, className:'no-go' }
-        },
-        polyline: false, rectangle: false, circle: false, circlemarker: false, marker: false
-      },
-      edit: { featureGroup: drawnItems, edit: true, remove: true }
-    });
-
-    // We'll toggle this control only when NO_GO tool is active.
-    let drawAdded = false;
-
     // --- State ---
     const $ = sel => document.querySelector(sel);
     const $$ = sel => document.querySelectorAll(sel);
-    const status = msg => { const s=$('#status'); s.textContent=msg; };
+    const status = msg => { $('#status').textContent = msg || ''; };
 
     const state = {
       course: {
@@ -214,8 +201,10 @@
       holeCount: 18,
       hole: 1,
       tool: 'MOVE',
-      markers: [], // live markers per hole for edit
-      stakes: { STAKE_WHITE:[], STAKE_RED:[], STAKE_YELLOW:[] } // temp edit arrays
+      markers: [],
+      drawingNoGo: false,
+      currentNoGoPts: [],
+      currentNoGoLayer: null,
     };
 
     // --- UI Init ---
@@ -248,21 +237,30 @@
       t.addEventListener('click', ()=>{
         $$('#tools .tool').forEach(x=>x.classList.remove('active'));
         t.classList.add('active');
-        state.tool = t.dataset.tool;
-        // Toggle draw controls
-        if (state.tool==='NO_GO'){
-          if (!drawAdded){ map.addControl(drawControl); drawAdded=true; }
-        } else {
-          if (drawAdded){ map.removeControl(drawControl); drawAdded=false; }
-        }
+        setTool(t.dataset.tool);
       });
     });
-    // Default active tool
     document.querySelector('[data-tool="MOVE"]').classList.add('active');
+
+    function setTool(tool){
+      // finalize/cancel any in-progress no-go
+      if (state.drawingNoGo) cancelNoGo();
+      state.tool = tool;
+      if (tool==='NO_GO'){
+        $('#nogobar').classList.add('show');
+        map.dragging.disable();
+        map.doubleClickZoom.disable();
+        status('No-Go: click to add points; double-click or "Finish Zone" to complete.');
+      } else {
+        $('#nogobar').classList.remove('show');
+        map.dragging.enable();
+        map.doubleClickZoom.enable();
+        status('');
+      }
+    }
 
     // --- Elevation helper ---
     async function fetchElevation(lat,lng){
-      // Online call to free API. If it fails, return null (we still save lat/lng).
       try{
         const r = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`);
         const j = await r.json();
@@ -271,10 +269,18 @@
       }catch(_){ return null; }
     }
 
-    // --- Map click behavior ---
+    // --- Map Clicks ---
     map.on('click', async (e)=>{
       const { lat, lng } = e.latlng;
       const tool = state.tool;
+
+      if (tool==='NO_GO'){
+        state.drawingNoGo = true;
+        state.currentNoGoPts.push([lat,lng]);
+        drawNoGoPreview();
+        return;
+      }
+
       if (tool==='MOVE' || tool==='ERASE') return;
 
       const ele = await fetchElevation(lat, lng);
@@ -312,18 +318,58 @@
       status(`${tool} placed at ${lat.toFixed(6)}, ${lng.toFixed(6)}${Number.isFinite(ele)?' • Elev '+ele+'m':''}`);
     });
 
-    map.on(L.Draw.Event.CREATED, function (event) {
-      if (state.tool!=='NO_GO') return;
-      const layer = event.layer;
-      drawnItems.addLayer(layer);
-      // Save polygon to hole pins as NO_GO (array of polygons; each polygon is array of latlng objects)
-      const latlngs = layer.getLatLngs()[0] || [];
-      const poly = latlngs.map(pt => ({ lat: pt.lat, lng: pt.lng }));
+    // Double-click to finish no-go
+    map.on('dblclick', (e)=>{
+      if (state.tool==='NO_GO' && state.drawingNoGo && state.currentNoGoPts.length>=3){
+        finishNoGo();
+      }
+    });
+
+    function drawNoGoPreview(){
+      if (state.currentNoGoLayer) { map.removeLayer(state.currentNoGoLayer); }
+      const pts = state.currentNoGoPts.map(([la,ln])=> L.latLng(la,ln));
+      if (pts.length < 2){
+        state.currentNoGoLayer = L.polyline(pts, { color:'#ef4444', weight:2, dashArray:'4,4' }).addTo(map);
+      } else if (pts.length === 2){
+        state.currentNoGoLayer = L.polyline(pts, { color:'#ef4444', weight:2, dashArray:'4,4' }).addTo(map);
+      } else {
+        state.currentNoGoLayer = L.polygon(pts, { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.22 }).addTo(map);
+      }
+    }
+
+    function finishNoGo(){
       const pins = getHolePins();
       pins.NO_GO = pins.NO_GO || [];
+      const poly = state.currentNoGoPts.map(([lat,lng])=>({lat,lng}));
       pins.NO_GO.push(poly);
-      status(`No-Go zone added with ${poly.length} points`);
+      const layer = L.polygon(poly.map(p=>[p.lat,p.lng]), { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.22 });
+      layer.addTo(map);
+      if (state.currentNoGoLayer){ map.removeLayer(state.currentNoGoLayer); }
+      state.currentNoGoLayer = null;
+      state.currentNoGoPts = [];
+      state.drawingNoGo = false;
+      status('No-Go zone saved');
+    }
+
+    function undoNoGo(){
+      if (!state.currentNoGoPts.length) return;
+      state.currentNoGoPts.pop();
+      drawNoGoPreview();
+    }
+
+    function cancelNoGo(){
+      if (state.currentNoGoLayer){ map.removeLayer(state.currentNoGoLayer); }
+      state.currentNoGoLayer = null;
+      state.currentNoGoPts = [];
+      state.drawingNoGo = false;
+      status('No-Go zone cancelled');
+    }
+
+    $('#finishNoGo').addEventListener('click', ()=>{
+      if (state.currentNoGoPts.length>=3) finishNoGo();
     });
+    $('#undoNoGo').addEventListener('click', undoNoGo);
+    $('#cancelNoGo').addEventListener('click', cancelNoGo);
 
     // --- Marker helpers ---
     function clearLiveMarkers(){
@@ -331,7 +377,7 @@
         try { map.removeLayer(m.layer); } catch{}
       });
       state.markers.length = 0;
-      drawnItems.clearLayers();
+      // Polygons are left; they get handled in loadHoleToUI
     }
 
     function addMarker(icon, pos, title, unique=false, listKey=null, listIndex=null){
@@ -393,30 +439,31 @@
 
     function loadHoleToUI(){
       clearLiveMarkers();
+      // remove polygons (keep baselayer)
+      map.eachLayer(l => {
+        if (l instanceof L.Polygon && !l._url) { try{ map.removeLayer(l); }catch{} }
+      });
+
       const hKey = String(state.hole);
       const h = state.course.holes[hKey];
       $('#holePar').value = h?.par ?? 4;
       $('#holeStroke').value = h?.stroke ?? 1;
       const p = h?.pins || {};
 
-      // Unique markers
       if (p.TEE)   addMarker(ICONS.TEE, p.TEE, 'TEE', true);
       if (p.FRONT) addMarker(ICONS.FRONT, p.FRONT, 'FRONT', true);
       if (p.MID)   addMarker(ICONS.MID, p.MID, 'MID', true);
       if (p.BACK)  addMarker(ICONS.BACK, p.BACK, 'BACK', true);
       if (p.TOILET) addMarker(ICONS.TOILET, p.TOILET, 'Toilet', true);
-
-      // Lists
       (p.TAPS || []).forEach((obj, i)=> addMarker(ICONS.TAPS, obj, 'Tap', false, 'TAPS', i));
       (p.STAKE_WHITE || []).forEach((obj, i)=> addMarker(ICONS.STAKE_WHITE, obj, 'Stake White', false, 'STAKE_WHITE', i));
       (p.STAKE_RED || []).forEach((obj, i)=> addMarker(ICONS.STAKE_RED, obj, 'Stake Red', false, 'STAKE_RED', i));
       (p.STAKE_YELLOW || []).forEach((obj, i)=> addMarker(ICONS.STAKE_YELLOW, obj, 'Stake Yellow', false, 'STAKE_YELLOW', i));
 
-      // No-go polygons
+      // Recreate saved no-go zones
       (p.NO_GO || []).forEach(poly => {
         const latlngs = poly.map(pt => L.latLng(pt.lat, pt.lng));
-        const layer = L.polygon(latlngs, { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.25, className:'no-go' });
-        drawnItems.addLayer(layer);
+        L.polygon(latlngs, { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.22 }).addTo(map);
       });
     }
 
@@ -483,28 +530,16 @@
       }
     });
 
-    // Fit map to current hole markers
-    function fitToHole(){
+    // Fit map to current hole markers on first ready (if any)
+    map.whenReady(()=> setTimeout(()=>{
       const h = state.course.holes[String(state.hole)];
-      const pins = h?.pins || {};
-      const list = [];
-      ['TEE','FRONT','MID','BACK','TOILET'].forEach(k=>{ if(pins[k]) list.push([pins[k].lat,pins[k].lng]); });
-      (pins.TAPS||[]).forEach(t=> list.push([t.lat,t.lng]));
-      (pins.STAKE_WHITE||[]).forEach(t=> list.push([t.lat,t.lng]));
-      (pins.STAKE_RED||[]).forEach(t=> list.push([t.lat,t.lng]));
-      (pins.STAKE_YELLOW||[]).forEach(t=> list.push([t.lat,t.lng]));
-      if (list.length){
-        map.fitBounds(L.latLngBounds(list), { padding:[40,40] });
+      if (h && h.pins){
+        const list = [];
+        ['TEE','FRONT','MID','BACK','TOILET'].forEach(k=>{ if(h.pins[k]) list.push([h.pins[k].lat,h.pins[k].lng]); });
+        (h.pins.TAPS||[]).forEach(t=> list.push([t.lat,t.lng]));
+        if (list.length){ map.fitBounds(L.latLngBounds(list), { padding:[40,40] }); }
       }
-    }
-
-    // Update course meta live
-    ['#courseId','#courseName','#coursePin'].forEach(sel=>{
-      $(sel).addEventListener('input', ()=> collectCourse());
-    });
-
-    // After any load, try to fit
-    map.whenReady(()=> setTimeout(fitToHole, 300));
+    }, 300));
   </script>
 </body>
 </html>
