@@ -1,546 +1,554 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TrackLinq GPS (Oriented)</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>TrackLinq GPS</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <style>
-    :root{--bg:#0c0c0c;--panel:#141414;--line:#2a2a2a;--accent:#01d28e;--muted:#a9a9a9}
-    *{box-sizing:border-box}
-    body{margin:0;background:#0b0b0b;color:#eee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;display:grid;grid-template-rows:auto 1fr;min-height:100dvh}
-    header{background:#141414;border-bottom:1px solid #2a2a2a;position:sticky;top:0;z-index:30}
-    .bar{display:flex;gap:10px;align-items:center;padding:10px 12px}
-    .title{font-weight:800}
-    .chip{border:1px solid #2a2a2a;background:#000;color:#fff;border-radius:999px;padding:4px 10px;font-size:12px}
-    .btn{border:1px solid #2a2a2a;background:#0e0e0e;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
-    .btn.primary{background:var(--accent);color:#0b1612;border-color:var(--accent);font-weight:800}
-    .spacer{flex:1}
-    main{display:grid;grid-template-columns:1fr 420px;gap:10px;padding:10px}
-    #mapWrap{position:relative}
-    #map{width:100%;height:68vh;border:1px solid #2a2a2a;border-radius:14px;overflow:hidden}
-    #orientCanvas{position:absolute;left:0;top:0;width:100%;height:68vh;pointer-events:auto;display:none}
-    #hint{position:absolute;left:10px;bottom:10px;z-index:10;background:#000;border:1px solid #2a2a2a;border-radius:10px;padding:6px 10px;font-size:12px;color:#ddd}
-    aside{background:#121212;border:1px solid #2a2a2a;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:10px;overflow:auto}
-    h3{margin:6px 0 8px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:#c8c8c8}
-    .muted{color:#a9a9a9;font-size:12px}
-    table{width:100%;border-collapse:collapse;font-size:12px}
-    th,td{border-bottom:1px solid #2a2a2a;padding:6px;text-align:center}
-    th.sticky{position:sticky;top:0;background:#151515;z-index:2}
-    .small{width:60px;padding:6px 8px;border-radius:8px;background:#0f0f0f;border:1px solid #333;color:#fff}
-    .name{width:140px}
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    @media (max-width:1100px){main{grid-template-columns:1fr} #map{height:56vh} #orientCanvas{height:56vh}}
-    .bubble{background:#000;border:1px solid #262626;color:#fff;padding:4px 8px;border-radius:10px;font-size:12px;white-space:nowrap}
+    :root{ --black:#000; --white:#fff; --border:#ffffff22; --green:#16a34a; --yellow:#fbbf24; --red:#ef4444; --blue:#0ea5e9; --gray:#6b7280; }
+    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
+    #map { width: 100%; height: 100%; }
+
+    /* Top full-width course banner */
+    .banner { position:absolute; top:0; left:0; right:0; z-index:1100; background:var(--black); color:var(--white);
+      border-bottom:1px solid var(--border); display:grid; grid-template-columns:80px 1fr 80px; align-items:center; padding:8px 10px; }
+    .banner h1 { margin:0; text-align:center; font-size:16px; font-weight:800; }
+    .exitBtn { cursor:pointer; padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:#111; color:#fff; font-weight:800; }
+
+    /* Hole bar with spacing below banner */
+    .holeBar { position:absolute; top:56px; left:50%; transform:translateX(-50%); z-index:1050; display:inline-flex; align-items:center; gap:10px;
+      background:var(--black); color:#fff; border:1px solid var(--border); padding:6px 10px; border-radius:12px; font-weight:800; }
+    .holeBtn { cursor:pointer; padding:4px 8px; border-radius:8px; border:1px solid var(--border); background:#111; color:#fff; font-weight:800; }
+
+    /* Distances (top-left) stacked vertical, MID larger; unit toggle here */
+    .distStack { position:absolute; top:112px; left:12px; z-index:1050; display:grid; gap:8px; min-width:160px; }
+    .chipV { display:grid; grid-template-columns:14px 1fr auto; align-items:center; gap:8px; padding:10px 12px; border-radius:14px;
+      background:var(--black); border:1px solid var(--border); color:#fff; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .midTxt { font-size:18px; font-weight:900; }
+    .smallTxt { font-size:12px; font-weight:700; }
+    .unitToggle { display:inline-flex; align-items:center; gap:6px; padding:8px 10px; border-radius:999px; background:var(--black);
+      border:1px solid var(--border); color:#fff; font-weight:800; cursor:pointer; width:max-content; }
+
+    /* Layup info chip */
+    .layupBox { display:none; grid-template-columns:1fr auto; align-items:center; gap:8px; padding:8px 10px; border-radius:12px; background:var(--black); color:#fff; border:1px solid var(--border); }
+    .clearLayupBtn { cursor:pointer; padding:6px 10px; border-radius:10px; background:#111; color:#fff; border:1px solid var(--border); }
+
+    /* Bottom-left stacked view icons */
+    .viewIcons { position:absolute; left:12px; bottom:12px; z-index:1050; display:grid; gap:8px; }
+    .viewBtn { width:52px; height:52px; display:grid; place-items:center; border-radius:14px; background:var(--black); border:1px solid var(--border); color:#fff; cursor:pointer; font-size:24px; user-select:none; }
+    .viewBtn:active { transform: translateY(1px); }
+
+    /* Bottom-center bubbles */
+    .bottomBubbles { position:absolute; left:50%; transform:translateX(-50%); bottom:12px; z-index:1050; display:flex; gap:10px; }
+    .bubbleBtn { cursor:pointer; padding:10px 14px; border-radius:999px; background:var(--black); border:1px solid var(--border); color:#fff; font-weight:800; }
+
+    /* Modals */
+    .modalBack { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; place-items:center; z-index:1200; }
+    .modal { width:min(92vw, 960px); max-height:84vh; overflow:auto; background:#0b0b0b; color:#fff; border:1px solid var(--border); border-radius:16px; padding:14px; }
+    .modal h2 { margin:0 0 10px; font-size:18px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px; border-bottom:1px solid #1f2937; text-align:center; color:#fff; }
+    .modalActions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+    .btn { cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:#111; color:#fff; font-weight:800; }
+    .btn.green { background:#14532d; border-color:#166534; }
+    .btn.red { background:#3f1b1b; border-color:#7f1d1d; }
+    input.nameInp, input.hcapInp, input.strokes { width:70px; padding:6px; border-radius:8px; border:1px solid #374151; background:#111; color:#fff; text-align:center; }
+
+    /* Hide Leaflet UI */
+    .leaflet-control-container { display:none !important; }
+    .leaflet-bottom.leaflet-right { display:none !important; }
+
+    /* Distance labels for layup lines */
+    .distLabel { background:#000; color:#fff; border:1px solid var(--border); padding:4px 6px; border-radius:10px; font-size:12px; font-weight:800; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="bar">
-      <div class="title" id="courseTitle">TrackLinq GPS</div>
-      <div class="chip" id="holeChip">Hole –</div>
-      <div class="spacer"></div>
-      <button class="btn" id="toggleOrient" title="Switch between Map and Oriented View">Oriented View: OFF</button>
-      <button class="btn" id="clearLayup">Clear layup</button>
-      <button class="btn" id="prevHole">◀</button>
-      <button class="btn" id="nextHole">▶</button>
-      <button class="btn primary" id="saveRound">Save</button>
-    </div>
-  </header>
+  <div id="map"></div>
 
-  <main>
-    <div id="mapWrap">
-      <div id="map"></div>
-      <canvas id="orientCanvas"></canvas>
-      <div id="hint" style="display:none;">Tap to set layup • Cart follows GPS • Distances show on lines</div>
+  <!-- Top course banner -->
+  <div class="banner">
+    <div></div>
+    <h1 id="courseTitle">Course</h1>
+    <div style="display:flex;justify-content:center;align-items:center;"><button class="exitBtn" id="exitBtn">Exit</button></div>
+  </div>
+
+  <!-- Center hole bar -->
+  <div class="holeBar">
+    <button class="holeBtn" id="prevHole">◀︎</button>
+    <div>Hole <span id="holeNo">1</span> • Par <span id="par">4</span> • Stroke <span id="stroke">1</span></div>
+    <button class="holeBtn" id="nextHole">▶︎</button>
+  </div>
+
+  <!-- Distances stack -->
+  <div class="distStack">
+    <div class="chipV">
+      <span class="dot" style="background:#ffffff"></span>
+      <span class="smallTxt">FRONT</span>
+      <span id="dFront" class="smallTxt">–</span>
     </div>
-    <aside>
-      <section>
-        <h3>Players & Handicaps</h3>
-        <div class="row">
-          <label>Players:
-            <select id="playersCount">
-              <option>1</option><option selected>2</option><option>3</option><option>4</option>
-            </select>
-          </label>
-          <label>Hcp base:
-            <select id="hcpBase">
-              <option value="18" selected>18</option>
-              <option value="9">9</option>
-              <option value="36">36</option>
-            </select>
-          </label>
+    <div class="chipV">
+      <span class="dot" style="background:#fbbf24"></span>
+      <span class="midTxt">MID</span>
+      <span id="dMid" class="midTxt">–</span>
+    </div>
+    <div class="chipV">
+      <span class="dot" style="background:#ef4444"></span>
+      <span class="smallTxt">BACK</span>
+      <span id="dBack" class="smallTxt">–</span>
+    </div>
+    <div class="unitToggle" id="unitBtn">Units: <span id="unitChip">m</span></div>
+
+    <!-- Layup info appears when there is a layup point -->
+    <div class="layupBox" id="layupBox">
+      <div id="layupText">Layup distances…</div>
+      <button class="clearLayupBtn" id="clearLayupBtn">CLEAR LAYUP</button>
+    </div>
+  </div>
+
+  <!-- Bottom-left stacked view icons -->
+  <div class="viewIcons">
+    <button title="Hole View (TEE↔BACK)" class="viewBtn" id="holeViewBtn">⛳</button>
+    <button title="Cart View (CART↔BACK)" class="viewBtn" id="cartViewBtn">🛺</button>
+  </div>
+
+  <!-- Bottom-center bubbles -->
+  <div class="bottomBubbles">
+    <button class="bubbleBtn" id="scoreBtn">Scorecard</button>
+    <button class="bubbleBtn" id="historyBtn">History</button>
+  </div>
+
+  <!-- Scorecard modal (classic layout) -->
+  <div class="modalBack" id="scoreModal">
+    <div class="modal">
+      <h2 id="scoreTitle">Scorecard</h2>
+
+      <!-- Setup -->
+      <div id="scoreSetup">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+          <label>Players:</label>
+          <select id="playerCount"><option>1</option><option>2</option><option selected>3</option><option>4</option></select>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="useHandicaps" checked/> Use handicaps</label>
         </div>
-      </section>
+        <div id="playersList"></div>
+        <div class="modalActions"><button class="btn green" id="createCard">Create scorecard</button></div>
+        <hr style="border-color:#1f2937; margin:12px 0;">
+      </div>
 
-      <section>
-        <h3>Scorecard (Classic)</h3>
-        <div id="scorecard"></div>
-        <p class="muted">Stableford auto-calculates per hole from par, stroke index & handicap.</p>
-      </section>
+      <!-- Card table (players in rows, holes in columns, IN/OUT/TOTAL) -->
+      <div id="scoreBody" style="display:none;">
+        <div style="overflow:auto;"><table id="scoreTable"></table></div>
+        <div class="modalActions">
+          <button class="btn" id="closeScore">Close</button>
+          <button class="btn green" id="saveRound">Save Round</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      <section>
-        <h3>History (Summary)</h3>
-        <div id="history"></div>
-      </section>
-    </aside>
-  </main>
+  <!-- History modal (summary only) -->
+  <div class="modalBack" id="histModal">
+    <div class="modal">
+      <h2>Last 10 Rounds</h2>
+      <div id="histList"></div>
+      <div class="modalActions">
+        <button class="btn" id="closeHist">Close</button>
+        <button class="btn red" id="clearHist">Clear History</button>
+      </div>
+    </div>
+  </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Toast -->
+  <div id="toast" style="display:none; position:absolute; left:50%; transform:translateX(-50%); bottom:12px; z-index:1300; background:#000; color:#fff; border:1px solid var(--border); padding:8px 12px; border-radius:10px; font-size:12px;"></div>
+
   <script>
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
+    // SW
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js')); }
 
-  // --- Map base ---
-  const map = L.map('map', { zoomControl:true, attributionControl:false });
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    // Helpers
+    const $  = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
+    function q(name){ return new URL(location.href).searchParams.get(name); }
+    function toast(msg, ms=1600){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', ms); }
 
-  // --- State ---
-  let course = null;
-  let currentHole = 1;
-  let layupLatLng = null;
-  let cartLatLng = null;
-  let cartMarker = null;
-
-  const courseId = (new URLSearchParams(location.search)).get('course')
-                 || (new URLSearchParams(location.search)).get('courseId')
-                 || localStorage.getItem('dd:lastCourseId');
-  const courseName = localStorage.getItem('dd:lastCourseName') || 'Course';
-  const courseTitle = document.getElementById('courseTitle');
-  const holeChip = document.getElementById('holeChip');
-
-  const orientBtn = document.getElementById('toggleOrient');
-  const canvas = document.getElementById('orientCanvas');
-  const hint = document.getElementById('hint');
-  const ctx = canvas.getContext('2d');
-  let oriented = false;
-
-  // --- Helpers ---
-  function hole(){ return course?.holes?.find(h=>h.no===currentHole); }
-  function metersBetweenLatLng(a,b){ return map.distance(a,b); }
-  function yards(m){ return m * 1.09361; }
-  function fmt(m){ return `${Math.round(m)} m (${Math.round(yards(m))} yd)`; }
-
-  function updateHeader(){
-    const h = hole(); if (!h) return;
-    holeChip.textContent = `Hole ${h.no} • Par ${h.par} • Stroke ${h.strokeIndex}`;
-  }
-
-  async function loadCourse() {
-    try {
-      let id = courseId;
-      if (!id) throw new Error('Missing course id (?course=)');
-      const res = await fetch(`/courses/${id}.json`, { cache: 'no-cache' });
-      course = await res.json();
-      currentHole = course.startHole || 1;
-      courseTitle.textContent = course.name || courseName;
-      localStorage.setItem('dd:lastCourseId', id);
-      localStorage.setItem('dd:lastCourseName', course.name || courseName);
-    } catch (e) {
-      course = {
-        name: courseName, startHole:1, metersPerPixel:0.35,
-        holes: Array.from({length:18}, (_,i)=> ({
-          no:i+1, par:[4,4,3,5,4,3,5,4,4,4,4,3,5,4,3,5,4,4][i], strokeIndex:(i%18)+1,
-          tee:{lat:-25.75,lng:28.23}, greenMid:{lat:-25.74,lng:28.25}, back:{lat:-25.739,lng:28.251}
-        }))
-      };
-    }
-  }
-
-  function fitHoleBounds(){
-    const h = hole(); if (!h) return;
-    const b = L.latLngBounds([ [h.tee.lat,h.tee.lng], [h.greenMid.lat,h.greenMid.lng] ]).pad(0.4);
-    map.fitBounds(b, { animate:false });
-  }
-
-  // --- Oriented canvas math ---
-  const view = { margin: 60, scale:1, rot:0, tx:0, ty:0 }; // screen transform for oriented mode
-  function resizeCanvas(){
-    const r = document.getElementById('map').getBoundingClientRect();
-    canvas.width = Math.floor(r.width * devicePixelRatio);
-    canvas.height = Math.floor(r.height * devicePixelRatio);
-    canvas.style.width = r.width + 'px';
-    canvas.style.height = r.height + 'px';
-    drawOriented();
-  }
-  window.addEventListener('resize', ()=>{ if(oriented) resizeCanvas(); });
-
-  function projectLL(ll){ return map.project(ll, 19); } // fixed high zoom for uniform local space
-  function unprojectPt(pt){ return map.unproject(pt, 19); }
-
-  function computeView(){
-    const h = hole(); if (!h) return;
-    // Base points in "pixel" space at z=19
-    const teeP = projectLL(L.latLng(h.tee.lat, h.tee.lng));
-    const midP = projectLL(L.latLng(h.greenMid.lat, h.greenMid.lng));
-
-    // angle tee->mid
-    const vx = midP.x - teeP.x, vy = midP.y - teeP.y;
-    const angle = Math.atan2(vy, vx);
-    view.rot = -angle; // rotate so tee->mid becomes horizontal
-
-    // rotate points
-    function rot(p){
-      const s = Math.sin(view.rot), c = Math.cos(view.rot);
-      const x = p.x*c - p.y*s;
-      const y = p.x*s + p.y*c;
-      return {x,y};
-    }
-    const rTee = rot(teeP), rMid = rot(midP);
-
-    // fit into canvas
-    const cw = canvas.width/devicePixelRatio;
-    const ch = canvas.height/devicePixelRatio;
-    const minX = Math.min(rTee.x, rMid.x), maxX = Math.max(rTee.x, rMid.x);
-    const minY = Math.min(rTee.y, rMid.y), maxY = Math.max(rTee.y, rMid.y);
-    const holeW = Math.max(1, maxX - minX);
-    const holeH = Math.max(1, maxY - minY);
-
-    const availW = cw - view.margin*2;
-    const availH = ch - view.margin*2;
-    view.scale = Math.min(availW / holeW, Math.max(1, availH / Math.max(holeH, 160))); // keep some vertical size
-
-    // place tee near left margin, center vertically
-    const afterMinX = minX * view.scale, afterMinY = minY * view.scale;
-    const neededH = (maxY - minY) * view.scale;
-    const targetX = view.margin;
-    const targetY = (ch - neededH)/2;
-    view.tx = targetX - afterMinX;
-    view.ty = targetY - afterMinY;
-  }
-
-  function toScreen(pt){
-    const s = Math.sin(view.rot), c = Math.cos(view.rot);
-    const xr =  pt.x*c - pt.y*s;
-    const yr =  pt.x*s + pt.y*c;
-    return { x: xr*view.scale + view.tx, y: yr*view.scale + view.ty };
-  }
-  function toOrientedWorld(screenX, screenY){
-    // inverse of toScreen (returns base z=19 pixel space)
-    const x = (screenX - view.tx)/view.scale;
-    const y = (screenY - view.ty)/view.scale;
-    const s = Math.sin(-view.rot), c = Math.cos(-view.rot);
-    return { x: x*c - y*s, y: x*s + y*c };
-  }
-
-  function drawCart(ctx,x,y){
-    ctx.save();
-    ctx.translate(x,y);
-    ctx.fillStyle = '#00c2ff';
-    ctx.strokeStyle = '#0086b3';
-    ctx.lineWidth = 1.5;
-    const w=24, h=14;
-    ctx.beginPath();
-    ctx.moveTo(-w/2, -h/2); ctx.lineTo(w/2, -h/2); ctx.lineTo(w/2-4, h/2); ctx.lineTo(-w/2+6, h/2); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-w/2+2, -h/2); ctx.lineTo(w/2-2, -h/2); ctx.lineTo(w/2-8, -h/2-6); ctx.lineTo(-w/2+10, -h/2-6); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.fillStyle = '#0b0b0b';
-    ctx.arc(-w/4, h/2+3, 4, 0, Math.PI*2); ctx.arc(w/4, h/2+3, 4, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  }
-  function drawBubble(ctx, x, y, text){
-    ctx.save();
-    ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial';
-    const padX=8, h=22;
-    const w = ctx.measureText(text).width + padX*2;
-    ctx.fillStyle = '#000'; ctx.strokeStyle='#262626'; ctx.lineWidth=1;
-    roundRect(ctx, x - w/2, y - h/2, w, h, 10); ctx.fill(); ctx.stroke();
-    ctx.fillStyle='#fff'; ctx.textBaseline='middle'; ctx.fillText(text, x - w/2 + padX, y);
-    ctx.restore();
-  }
-  function roundRect(ctx,x,y,w,h,r){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
-  }
-
-  function drawOriented(){
-    if(!oriented) return;
-    const r = document.getElementById('map').getBoundingClientRect();
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#0b0b0b'; ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    const h=hole(); if(!h) return;
-    computeView();
-
-    const teeP = projectLL(h.tee);
-    const midP = projectLL(h.greenMid);
-
-    const teeS = toScreen(teeP);
-    const midS = toScreen(midP);
-
-    // Fairway band (wide + inner)
-    ctx.save();
-    ctx.strokeStyle = '#134e18'; ctx.lineWidth = 60; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(teeS.x, teeS.y); ctx.lineTo(midS.x, midS.y); ctx.stroke();
-    ctx.strokeStyle = '#1a6b24'; ctx.lineWidth = 36;
-    ctx.beginPath(); ctx.moveTo(teeS.x, teeS.y); ctx.lineTo(midS.x, midS.y); ctx.stroke();
-    ctx.restore();
-
-    // Cart
-    const cartP = cartLatLng ? projectLL(cartLatLng) : teeP;
-    const cartS = toScreen(cartP);
-    drawCart(ctx, cartS.x, cartS.y);
-
-    // Layup + lines/bubbles
-    const layLL = layupLatLng;
-    if (layLL){
-      const layP = projectLL(layLL);
-      const layS = toScreen(layP);
-
-      // Solid: cart->layup
-      ctx.save();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth=2.5;
-      ctx.beginPath(); ctx.moveTo(cartS.x, cartS.y); ctx.lineTo(layS.x, layS.y); ctx.stroke();
-      ctx.restore();
-
-      // Bubble at midpoint, offset normal
-      const m1x = (cartS.x + layS.x)/2, m1y=(cartS.y + layS.y)/2;
-      const dx1 = layS.x - cartS.x, dy1 = layS.y - cartS.y, L1=Math.hypot(dx1,dy1)||1;
-      drawBubble(ctx, m1x - (dy1/L1)*12, m1y + (dx1/L1)*12, `Cart→Layup: ${fmt(metersBetweenLatLng(cartLatLng||h.tee, layLL))}`);
-
-      // Dashed: layup->mid
-      ctx.save();
-      ctx.setLineDash([10,8]); ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
-      ctx.beginPath(); ctx.moveTo(layS.x, layS.y); ctx.lineTo(midS.x, midS.y); ctx.stroke();
-      ctx.restore();
-
-      const m2x = (layS.x + midS.x)/2, m2y=(layS.y + midS.y)/2;
-      const dx2 = midS.x - layS.x, dy2 = midS.y - layS.y, L2=Math.hypot(dx2,dy2)||1;
-      drawBubble(ctx, m2x - (dy2/L2)*12, m2y + (dx2/L2)*12, `Layup→Mid: ${fmt(metersBetweenLatLng(layLL, h.greenMid))}`);
-
-      // Layup dot
-      ctx.save(); ctx.fillStyle='#ffcc00'; ctx.beginPath(); ctx.arc(layS.x, layS.y, 6, 0, Math.PI*2); ctx.fill(); ctx.restore();
-
-    } else {
-      // Cart→Mid bubble
-      const m3x = (cartS.x + midS.x)/2, m3y=(cartS.y + midS.y)/2;
-      const dx3 = midS.x - cartS.x, dy3 = midS.y - cartS.y, L3=Math.hypot(dx3,dy3)||1;
-      drawBubble(ctx, m3x - (dy3/L3)*12, m3y + (dx3/L3)*12, `Cart→Mid: ${fmt(metersBetweenLatLng(cartLatLng||h.tee, h.greenMid))}`);
-    }
-
-    // Tee & Mid dots
-    ctx.save();
-    ctx.fillStyle='#3aa657'; ctx.beginPath(); ctx.arc(teeS.x, teeS.y, 8, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle='#8fd19e'; ctx.beginPath(); ctx.arc(midS.x, midS.y, 9, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  }
-
-  // Canvas click -> set layup (inverse transform to latlng)
-  canvas.addEventListener('click', (ev)=>{
-    if (!oriented) return;
-    const rect = canvas.getBoundingClientRect();
-    const sx = (ev.clientX - rect.left);
-    const sy = (ev.clientY - rect.top);
-    const base = toOrientedWorld(sx, sy); // z=19 pixel space
-    const ll = unprojectPt(base);
-    layupLatLng = L.latLng(ll.lat, ll.lng);
-    drawOriented();
-  });
-
-  // Toggle oriented
-  orientBtn.addEventListener('click', ()=>{
-    oriented = !oriented;
-    orientBtn.textContent = 'Oriented View: ' + (oriented ? 'ON' : 'OFF');
-    canvas.style.display = oriented ? 'block' : 'none';
-    hint.style.display = oriented ? 'block' : 'none';
-    if (oriented){ resizeCanvas(); drawOriented(); } else { /* map is visible underneath */ }
-  });
-
-  // Layup clear
-  document.getElementById('clearLayup').onclick = ()=>{ layupLatLng=null; drawOriented(); };
-
-  // Hole nav
-  document.getElementById('prevHole').onclick = ()=>{ currentHole=Math.max(1,currentHole-1); updateHeader(); fitHoleBounds(); drawOriented(); };
-  document.getElementById('nextHole').onclick = ()=>{ currentHole=Math.min(course.holes.length,currentHole+1); updateHeader(); fitHoleBounds(); drawOriented(); };
-
-  // Geolocation for cart
-  function initCart(){
-    const h = hole(); if (!h) return;
-    cartLatLng = L.latLng(h.tee.lat, h.tee.lng); // default tee
-    cartMarker = L.marker(cartLatLng).addTo(map);
-    if ('geolocation' in navigator){
-      navigator.geolocation.watchPosition((pos)=>{
-        cartLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-        cartMarker.setLatLng(cartLatLng);
-        if(oriented) drawOriented();
-      }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:8000 });
-    }
-  }
-
-  // -------- Scorecard & History (same as prior version) --------
-  const playersSel = document.getElementById('playersCount');
-  const hcpBaseSel = document.getElementById('hcpBase');
-  const scorecardHost = document.getElementById('scorecard');
-  let card = [];
-
-  playersSel.addEventListener('change', buildScorecard);
-  hcpBaseSel.addEventListener('change', ()=>{ distributeHandicaps(); recomputePoints(); });
-
-  function buildScorecard(){
-    const nPlayers = parseInt(playersSel.value,10);
-    const holes = course.holes; const nHoles = holes.length;
-    card = Array.from({length:nPlayers}, (_,i)=>({
-      name:`Player ${i+1}`, hcp:18, scores:Array(nHoles).fill(''), points:Array(nHoles).fill(0), hcpStrokes:Array(nHoles).fill(0)
-    }));
-    renderScorecard();
-    distributeHandicaps();
-    recomputePoints();
-  }
-
-  function renderScorecard(){
-    const holes = course.holes; const n = holes.length;
-    const front = Math.min(9,n), back = Math.max(0,n-9);
-    const thead = `
-      <thead>
-        <tr>
-          <th class="sticky" style="text-align:left">Player</th>
-          ${Array.from({length:front}, (_,i)=>`<th class="sticky">${i+1}</th>`).join('')}
-          <th class="sticky">OUT</th>
-          ${back ? Array.from({length:back}, (_,i)=>`<th class="sticky">${i+10}</th>`).join('') : ''}
-          ${back ? '<th class="sticky">IN</th>' : ''}
-          <th class="sticky">TOTAL</th>
-          <th class="sticky">Pts</th>
-        </tr>
-      </thead>`;
-
-    let rows = '';
-    card.forEach((p,pi)=>{
-      const nameCell = `
-        <td style="text-align:left">
-          <div>
-            <input class="name small" value="${p.name}" data-pi="${pi}" data-field="name">
-            <div class="muted">Hcp: <input class="small" value="${p.hcp}" data-pi="${pi}" data-field="hcp"></div>
-          </div>
-        </td>`;
-      const frontInputs = Array.from({length:front}, (_,hi)=>`<td><input class="small" data-pi="${pi}" data-hi="${hi}" placeholder="-"></td>`).join('');
-      const outCell = `<td id="out-${pi}">0</td>`;
-      const backInputs = back ? Array.from({length:back}, (_,k)=>{
-        const hi = 9+k; return `<td><input class="small" data-pi="${pi}" data-hi="${hi}" placeholder="-"></td>`;
-      }).join('') : '';
-      const inCell = back ? `<td id="in-${pi}">0</td>` : '';
-      const totalCell = `<td id="total-${pi}">0</td>`;
-      const ptsCell = `<td id="pts-${pi}">0</td>`;
-      rows += `<tr>${nameCell}${frontInputs}${outCell}${backInputs}${inCell}${totalCell}${ptsCell}</tr>`;
-    });
-
-    scorecardHost.innerHTML = `<div style="overflow:auto"><table>${thead}<tbody id="scBody">${rows}</tbody></table></div>`;
-
-    scorecardHost.querySelectorAll('input').forEach(inp=>{
-      inp.addEventListener('input', onScoreInput);
-    });
-  }
-
-  function onScoreInput(e){
-    const pi = parseInt(e.target.dataset.pi,10);
-    const field = e.target.dataset.field;
-    if (field === 'name'){ card[pi].name = e.target.value; return; }
-    if (field === 'hcp'){ card[pi].hcp = Math.max(0, Math.min(54, parseInt(e.target.value||'0',10))); distributeHandicaps(); recomputePoints(); return; }
-    const hi = parseInt(e.target.dataset.hi,10);
-    const v = e.target.value.trim()==='' ? '' : Math.max(0, parseInt(e.target.value,10));
-    card[pi].scores[hi] = v;
-    recomputePoints();
-  }
-
-  function distributeHandicaps(){
-    const unit = parseInt(hcpBaseSel.value,10) || 18;
-    const holes = course.holes;
-    card.forEach(p=>{
-      const full = Math.floor(p.hcp / unit);
-      const rem = p.hcp % unit;
-      p.hcpStrokes = holes.map(()=> full);
-      const order = holes.map((h,idx)=>({idx, si:h.strokeIndex})).sort((a,b)=>a.si-b.si);
-      for(let i=0;i<rem;i++){ p.hcpStrokes[order[i%holes.length].idx] += 1; }
-    });
-  }
-
-  function stableford(gross, par, strokes){
-    if (gross==='' || gross==null) return 0;
-    const net = gross - strokes;
-    const d = net - par;
-    if (d <= -3) return 5;
-    if (d === -2) return 4;
-    if (d === -1) return 3;
-    if (d === 0) return 2;
-    if (d === 1) return 1;
-    return 0;
-  }
-
-  function recomputePoints(){
-    const holes = course.holes; const n = holes.length;
-    card.forEach((p,pi)=>{
-      let out=0, inn=0, pts=0;
-      for(let hi=0; hi<n; hi++){
-        const g=p.scores[hi]; const strokes=p.hcpStrokes[hi]||0;
-        const s=stableford(g, holes[hi].par, strokes); p.points[hi]=s; pts+=s;
-        if (g!=='' && g!=null){ if (hi<9) out+= (g-strokes); else inn+= (g-strokes); }
-      }
-      const o=document.getElementById('out-'+pi); if (o) o.textContent = out;
-      const i=document.getElementById('in-'+pi); if (i) i.textContent = inn;
-      const t=document.getElementById('total-'+pi); if (t) t.textContent = out+inn;
-      const ptd=document.getElementById('pts-'+pi); if (ptd) ptd.textContent = pts;
-    });
-  }
-
-  document.getElementById('saveRound').addEventListener('click', ()=>{
-    const holes = course.holes;
-    const date = new Date().toISOString().slice(0,10);
-    const record = {
-      date, course: course.name || courseTitle.textContent,
-      players: card.map(p=>{
-        let out=0, inn=0, pts=0;
-        holes.forEach((h,hi)=>{
-          const g=p.scores[hi]; const strokes=p.hcpStrokes[hi]||0;
-          if (g!=='' && g!=null){ if (hi<9) out+=(g-strokes); else inn+=(g-strokes); }
-          pts += p.points[hi]||0;
-        });
-        return { name:p.name, hcp:p.hcp, out, inn, total:out+inn, points:pts };
-      })
+    // Icons
+    function dotIcon(color='#ffffff', size=12){ const r=Math.floor(size/2); const svg=encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'><circle cx='${r}' cy='${r}' r='${r}' fill='${color}' /></svg>`); return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] }); }
+    function largeSymbolIcon(svgPath, size=44){ const svg=encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`); return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] }); }
+    const TOILET_SVG = `<rect x='2' y='2' width='36' height='36' rx='8' fill='#6b7280'/><path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>`;
+    const TAP_SVG = `<rect x='2' y='2' width='36' height='36' rx='8' fill='#0ea5e9'/><path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>`;
+    const ICONS = {
+      TEE: dotIcon('#16a34a', 14),
+      FRONT: dotIcon('#ffffff', 12),
+      MID: dotIcon('#fbbf24', 12),
+      BACK: dotIcon('#ef4444', 12),
+      TOILET: largeSymbolIcon(TOILET_SVG, 44),
+      TAPS: largeSymbolIcon(TAP_SVG, 44),
+      STAKE_WHITE: dotIcon('#ffffff', 10),
+      STAKE_RED: dotIcon('#ef4444', 10),
+      STAKE_YELLOW: dotIcon('#fbbf24', 10),
+      CART: dotIcon('#60a5fa', 12),
+      LAYUP: dotIcon('#ffffff', 12)
     };
-    const key = 'dd:history';
-    const list = JSON.parse(localStorage.getItem(key)||'[]');
-    list.unshift(record);
-    localStorage.setItem(key, JSON.stringify(list));
-    renderHistory();
-    alert('Saved');
-  });
 
-  function renderHistory(){
-    const key='dd:history'; const list=JSON.parse(localStorage.getItem(key)||'[]');
-    const host=document.getElementById('history');
-    if (!list.length){ host.innerHTML='<p class="muted">No saved rounds yet.</p>'; return; }
-    host.innerHTML = list.map(rec=>{
-      const rows = rec.players.map(p=>`<tr><td style="text-align:left">${p.name}</td><td>${p.hcp}</td><td>${p.out}</td><td>${p.inn}</td><td>${p.total}</td><td>${p.points}</td></tr>`).join('');
-      return `<div style="border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;margin:6px 0">
-        <div style="background:#151515;padding:8px 10px;display:flex;justify-content:space-between">
-          <div><strong>${rec.course}</strong></div><div class="muted">${rec.date}</div>
-        </div>
-        <div style="padding:0;overflow:auto">
-          <table style="min-width:560px">
-            <thead><tr><th>Player</th><th>Hcp</th><th>OUT</th><th>IN</th><th>Total</th><th>Pts</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </div>`;
-    }).join('');
-  }
+    // Map
+    const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 }).addTo(map);
 
-  // Boot
-  (async function(){
-    await loadCourse();
-    updateHeader();
-    fitHoleBounds();
-    initCart();
-    buildScorecard();
-    renderHistory();
-  })();
+    // Data helpers
+    async function getIndex(){ let res=await caches.match('/courses/index.json'); if(!res) res=await fetch('/courses/index.json',{cache:'reload'}); return res.json(); }
+    async function loadCourseJson(id){ const url=`/courses/${id}.json`; let res=await caches.match(url); if(!res) res=await fetch(url,{cache:'reload'}); return res.json(); }
+    async function pickCourseFromIndex(idx){ const want=(q('course')||'').trim(); if(want){ const c=(idx.courses||[]).find(x=>x.id.toUpperCase()===want.toUpperCase()); if(c) return c; } return (idx.courses||[])[0]||null; }
+
+    // PIN flow
+    async function validatePinFlow(courseId, courseJson){
+      if((q('guest')||'').trim()==='1') return true;
+      const pinFromUrl=(q('pin')||'').trim().toUpperCase();
+      if(pinFromUrl.length===10){ localStorage.setItem(`pin_${courseId}`, pinFromUrl); return await isPinValid(courseId, courseJson, pinFromUrl); }
+      const stored=(localStorage.getItem(`pin_${courseId}`)||'').trim().toUpperCase();
+      if(stored.length===10 && await isPinValid(courseId, courseJson, stored)) return true;
+      const entered=(prompt(`Enter PIN for ${courseJson?.course?.name || courseId}:`)||'').trim().toUpperCase();
+      if(entered.length!==10) return false;
+      const ok=await isPinValid(courseId, courseJson, entered);
+      if(ok) localStorage.setItem(`pin_${courseId}`, entered); else alert('Invalid PIN');
+      return ok;
+    }
+    async function isPinValid(courseId, courseJson, candidate){
+      if(!candidate||candidate.length!==10) return false;
+      try{ const idx=await getIndex(); const c=(idx.courses||[]).find(x=>x.id===courseId); if(c?.pin && c.pin.trim().toUpperCase()===candidate) return true; }catch(_){}
+      const metaPin=(courseJson?.course?.pin||'').trim().toUpperCase(); if(metaPin && metaPin===candidate) return true; return false;
+    }
+
+    // State
+    const state = { meta:null, course:null, hole:1, markers:[], cartMarker:null, unit:'m', layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null, inNoGo:false };
+
+    // Distance utils
+    const toRad=d=>d*Math.PI/180;
+    function haversine(a,b){ const R=6371000, dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2), s2=Math.sin(dLng/2);
+      const aa=s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.atan2(Math.sqrt(aa),Math.sqrt(1-aa)); }
+    const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
+    function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
+
+    function updateChips(pins){
+      const f=$('#dFront'), m=$('#dMid'), b=$('#dBack'); f.textContent=m.textContent=b.textContent='–';
+      const cart = fromCart() || (pins.TEE ? {lat:pins.TEE.lat,lng:pins.TEE.lng} : null); if(!cart) return;
+      if(pins.FRONT) f.textContent=fmt(haversine(cart, pins.FRONT));
+      if(pins.MID)   m.textContent=fmt(haversine(cart, pins.MID));
+      if(pins.BACK)  b.textContent=fmt(haversine(cart, pins.BACK));
+      $('#unitChip').textContent = state.unit;
+      updateLayupGraphics(); // keep labels in sync
+    }
+
+    // Markers & fitting
+    function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
+    function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
+    function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
+
+    function renderHole(){
+      clearMarkers();
+      const h = state.course.holes[String(state.hole)];
+      $('#holeNo').textContent = state.hole; $('#par').textContent = h?.par ?? '-'; $('#stroke').textContent = h?.stroke ?? '-';
+      if(!h) return;
+      const p = h.pins || {};
+      if (p.TEE)   addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
+      if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
+      if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
+      if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
+      if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
+      (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
+      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
+      (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
+      (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
+
+      // Default CART view if possible
+      const cart = fromCart();
+      if (cart && p.BACK) { fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
+      else if (p.TEE && p.BACK) { fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); }
+
+      updateChips(p);
+      clearLayup();
+      drawNoGoPolys(); // draw polygons if any
+    }
+
+    // View buttons
+    $('#holeViewBtn').addEventListener('click', ()=>{
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      // We cannot rotate tiles in Leaflet core; we still frame TEE & BACK
+      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
+    });
+    $('#cartViewBtn').addEventListener('click', ()=>{
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      const cart = fromCart();
+      if (cart && p.BACK) fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]);
+    });
+
+    // Hole nav
+    $('#prevHole').addEventListener('click', ()=>{ const min=1; state.hole=Math.max(min, state.hole-1); renderHole(); });
+    $('#nextHole').addEventListener('click', ()=>{ const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite)); state.hole=Math.min(max||state.hole+1, state.hole+1); renderHole(); });
+
+    // Units
+    $('#unitBtn').addEventListener('click', ()=>{ state.unit = state.unit==='m' ? 'yd' : 'm'; const p = state.course.holes[String(state.hole)]?.pins || {}; updateChips(p); });
+
+    // Exit -> back to login
+    $('#exitBtn').addEventListener('click', ()=>{ location.href = '/index.html'; });
+
+    // Geolocation (watch for live CART updates; always show cart icon)
+    function updateCartAndChips(){ const p = state.course.holes[String(state.hole)]?.pins || {}; updateChips(p); checkNoGo(); }
+    if (navigator.geolocation){
+      navigator.geolocation.watchPosition((pos)=>{
+        const { latitude, longitude } = pos.coords;
+        if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
+        else state.cartMarker.setLatLng([latitude,longitude]);
+        updateCartAndChips();
+      }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
+    }
+
+    // LAYUP: click map -> layup marker + two lines + distance labels
+    map.on('click', (e)=>{
+      const { lat, lng } = e.latlng;
+      if (state.layupMarker) state.layupMarker.remove();
+      state.layupMarker = L.marker([lat,lng], { icon: ICONS.LAYUP, title:'LAYUP' }).addTo(map);
+      updateLayupGraphics();
+    });
+    function clearLayup(){
+      if (state.layupMarker){ state.layupMarker.remove(); state.layupMarker=null; }
+      if (state.layupSolid){ state.layupSolid.remove(); state.layupSolid=null; }
+      if (state.layupDash){ state.layupDash.remove(); state.layupDash=null; }
+      if (state.layupLabel1){ state.layupLabel1.remove(); state.layupLabel1=null; }
+      if (state.layupLabel2){ state.layupLabel2.remove(); state.layupLabel2=null; }
+      $('#layupBox').style.display='none';
+    }
+    function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
+    function labelAt(ll, text){
+      const div = L.divIcon({ className:'', html:`<div class="distLabel">${text}</div>` });
+      return L.marker([ll.lat, ll.lng], { icon: div, interactive:false }).addTo(map);
+    }
+    function updateLayupGraphics(){
+      const box = $('#layupBox'); const text = $('#layupText');
+      const h = state.course?.holes?.[String(state.hole)]; const mid = h?.pins?.MID || null;
+      const cart = fromCart(); if (!state.layupMarker) { box.style.display='none'; return; }
+      const ll = state.layupMarker.getLatLng(); const P = { lat: ll.lat, lng: ll.lng };
+
+      // Clear old lines/labels
+      if (state.layupSolid){ state.layupSolid.remove(); state.layupSolid=null; }
+      if (state.layupDash){ state.layupDash.remove(); state.layupDash=null; }
+      if (state.layupLabel1){ state.layupLabel1.remove(); state.layupLabel1=null; }
+      if (state.layupLabel2){ state.layupLabel2.remove(); state.layupLabel2=null; }
+
+      let cartDist = '—', midDist = '—';
+      if (cart){
+        cartDist = fmt(haversine(cart, P));
+        state.layupSolid = L.polyline([[cart.lat,cart.lng],[P.lat,P.lng]], { color:'#fff', weight:3, opacity:1 }).addTo(map);
+        state.layupLabel1 = labelAt(midPoint(cart,P), `${cartDist} ${state.unit}`);
+      }
+      if (mid){
+        midDist = fmt(haversine(P, mid));
+        state.layupDash = L.polyline([[P.lat,P.lng],[mid.lat,mid.lng]], { color:'#fff', weight:3, opacity:1, dashArray:'6,6' }).addTo(map);
+        state.layupLabel2 = labelAt(midPoint(P,mid), `${midDist} ${state.unit}`);
+      }
+      text.textContent = `Layup: CART→P ${cartDist} ${state.unit} • P→MID ${midDist} ${state.unit}`;
+      box.style.display='grid';
+    }
+    $('#clearLayupBtn').addEventListener('click', clearLayup);
+
+    // ---------- Scorecard v2 (classic) ----------
+    function scoreKey(){ return `score_${state.course?.course?.id || state.meta?.id || 'course'}`; }
+    function histKey(){ return `history_${state.course?.course?.id || state.meta?.id || 'course'}`; }
+
+    function strokesReceived(hcap, holeStrokeIndex){
+      const base = Math.floor(hcap / 18); const rem = hcap % 18;
+      return base + ((holeStrokeIndex||18) <= rem ? 1 : 0);
+    }
+    function stablefordPoints(par, gross, recv){
+      if (!Number.isFinite(par) || !Number.isFinite(gross)) return 0;
+      const net = gross - (recv||0); const diff = net - par;
+      if (diff >= 2) return 0; if (diff === 1) return 1; if (diff === 0) return 2; if (diff === -1) return 3; if (diff === -2) return 4; return 5;
+    }
+
+    function buildPlayersSetup(){
+      const count = parseInt($('#playerCount').value,10); const wrap = $('#playersList'); wrap.innerHTML='';
+      for (let i=0;i<count;i++){
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:8px;align-items:center;margin:6px 0;';
+        row.innerHTML = \`
+          <div style="width:70px;">P\${i+1}</div>
+          <input class="nameInp" placeholder="Name" value="P\${i+1}">
+          <input class="hcapInp" type="number" min="0" max="54" step="1" value="\${[12,18,24,10][i]||10}">
+        \`;
+        wrap.appendChild(row);
+      }
+    }
+    $('#playerCount').addEventListener('change', buildPlayersSetup);
+
+    function buildScoreTableClassic(players, useH){
+      const holes = state.course?.holes || {}; const all = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
+      const front = all.filter(n=>n<=9); const back = all.filter(n=>n>=10);
+      const tbl = $('#scoreTable'); let html='';
+
+      function headerRow(label, arr){
+        html += '<tr><th style="text-align:left">'+label+'</th>';
+        arr.forEach(n=> html += '<th>'+n+'</th>');
+        if (arr===front) html += '<th>IN</th>'; else if (arr===back) html += '<th>OUT</th>';
+        if (arr===back) html += '<th>TOTAL</th>';
+        html += '</tr>';
+      }
+      function parRow(arr){
+        html += '<tr><th style="text-align:left">Par</th>';
+        arr.forEach(n=> html += '<td>'+ (holes[n]?.par ?? '') +'</td>');
+        if (arr===front) html += '<td></td>'; else if (arr===back) html += '<td></td>';
+        if (arr===back) html += '<td></td>';
+        html += '</tr>';
+      }
+
+      // Front
+      if (front.length){
+        headerRow('Holes', front);
+        parRow(front);
+        players.forEach((p,idx)=>{
+          html += '<tr><th style="text-align:left">'+p.name+(useH? \` (H\${p.hcap})\`:'')+'</th>';
+          front.forEach(n=> html += \`<td><input class="strokes" data-player="\${idx}" data-hole="\${n}" /></td>\`);
+          html += '<td class="inCell" data-player="'+idx+'">–</td>';
+          if (!back.length) html += '<td class="totCell" data-player="'+idx+'">–</td>';
+          html += '</tr>';
+        });
+      }
+      // Back
+      if (back.length){
+        headerRow('Holes', back);
+        parRow(back);
+        players.forEach((p,idx)=>{
+          html += '<tr><th style="text-align:left">'+p.name+(useH? \` (H\${p.hcap})\`:'')+'</th>';
+          back.forEach(n=> html += \`<td><input class="strokes" data-player="\${idx}" data-hole="\${n}" /></td>\`);
+          html += '<td class="outCell" data-player="'+idx+'">–</td>';
+          html += '<td class="totCell" data-player="'+idx+'">–</td>';
+          html += '</tr>';
+        });
+      }
+
+      tbl.innerHTML = html;
+    }
+
+    function collectRound(players, useH){
+      const holes = state.course?.holes || {}; const all = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
+      const front = all.filter(n=>n<=9); const back = all.filter(n=>n>=10);
+      const res = players.map(p => ({ name:p.name, hcap:p.hcap, gross:0, net:0, points:0, in:0, out:0 }));
+
+      $$('#scoreTable input.strokes').forEach(inp=>{
+        const pid = parseInt(inp.dataset.player,10); const hole = parseInt(inp.dataset.hole,10);
+        const v = parseInt(inp.value,10); if (!Number.isFinite(v)) return;
+        const par = holes[hole]?.par ?? null; const si = holes[hole]?.stroke ?? 18;
+        const recv = useH ? strokesReceived(res[pid].hcap, si) : 0;
+        const pts = stablefordPoints(par, v, recv);
+        res[pid].gross += v; res[pid].net += (v - recv); res[pid].points += pts;
+        if (hole<=9) res[pid].in += v; else res[pid].out += v;
+      });
+      return res;
+    }
+
+    function openScore(){
+      $('#scoreTitle').textContent = \`Scorecard — \${state.course?.course?.name || 'Course'}\`;
+      $('#scoreSetup').style.display='block'; $('#scoreBody').style.display='none';
+      buildPlayersSetup(); $('#scoreModal').style.display='grid';
+    }
+    function closeScore(){ $('#scoreModal').style.display='none'; }
+
+    $('#createCard').addEventListener('click', ()=>{
+      const count = parseInt($('#playerCount').value,10); const useH = $('#useHandicaps').checked;
+      const players=[]; const names=$$('.nameInp'); const hcaps=$$('.hcapInp');
+      for (let i=0;i<count;i++){ const name=(names[i].value||\`P\${i+1}\`).trim(); let h=parseInt(hcaps[i].value,10); if(!Number.isFinite(h)||h<0) h=0; players.push({name:name,hcap:h}); }
+      buildScoreTableClassic(players, useH);
+      $('#scoreBody').dataset.players = JSON.stringify(players); $('#scoreBody').dataset.useH = useH?'1':'0';
+      $('#scoreSetup').style.display='none'; $('#scoreBody').style.display='block';
+    });
+    $('#closeScore').addEventListener('click', closeScore);
+
+    $('#saveRound').addEventListener('click', ()=>{
+      const players = JSON.parse($('#scoreBody').dataset.players || '[]'); const useH = $('#scoreBody').dataset.useH==='1';
+      const results = collectRound(players, useH);
+      const entry = { course: state.course?.course?.name || 'Course', id: state.course?.course?.id || state.meta?.id || 'course', ts: Date.now(), useHandicaps: useH, players: results };
+      const key = histKey(); const arr = JSON.parse(localStorage.getItem(key) || '[]'); arr.unshift(entry); while(arr.length>10) arr.pop(); localStorage.setItem(key, JSON.stringify(arr));
+      toast('Round saved'); closeScore();
+    });
+
+    function openHist(){
+      const div = $('#histList'); const arr = JSON.parse(localStorage.getItem(histKey()) || '[]');
+      if (!arr.length){ div.innerHTML = '<p style="margin:10px 0; color:#9ca3af;">No rounds yet.</p>'; }
+      else {
+        div.innerHTML = arr.map(r=>{
+          const dt = new Date(r.ts).toLocaleString();
+          const players = r.players.map(p=>\`<div style="display:flex;justify-content:space-between;"><div><strong>\${p.name}</strong>\${r.useHandicaps? \` <span style="color:#9ca3af;">(H\${p.hcap})</span>\` : ''}</div><div>In: \${p.in||0} • Out: \${p.out||0} • Total: <strong>\${p.gross}</strong> • Net: <strong>\${p.net}</strong> • Pts: <strong>\${p.points}</strong></div></div>\`).join('');
+          return \`<div style="border-bottom:1px solid #1f2937; padding:10px 0;"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><div><strong>\${r.course}</strong></div><div style="color:#9ca3af;font-size:12px;">\${dt}</div></div>\${players}</div>\`;
+        }).join('');
+      }
+      $('#histModal').style.display='grid';
+    }
+    function closeHist(){ $('#histModal').style.display='none'; }
+    function clearHistory(){ localStorage.removeItem(histKey()); $('#histList').innerHTML='<p style="margin:10px 0; color:#9ca3af;">History cleared.</p>'; }
+    $('#historyBtn').addEventListener('click', openHist);
+    $('#closeHist').addEventListener('click', closeHist);
+    $('#clearHist').addEventListener('click', clearHistory);
+    $('#scoreBtn').addEventListener('click', openScore);
+
+    // ---------- No-go zones (geofencing) ----------
+    let noGoLayers = [];
+    function drawNoGoPolys(){
+      // clear old
+      noGoLayers.forEach(l=>l.remove()); noGoLayers=[];
+      const h = state.course?.holes?.[String(state.hole)];
+      const polys = h?.NO_GO || []; // array of arrays of {lat,lng}
+      polys.forEach(poly=>{
+        const latlngs = poly.map(p=>[p.lat,p.lng]);
+        const layer = L.polygon(latlngs, { color:'#ff4d4f', weight:2, fillOpacity:0.15, fillColor:'#ff4d4f' }).addTo(map);
+        noGoLayers.push(layer);
+      });
+    }
+    function pointInPolygon(pt, poly){
+      // Ray-casting algorithm
+      let x=pt.lng, y=pt.lat, inside=false;
+      for (let i=0, j=poly.length-1; i<poly.length; j=i++){
+        const xi=poly[i].lng, yi=poly[i].lat;
+        const xj=poly[j].lng, yj=poly[j].lat;
+        const intersect = ((yi>y)!=(yj>y)) && (x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    function checkNoGo(){
+      const cart = fromCart(); if (!cart) return;
+      const h = state.course?.holes?.[String(state.hole)]; const polys = h?.NO_GO || [];
+      const inAny = polys.some(poly=> pointInPolygon(cart, poly));
+      if (inAny && !state.inNoGo){ state.inNoGo=true; warnNoGo(); }
+      if (!inAny && state.inNoGo){ state.inNoGo=false; }
+    }
+    function warnNoGo(){
+      toast('Please stay clear of Greens or other no-go zones.', 2500);
+      // Simple beep using WebAudio (no external asset)
+      try{
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.5);
+        o.start(); o.stop(ctx.currentTime+0.5);
+      }catch(_){}
+    }
+
+    // Boot
+    (async function boot(){
+      const idx = await getIndex();
+      const meta = await pickCourseFromIndex(idx);
+      if (!meta){ alert('No courses in index.json'); return; }
+      const course = await loadCourseJson(meta.id);
+      const ok = await validatePinFlow(meta.id, course); if (!ok) return;
+      state.meta = meta; state.course = course;
+      $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
+      const startHole = parseInt(q('hole') || '1', 10); state.hole = startHole;
+      renderHole();
+      toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
+    })();
   </script>
 </body>
 </html>
