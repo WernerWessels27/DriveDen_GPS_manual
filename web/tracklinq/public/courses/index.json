@@ -7,5 +7,14 @@
       "pin": "WGC1234567",
       "active": true
     }
+
+    {
+      "id": "Home",
+      "name": "Home",
+      "short_code": "HOME",
+      "pin": "HOME123456",
+      "active": true
+    }
+    
   ]
 }
