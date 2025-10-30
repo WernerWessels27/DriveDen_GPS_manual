@@ -344,7 +344,7 @@
     const state = {
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
-      layupMarker:null
+      layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null
     };
 
     // Distance helpers
@@ -358,6 +358,11 @@
     const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
 
+    function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
+    function labelAt(ll, text){
+      const div = L.divIcon({ className:'', html:`<div style="background:#000;color:#fff;border:1px solid #ffffff22;padding:4px 6px;border-radius:10px;font-size:12px;font-weight:800;">${text}</div>` });
+      return L.marker([ll.lat, ll.lng], { icon: div, interactive:false });
+    }
     function fromPoint(pins, pref='CART'){
       if(pref==='TEE' && pins.TEE) return { lat:pins.TEE.lat, lng:pins.TEE.lng };
       return fromCart();
@@ -399,7 +404,9 @@
       (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
       (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
-      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
+      const cartLL = state.cartMarker ? state.cartMarker.getLatLng() : null;
+      if (cartLL && p.BACK) { fitBetween([cartLL.lat,cartLL.lng],[p.BACK.lat,p.BACK.lng]); }
+      else if (p.TEE && p.BACK) { fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); }
       else {
         const latlngs = state.markers.map(m => m.getLatLng());
         if (latlngs.length) map.fitBounds(L.latLngBounds(latlngs), { padding: [40,40] });
@@ -411,7 +418,9 @@
     // View buttons
     $('#holeViewBtn').addEventListener('click', ()=>{
       const p = state.course.holes[String(state.hole)]?.pins || {};
-      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
+      const cartLL = state.cartMarker ? state.cartMarker.getLatLng() : null;
+      if (cartLL && p.BACK) { fitBetween([cartLL.lat,cartLL.lng],[p.BACK.lat,p.BACK.lng]); }
+      else if (p.TEE && p.BACK) { fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); }
     });
     $('#cartViewBtn').addEventListener('click', ()=>{
       const p = state.course.holes[String(state.hole)]?.pins || {};
