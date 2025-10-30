@@ -2,401 +2,509 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Course Mapper</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>TrackLinq Mapper</title>
 
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+  <!-- Leaflet core -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Leaflet.draw for polygon & freehand shapes -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
   <style>
-    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial; }
-    .app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
-    .panel { padding: 12px; overflow: auto; border-right: 1px solid #e5e7eb; background: #fafafa; }
-    fieldset { border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 12px; }
-    legend { padding: 0 6px; font-weight: 600; }
-    label { display: block; font-size: 12px; color: #374151; margin: 6px 0 4px; }
-    input, select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .toolbar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .tool { cursor: pointer; padding: 8px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 8px; justify-content: center; }
-    .tool.active { outline: 2px solid #2563eb; box-shadow: 0 0 0 2px #93c5fd inset; }
-    .minor { font-size: 12px; color: #6b7280; }
-    #map { width: 100%; height: 100%; }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { font-size: 11px; padding: 4px 8px; border: 1px dashed #d1d5db; border-radius: 999px; background: #fff; }
-    .btn { cursor: pointer; padding: 10px 12px; border-radius: 10px; border: 1px solid #d1d5db; background: #111827; color: #fff; font-weight: 600; }
-    .btn.secondary { background: #fff; color: #111827; }
-    .btn.warn { background: #7c2d12; }
-    .section-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .json-box { white-space: pre; background: #0b1020; color: #c7e1ff; padding: 8px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: 220px; }
-    .hr { height: 1px; background: #e5e7eb; margin: 10px 0; }
-    .legend { position: absolute; z-index: 1000; right: 10px; top: 10px; background: #fff; border-radius: 8px; padding: 6px 8px; border:1px solid #e5e7eb; }
+    :root{
+      --bg:#f7faf7; --panel:#fff; --text:#0b0b0b; --muted:#6b7280; --border:#dbe5d9;
+      --green:#16a34a; --yellow:#fbbf24; --red:#ef4444; --blue:#0ea5e9; --gray:#6b7280;
+    }
+    html, body { height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text); }
+    #map { position:absolute; inset:0; }
+
+    .panel {
+      position:absolute; top:10px; left:10px; z-index:1000;
+      width:min(92vw,380px); max-height:88vh; overflow:auto;
+      background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.08);
+    }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
+    .row4 { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+    .row > * , .row3 > *, .row4 > * { width:100%; }
+
+    input, select, button, textarea {
+      border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:#fff; color:var(--text);
+    }
+    button { cursor:pointer; font-weight:800; }
+    h2 { margin:0 0 8px 0; font-size:16px; }
+    h3 { margin:12px 0 6px 0; font-size:13px; color:#111; }
+
+    .toolgrid { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:6px; }
+    .tool { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; }
+    .tool.active { outline:2px solid var(--green); }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .muted { color:var(--muted); font-size:12px; }
+
+    .saveRow { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+
+    /* Drawn polygon style */
+    .no-go { color:#ef4444; fill:#ef4444; fill-opacity:0.25; stroke:#ef4444; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="panel">
-      <fieldset>
-        <legend>Course</legend>
-        <label>Course Name</label>
-        <input id="courseName" placeholder="Silver Lakes" />
-        <div class="row">
-          <div>
-            <label>Course ID</label>
-            <input id="courseId" placeholder="SLK" maxlength="8" />
-          </div>
-          <div>
-            <label>Club PIN (10 chars)</label>
-            <input id="clubPin" placeholder="SLK1234567" maxlength="10" />
-          </div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Total Holes</label>
-            <select id="holesCount">
-              <option>9</option>
-              <option selected>18</option>
-              <option>27</option>
-              <option>36</option>
-            </select>
-          </div>
-          <div>
-            <label>Elevation (online)</label>
-            <select id="elevMode">
-              <option value="on">On (OpenTopo/online)</option>
-              <option value="off">Off (offline)</option>
-            </select>
-          </div>
-        </div>
-      </fieldset>
+  <div id="map"></div>
 
-      <fieldset>
-        <legend>Hole</legend>
-        <div class="row">
-          <div>
-            <label>Hole #</label>
-            <input id="holeNumber" type="number" min="1" max="36" value="1" />
-          </div>
-          <div>
-            <label>Par</label>
-            <input id="holePar" type="number" min="3" max="6" value="4" />
-          </div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Stroke</label>
-            <input id="holeStroke" type="number" min="1" max="36" value="7" />
-          </div>
-          <div>
-            <label>Start Center</label>
-            <select id="startCenter">
-              <option value="-25.746,28.229">Pretoria</option>
-              <option value="-26.204,28.047">Johannesburg</option>
-              <option value="-25.936,28.182">Blue Valley</option>
-            </select>
-          </div>
-        </div>
-        <div class="minor">Click the satellite map to drop the selected pin. Elevation only when online.</div>
-      </fieldset>
+  <div class="panel">
+    <h2>TrackLinq Mapper</h2>
 
-      <fieldset>
-        <legend>Pin Tools</legend>
-        <div class="toolbar" id="tools"></div>
-        <div class="hr"></div>
-        <div class="chips" id="currentPins"></div>
-        <div class="section-actions" style="margin-top:10px">
-          <button class="btn secondary" id="undoBtn">Undo last pin</button>
-          <button class="btn warn" id="clearHole">Clear hole pins</button>
+    <div class="row">
+      <div>
+        <label class="muted">Course Name</label>
+        <input id="courseName" placeholder="e.g., Waterkloof Golf Club" />
+      </div>
+      <div>
+        <label class="muted">Course ID (file name)</label>
+        <input id="courseId" placeholder="e.g., WGC-course" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label class="muted">10-digit PIN</label>
+        <input id="coursePin" placeholder="e.g., WGC1234567" maxlength="10" />
+      </div>
+      <div>
+        <label class="muted"># Holes</label>
+        <select id="holeCount">
+          <option>9</option><option selected>18</option><option>27</option><option>36</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label class="muted">Hole</label>
+        <select id="holeNo"></select>
+      </div>
+      <div class="row">
+        <div>
+          <label class="muted">Par</label>
+          <input id="holePar" type="number" min="3" max="6" value="4"/>
         </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Data</legend>
-        <div class="section-actions">
-          <button class="btn" id="exportBtn">Export hole JSON</button>
-          <button class="btn secondary" id="exportCourseBtn">Export full course JSON</button>
-          <input type="file" id="importFile" accept="application/json" />
+        <div>
+          <label class="muted">Stroke</label>
+          <input id="holeStroke" type="number" min="1" max="36" value="1"/>
         </div>
-        <label style="margin-top:8px">Preview</label>
-        <div class="json-box" id="preview"></div>
-      </fieldset>
+      </div>
+    </div>
 
-      <div class="minor">Pins: <b>TEE</b>, <b>FRONT</b>, <b>MID</b>, <b>BACK</b>, <b>TOILET</b>, <b>TAPS</b>, <b>STAKE WHITE/RED/YELLOW</b>. JSON matches gps.html.</div>
-    </aside>
+    <h3>Place Pins</h3>
+    <div class="toolgrid" id="tools">
+      <div class="tool" data-tool="TEE"><span>🏌️‍♂️</span><span>TEE</span></div>
+      <div class="tool" data-tool="FRONT"><span class="dot" style="background:#ffffff"></span><span>FRONT</span></div>
+      <div class="tool" data-tool="MID"><span class="dot" style="background:#fbbf24"></span><span>MID (flag)</span></div>
+      <div class="tool" data-tool="BACK"><span class="dot" style="background:#ef4444"></span><span>BACK</span></div>
+      <div class="tool" data-tool="TOILET"><span>🚻</span><span>Toilet</span></div>
+      <div class="tool" data-tool="TAPS"><span>🚰</span><span>Tap</span></div>
+      <div class="tool" data-tool="STAKE_WHITE"><span class="dot" style="background:#ffffff"></span><span>Stake (White)</span></div>
+      <div class="tool" data-tool="STAKE_RED"><span class="dot" style="background:#ef4444"></span><span>Stake (Red)</span></div>
+      <div class="tool" data-tool="STAKE_YELLOW"><span class="dot" style="background:#fbbf24"></span><span>Stake (Yellow)</span></div>
+      <div class="tool" data-tool="NO_GO"><span>⛔</span><span>No-Go Zone</span></div>
+      <div class="tool" data-tool="MOVE"><span>✥</span><span>Move/Select</span></div>
+      <div class="tool" data-tool="ERASE"><span>🗑️</span><span>Erase</span></div>
+    </div>
+    <div class="muted" style="margin-top:6px;">Click a tool, then click the map to place. For <strong>No‑Go Zone</strong>, draw a polygon.</div>
 
-    <main>
-      <div id="map"></div>
-      <div class="legend minor">Satellite: Esri World Imagery • Streets: OpenStreetMap (both cacheable)</div>
-    </main>
+    <div class="saveRow">
+      <button id="saveHole">Save Hole</button>
+      <button id="clearHole">Clear Hole</button>
+      <button id="downloadJson">Download Course JSON</button>
+      <button id="loadLocal">Load Saved (Local)</button>
+      <button id="saveLocal">Save (Local)</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:6px;"></div>
   </div>
 
   <script>
-    // --- Marker Icon Helpers (no borders on dots) ---
-    function dotIcon(color = '#ffffff', size = 12) {
-      const r = Math.floor(size / 2);
-      const svg = encodeURIComponent(`<?xml version="1.0"?>
+    // --- Map & Icons ---
+    const map = L.map('map', { zoomControl:true, attributionControl:false }).setView([-25.746, 28.229], 17);
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 20 }
+    ).addTo(map);
+
+    // Small, clean dots (no border)
+    function dotIcon(color='#ffffff', size=10){
+      const r=Math.floor(size/2);
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>
           <circle cx='${r}' cy='${r}' r='${r}' fill='${color}' />
         </svg>`);
-      return L.icon({
-        iconUrl: `data:image/svg+xml;utf8,${svg}`,
-        iconSize: [size, size],
-        iconAnchor: [r, r]
-      });
+      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] });
     }
 
-    function largeSymbolIcon(svgPath, size = 40) {
-      const svg = encodeURIComponent(`<?xml version="1.0"?>
-        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>
-          ${svgPath}
+    function flagMidIcon(size=18){
+      // Yellow dot with a small flagstick
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24'>
+          <circle cx='12' cy='12' r='5' fill='#fbbf24'/>
+          <rect x='11.5' y='4' width='1' height='8' fill='#374151'/>
+          <path d='M12 5 L17 7 L12 9 Z' fill='#16a34a'/>
         </svg>`);
-      return L.icon({
-        iconUrl: `data:image/svg+xml;utf8,${svg}`,
-        iconSize: [size, size],
-        iconAnchor: [size/2, size/2]
-      });
+      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[12,12] });
     }
 
-    const TOILET_SVG = `
-      <rect x='2' y='2' width='36' height='36' rx='8' fill='#6b7280'/>
-      <path d='M14 26h2l1-6 1 6h2l-2-10h-2l-2 10Zm8 0h2v-4h2v4h2V16h-2v4h-2v-4h-2v10Z' fill='white'/>
-    `;
-    const TAP_SVG = `
-      <rect x='2' y='2' width='36' height='36' rx='8' fill='#0ea5e9'/>
-      <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
-    `;
+    function teeIcon(size=18){
+      // Simple tee marker icon
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24'>
+          <circle cx='12' cy='8' r='4' fill='#16a34a'/>
+          <rect x='11' y='10' width='2' height='8' fill='#3b3b3b'/>
+        </svg>`);
+      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[12,12] });
+    }
+
+    function smallSymbol(svgPath,size=18){
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24'>${svgPath}</svg>`);
+      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[12,12] });
+    }
+    const TOILET_SVG = `<rect x='3' y='3' width='18' height='18' rx='4' fill='#6b7280'/><path d='M8 16h2l1-5 1 5h2l-2-8h-2l-2 8Zm6 0h2v-3h2v3h2V8h-2v3h-2V8h-2v8Z' fill='white'/>`;
+    const TAP_SVG = `<rect x='3' y='3' width='18' height='18' rx='4' fill='#0ea5e9'/><path d='M6 11h6V9h2V7h6v2h-5v2h-3v3h3v2H9v-2h2v-3H6v-2Z' fill='white'/>`;
 
     const ICONS = {
-      TEE: dotIcon('#16a34a', 14),
-      FRONT: dotIcon('#ffffff', 12),
-      MID: dotIcon('#fbbf24', 12),
-      BACK: dotIcon('#ef4444', 12),
-      TOILET: largeSymbolIcon(TOILET_SVG, 44),
-      TAPS: largeSymbolIcon(TAP_SVG, 44),
-      STAKE_WHITE: dotIcon('#ffffff', 10),
-      STAKE_RED: dotIcon('#ef4444', 10),
-      STAKE_YELLOW: dotIcon('#fbbf24', 10)
+      TEE: teeIcon(18),
+      FRONT: dotIcon('#ffffff', 10),
+      MID: flagMidIcon(18),
+      BACK: dotIcon('#ef4444', 10),
+      TOILET: smallSymbol(TOILET_SVG, 18),
+      TAPS: smallSymbol(TAP_SVG, 18),
+      STAKE_WHITE: dotIcon('#ffffff', 6),
+      STAKE_RED: dotIcon('#ef4444', 6),
+      STAKE_YELLOW: dotIcon('#fbbf24', 6)
     };
 
-    const TOOL_ORDER = ['TEE','FRONT','MID','BACK','TOILET','TAPS','STAKE_WHITE','STAKE_RED','STAKE_YELLOW'];
+    // Draw layer for no-go zones
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
 
-    let map, activeTool = 'TEE', markers = [];
-    const courseData = { meta: { name:"", id:"", pin:"", holes:18 }, holes:{} };
-
-    // Tools UI
-    const toolsEl = document.getElementById('tools');
-    TOOL_ORDER.forEach(key => {
-      const btn = document.createElement('button');
-      btn.className = 'tool';
-      btn.dataset.tool = key;
-      btn.innerHTML = `<img alt='' width='18' height='18' src='${ICONS[key].options.iconUrl}'/> <span>${key.replace('STAKE_','STAKE ')}</span>`;
-      btn.addEventListener('click', () => setActiveTool(key));
-      toolsEl.appendChild(btn);
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polygon: {
+          shapeOptions: { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.25, className:'no-go' }
+        },
+        polyline: false, rectangle: false, circle: false, circlemarker: false, marker: false
+      },
+      edit: { featureGroup: drawnItems, edit: true, remove: true }
     });
-    function setActiveTool(tool){ activeTool = tool; [...toolsEl.children].forEach(b=>b.classList.toggle('active', b.dataset.tool===tool)); }
-    setActiveTool('TEE');
 
-    // Map init
-    function initMap(){
-      const def = document.getElementById('startCenter').value.split(',').map(Number);
-      map = L.map('map', { zoomControl: true }).setView(def, 17);
+    // We'll toggle this control only when NO_GO tool is active.
+    let drawAdded = false;
 
-      const esriWorldImagery = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxZoom: 19, attribution: 'Imagery © Esri' }
-      ).addTo(map);
+    // --- State ---
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => document.querySelectorAll(sel);
+    const status = msg => { const s=$('#status'); s.textContent=msg; };
 
-      const osmStreets = L.tileLayer(
-        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { maxZoom: 19, attribution: '&copy; OpenStreetMap' }
-      );
+    const state = {
+      course: {
+        course: { id:'', name:'', pin:'' },
+        holes: {} // "1": { par, stroke, pins:{} }
+      },
+      holeCount: 18,
+      hole: 1,
+      tool: 'MOVE',
+      markers: [], // live markers per hole for edit
+      stakes: { STAKE_WHITE:[], STAKE_RED:[], STAKE_YELLOW:[] } // temp edit arrays
+    };
 
-      L.control.layers(
-        { 'Satellite (Esri)': esriWorldImagery, 'Streets (OSM)': osmStreets },
-        {},
-        { position: 'topright', collapsed: true }
-      ).addTo(map);
-
-      map.on('click', handleMapClick);
-    }
-    initMap();
-
-    async function handleMapClick(e){
-      const pos = e.latlng;
-      let elevation = null;
-      if(document.getElementById('elevMode').value==='on'){
-        try{
-          const r = await fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${pos.lat},${pos.lng}`);
-          const j = await r.json();
-          elevation = Math.round(j?.results?.[0]?.elevation ?? null);
-        }catch(_){ elevation = null; }
+    // --- UI Init ---
+    function fillHoleDropdown(n=18){
+      const sel = $('#holeNo');
+      sel.innerHTML = '';
+      for(let i=1;i<=n;i++){
+        const opt=document.createElement('option');
+        opt.value=String(i); opt.textContent=String(i);
+        sel.appendChild(opt);
       }
-      addPinToHole(activeTool, pos, elevation);
+      sel.value = String(state.hole);
     }
+    fillHoleDropdown(18);
 
-    // Data + Markers
-    function ensureHole(holeNo){
-      if(!courseData.holes[holeNo]) courseData.holes[holeNo] = { par: 4, stroke: 1, pins: {} };
-      return courseData.holes[holeNo];
-    }
+    $('#holeCount').addEventListener('change', e=>{
+      state.holeCount = parseInt(e.target.value,10);
+      fillHoleDropdown(state.holeCount);
+      status('Hole count updated');
+    });
 
-    function addPinToHole(kind, position, elev){
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      const par = parseInt(document.getElementById('holePar').value,10);
-      const stroke = parseInt(document.getElementById('holeStroke').value,10);
+    $('#holeNo').addEventListener('change', e=>{
+      saveHoleToState();
+      state.hole = parseInt(e.target.value,10);
+      loadHoleToUI();
+    });
 
-      const hole = ensureHole(holeNo);
-      hole.par = par; hole.stroke = stroke;
-
-      const pinObj = { kind, lat: position.lat, lng: position.lng, elev_m: elev, ts: Date.now() };
-
-      const singular = ['TEE','FRONT','MID','BACK','TOILET'];
-      if(singular.includes(kind)) {
-        hole.pins[kind] = pinObj;
-      } else {
-        (hole.pins[kind] ||= []).push(pinObj);
-      }
-
-      const marker = L.marker([position.lat, position.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
-      marker.__pinRef = { holeNo, kind, pinObj, index: singular.includes(kind) ? null : hole.pins[kind].length - 1 };
-      marker.on('dragend', (ev) => {
-        const ll = ev.target.getLatLng();
-        const ref = ev.target.__pinRef;
-        const h = courseData.holes[ref.holeNo];
-        if (!h) return;
-        if (Array.isArray(h.pins[ref.kind]) && ref.index != null) {
-          h.pins[ref.kind][ref.index].lat = ll.lat;
-          h.pins[ref.kind][ref.index].lng = ll.lng;
-        } else if (h.pins[ref.kind]) {
-          h.pins[ref.kind].lat = ll.lat;
-          h.pins[ref.kind].lng = ll.lng;
+    // Tools activation
+    $$('#tools .tool').forEach(t=>{
+      t.addEventListener('click', ()=>{
+        $$('#tools .tool').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        state.tool = t.dataset.tool;
+        // Toggle draw controls
+        if (state.tool==='NO_GO'){
+          if (!drawAdded){ map.addControl(drawControl); drawAdded=true; }
+        } else {
+          if (drawAdded){ map.removeControl(drawControl); drawAdded=false; }
         }
-        refreshPreview();
       });
-
-      markers.push(marker);
-      refreshPinsUI(); refreshPreview();
-    }
-
-    function renderMarker(kind, p, holeNo, index=null){
-      const marker = L.marker([p.lat, p.lng], { icon: ICONS[kind], draggable: true }).addTo(map);
-      marker.__pinRef = { holeNo, kind, pinObj: p, index };
-      marker.on('dragend', (ev) => {
-        const ll = ev.target.getLatLng();
-        const ref = ev.target.__pinRef;
-        const h = courseData.holes[ref.holeNo];
-        if (!h) return;
-        if (Array.isArray(h.pins[ref.kind]) && ref.index != null) {
-          h.pins[ref.kind][ref.index].lat = ll.lat;
-          h.pins[ref.kind][ref.index].lng = ll.lng;
-        } else if (h.pins[ref.kind]) {
-          h.pins[ref.kind].lat = ll.lat;
-          h.pins[ref.kind].lng = ll.lng;
-        }
-        refreshPreview();
-      });
-      markers.push(marker);
-    }
-
-    function redrawHoleMarkers(){
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      markers.forEach(m=>m.remove()); markers=[];
-      const hole = courseData.holes[holeNo]; if(!hole) { refreshPinsUI(); return; }
-      for (const [k, v] of Object.entries(hole.pins || {})) {
-        if (Array.isArray(v)) v.forEach((p,i)=>renderMarker(k,p,holeNo,i));
-        else if (v) renderMarker(k, v, holeNo, null);
-      }
-      refreshPinsUI();
-    }
-
-    function refreshPinsUI(){
-      const el = document.getElementById('currentPins'); el.innerHTML='';
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      const hole = courseData.holes[holeNo]; if(!hole) return;
-      const pins = hole.pins || {};
-      Object.entries(pins).forEach(([k,v])=>{
-        const count = Array.isArray(v) ? v.length : (v?1:0);
-        const chip = document.createElement('div'); chip.className='chip'; chip.textContent = `${k}: ${count}`; el.appendChild(chip);
-      });
-    }
-
-    function refreshPreview(){
-      courseData.meta.name = document.getElementById('courseName').value.trim();
-      courseData.meta.id = document.getElementById('courseId').value.trim();
-      courseData.meta.pin = document.getElementById('clubPin').value.trim();
-      courseData.meta.holes = parseInt(document.getElementById('holesCount').value,10);
-      const sorted = JSON.parse(JSON.stringify(courseData));
-      sorted.holes = Object.fromEntries(Object.entries(sorted.holes).sort((a,b)=>a[0]-b[0]));
-      document.getElementById('preview').textContent = JSON.stringify({ course: sorted.meta, holes: sorted.holes }, null, 2);
-    }
-
-    // Buttons & Inputs
-    document.getElementById('undoBtn').addEventListener('click', ()=>{
-      for(let i=markers.length-1;i>=0;i--){
-        const m = markers[i];
-        const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-        if(m.__pinRef?.holeNo === holeNo){
-          const kind = m.__pinRef.kind; const ref = m.__pinRef;
-          m.remove(); markers.splice(i,1);
-          const pins = courseData.holes[holeNo]?.pins || {};
-          if(Array.isArray(pins[kind])) pins[kind].pop(); else pins[kind] = undefined;
-          refreshPinsUI(); refreshPreview(); break;
-        }
-      }
     });
+    // Default active tool
+    document.querySelector('[data-tool="MOVE"]').classList.add('active');
 
-    document.getElementById('clearHole').addEventListener('click', ()=>{
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      markers = markers.filter(m=>{ if(m.__pinRef?.holeNo===holeNo){ m.remove(); return false; } return true; });
-      if(courseData.holes[holeNo]) courseData.holes[holeNo].pins = {};
-      refreshPinsUI(); refreshPreview();
-    });
-
-    document.getElementById('exportBtn').addEventListener('click', ()=>{
-      const holeNo = parseInt(document.getElementById('holeNumber').value,10);
-      const hole = courseData.holes[holeNo] || { par:null, stroke:null, pins:{} };
-      const payload = { course: courseData.meta, hole: { number: holeNo, ...hole } };
-      downloadJSON(payload, `${courseData.meta.id || 'COURSE'}-H${holeNo}.json`);
-    });
-
-    document.getElementById('exportCourseBtn').addEventListener('click', ()=>{
-      const payload = { course: courseData.meta, holes: courseData.holes };
-      downloadJSON(payload, `${courseData.meta.id || 'COURSE'}-course.json`);
-    });
-
-    document.getElementById('importFile').addEventListener('change', async (e)=>{
-      const file = e.target.files?.[0]; if(!file) return; const txt = await file.text();
+    // --- Elevation helper ---
+    async function fetchElevation(lat,lng){
+      // Online call to free API. If it fails, return null (we still save lat/lng).
       try{
-        const json = JSON.parse(txt);
-        if(json.course && json.holes){ courseData.meta = json.course; courseData.holes = json.holes; }
-        else if(json.course && json.hole){ courseData.meta = json.course; courseData.holes[json.hole.number] = { par: json.hole.par, stroke: json.hole.stroke, pins: json.hole.pins }; }
-        else { alert('Unrecognized JSON'); return; }
-        document.getElementById('courseName').value = courseData.meta.name || '';
-        document.getElementById('courseId').value = courseData.meta.id || '';
-        document.getElementById('clubPin').value = courseData.meta.pin || '';
-        document.getElementById('holesCount').value = String(courseData.meta.holes || 18);
-        markers.forEach(m=>m.remove()); markers=[]; refreshPinsUI(); refreshPreview(); alert('Import OK. Switch holes to view/edit.');
-      }catch(err){ console.error(err); alert('Invalid JSON'); }
-    });
-
-    ['courseName','courseId','clubPin','holesCount','holeNumber','holePar','holeStroke','startCenter'].forEach(id=>{
-      document.getElementById(id).addEventListener('input', ()=>{ refreshPreview(); redrawHoleMarkers(); });
-    });
-
-    function downloadJSON(obj, filename){
-      const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+        const r = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`);
+        const j = await r.json();
+        const e = j?.results?.[0]?.elevation;
+        return Number.isFinite(e) ? e : null;
+      }catch(_){ return null; }
     }
+
+    // --- Map click behavior ---
+    map.on('click', async (e)=>{
+      const { lat, lng } = e.latlng;
+      const tool = state.tool;
+      if (tool==='MOVE' || tool==='ERASE') return;
+
+      const ele = await fetchElevation(lat, lng);
+      const base = { lat, lng };
+      if (Number.isFinite(ele)) base.ele = ele;
+
+      const pins = getHolePins();
+      let m;
+
+      if (tool==='TEE'){
+        pins.TEE = base;
+        m = addMarker(ICONS.TEE, base, 'TEE', true);
+      } else if (tool==='FRONT'){
+        pins.FRONT = base;
+        m = addMarker(ICONS.FRONT, base, 'FRONT', true);
+      } else if (tool==='MID'){
+        pins.MID = base;
+        m = addMarker(ICONS.MID, base, 'MID', true);
+      } else if (tool==='BACK'){
+        pins.BACK = base;
+        m = addMarker(ICONS.BACK, base, 'BACK', true);
+      } else if (tool==='TOILET'){
+        pins.TOILET = base;
+        m = addMarker(ICONS.TOILET, base, 'Toilet', true);
+      } else if (tool==='TAPS'){
+        pins.TAPS = pins.TAPS || [];
+        pins.TAPS.push(base);
+        m = addMarker(ICONS.TAPS, base, 'Tap', false, 'TAPS', pins.TAPS.length-1);
+      } else if (tool==='STAKE_WHITE' || tool==='STAKE_RED' || tool==='STAKE_YELLOW'){
+        const key = tool;
+        pins[key] = pins[key] || [];
+        pins[key].push(base);
+        m = addMarker(ICONS[key], base, key.replace('STAKE_','Stake '), false, key, pins[key].length-1);
+      }
+      status(`${tool} placed at ${lat.toFixed(6)}, ${lng.toFixed(6)}${Number.isFinite(ele)?' • Elev '+ele+'m':''}`);
+    });
+
+    map.on(L.Draw.Event.CREATED, function (event) {
+      if (state.tool!=='NO_GO') return;
+      const layer = event.layer;
+      drawnItems.addLayer(layer);
+      // Save polygon to hole pins as NO_GO (array of polygons; each polygon is array of latlng objects)
+      const latlngs = layer.getLatLngs()[0] || [];
+      const poly = latlngs.map(pt => ({ lat: pt.lat, lng: pt.lng }));
+      const pins = getHolePins();
+      pins.NO_GO = pins.NO_GO || [];
+      pins.NO_GO.push(poly);
+      status(`No-Go zone added with ${poly.length} points`);
+    });
+
+    // --- Marker helpers ---
+    function clearLiveMarkers(){
+      state.markers.forEach(m => {
+        try { map.removeLayer(m.layer); } catch{}
+      });
+      state.markers.length = 0;
+      drawnItems.clearLayers();
+    }
+
+    function addMarker(icon, pos, title, unique=false, listKey=null, listIndex=null){
+      const marker = L.marker([pos.lat, pos.lng], { icon, draggable:true, title });
+      marker.addTo(map);
+      const rec = { layer: marker, listKey, listIndex, uniqueKey: unique ? title : null };
+      state.markers.push(rec);
+
+      marker.on('dragend', async () => {
+        const ll = marker.getLatLng();
+        const elev = await fetchElevation(ll.lat, ll.lng);
+        const pins = getHolePins();
+        const obj = { lat: ll.lat, lng: ll.lng };
+        if (Number.isFinite(elev)) obj.ele = elev;
+
+        if (rec.uniqueKey){
+          pins[rec.uniqueKey] = obj;
+        } else if (rec.listKey){
+          pins[rec.listKey][rec.listIndex] = obj;
+        }
+        status(`${title} moved to ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}${Number.isFinite(elev)?' • Elev '+elev+'m':''}`);
+      });
+
+      marker.on('click', ()=>{
+        if (state.tool!=='ERASE') return;
+        // Remove from map + state
+        map.removeLayer(marker);
+        const pins = getHolePins();
+        if (rec.uniqueKey){
+          delete pins[rec.uniqueKey];
+        } else if (rec.listKey){
+          try { pins[rec.listKey].splice(rec.listIndex,1); } catch{}
+        }
+        // remove from local array
+        state.markers = state.markers.filter(x => x.layer !== marker);
+        status(`${title} removed`);
+      });
+
+      return marker;
+    }
+
+    function getHolePins(){
+      const hKey = String(state.hole);
+      state.course.holes[hKey] = state.course.holes[hKey] || { par:4, stroke:1, pins:{} };
+      state.course.holes[hKey].par = parseInt($('#holePar').value,10) || 4;
+      state.course.holes[hKey].stroke = parseInt($('#holeStroke').value,10) || 1;
+      state.course.holes[hKey].pins = state.course.holes[hKey].pins || {};
+      return state.course.holes[hKey].pins;
+    }
+
+    function saveHoleToState(){
+      const hKey = String(state.hole);
+      const h = state.course.holes[hKey] || { par:4, stroke:1, pins:{} };
+      h.par = parseInt($('#holePar').value,10) || 4;
+      h.stroke = parseInt($('#holeStroke').value,10) || 1;
+      state.course.holes[hKey] = h;
+      status(`Hole ${hKey} saved`);
+    }
+
+    function loadHoleToUI(){
+      clearLiveMarkers();
+      const hKey = String(state.hole);
+      const h = state.course.holes[hKey];
+      $('#holePar').value = h?.par ?? 4;
+      $('#holeStroke').value = h?.stroke ?? 1;
+      const p = h?.pins || {};
+
+      // Unique markers
+      if (p.TEE)   addMarker(ICONS.TEE, p.TEE, 'TEE', true);
+      if (p.FRONT) addMarker(ICONS.FRONT, p.FRONT, 'FRONT', true);
+      if (p.MID)   addMarker(ICONS.MID, p.MID, 'MID', true);
+      if (p.BACK)  addMarker(ICONS.BACK, p.BACK, 'BACK', true);
+      if (p.TOILET) addMarker(ICONS.TOILET, p.TOILET, 'Toilet', true);
+
+      // Lists
+      (p.TAPS || []).forEach((obj, i)=> addMarker(ICONS.TAPS, obj, 'Tap', false, 'TAPS', i));
+      (p.STAKE_WHITE || []).forEach((obj, i)=> addMarker(ICONS.STAKE_WHITE, obj, 'Stake White', false, 'STAKE_WHITE', i));
+      (p.STAKE_RED || []).forEach((obj, i)=> addMarker(ICONS.STAKE_RED, obj, 'Stake Red', false, 'STAKE_RED', i));
+      (p.STAKE_YELLOW || []).forEach((obj, i)=> addMarker(ICONS.STAKE_YELLOW, obj, 'Stake Yellow', false, 'STAKE_YELLOW', i));
+
+      // No-go polygons
+      (p.NO_GO || []).forEach(poly => {
+        const latlngs = poly.map(pt => L.latLng(pt.lat, pt.lng));
+        const layer = L.polygon(latlngs, { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.25, className:'no-go' });
+        drawnItems.addLayer(layer);
+      });
+    }
+
+    // --- Save / Load Course ---
+    function collectCourse(){
+      state.course.course.id = ($('#courseId').value || '').trim();
+      state.course.course.name = ($('#courseName').value || '').trim();
+      state.course.course.pin = ($('#coursePin').value || '').trim().toUpperCase();
+      return state.course;
+    }
+
+    $('#saveHole').addEventListener('click', ()=>{
+      saveHoleToState();
+    });
+
+    $('#clearHole').addEventListener('click', ()=>{
+      if (!confirm('Clear all pins for this hole?')) return;
+      const hKey=String(state.hole);
+      state.course.holes[hKey] = { par:4, stroke:1, pins:{} };
+      loadHoleToUI();
+      status(`Hole ${hKey} cleared`);
+    });
+
+    $('#downloadJson').addEventListener('click', ()=>{
+      saveHoleToState();
+      const obj = collectCourse();
+      if (!obj.course.id){ alert('Please enter a Course ID (file name)'); return; }
+      const blob = new Blob([JSON.stringify(obj,null,2)], { type:'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${obj.course.id}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      status('Course JSON downloaded');
+    });
+
+    const LOCAL_KEY = 'tl_mapper_draft';
+    $('#saveLocal').addEventListener('click', ()=>{
+      saveHoleToState();
+      collectCourse();
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(state.course));
+      status('Saved to local storage');
+    });
+    $('#loadLocal').addEventListener('click', ()=>{
+      try{
+        const raw = localStorage.getItem(LOCAL_KEY);
+        if (!raw) return alert('No local save found');
+        const obj = JSON.parse(raw);
+        state.course = obj;
+        $('#courseId').value = obj.course?.id || '';
+        $('#courseName').value = obj.course?.name || '';
+        $('#coursePin').value = obj.course?.pin || '';
+        const most = Math.max(...Object.keys(obj.holes||{}).map(k=>+k).filter(n=>Number.isFinite(n)));
+        const inferredCount = Number.isFinite(most) ? Math.max(most, 18) : 18;
+        $('#holeCount').value = String(inferredCount);
+        state.holeCount = inferredCount;
+        fillHoleDropdown(inferredCount);
+        state.hole = 1;
+        $('#holeNo').value = '1';
+        loadHoleToUI();
+        status('Local save loaded');
+      }catch(e){
+        alert('Failed to load local save');
+      }
+    });
+
+    // Fit map to current hole markers
+    function fitToHole(){
+      const h = state.course.holes[String(state.hole)];
+      const pins = h?.pins || {};
+      const list = [];
+      ['TEE','FRONT','MID','BACK','TOILET'].forEach(k=>{ if(pins[k]) list.push([pins[k].lat,pins[k].lng]); });
+      (pins.TAPS||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (pins.STAKE_WHITE||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (pins.STAKE_RED||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (pins.STAKE_YELLOW||[]).forEach(t=> list.push([t.lat,t.lng]));
+      if (list.length){
+        map.fitBounds(L.latLngBounds(list), { padding:[40,40] });
+      }
+    }
+
+    // Update course meta live
+    ['#courseId','#courseName','#coursePin'].forEach(sel=>{
+      $(sel).addEventListener('input', ()=> collectCourse());
+    });
+
+    // After any load, try to fit
+    map.whenReady(()=> setTimeout(fitToHole, 300));
   </script>
 </body>
 </html>
