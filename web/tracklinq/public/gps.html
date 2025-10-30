@@ -1,3 +1,4 @@
+This is an example of simple text.
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -160,13 +161,30 @@
 
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
-  </style>
+  
+    /* ---- TrackLinq additions (light UI, rules/penalties, layup label) ---- */
+    .topRight { position:absolute; top:8px; right:8px; z-index:1120; display:flex; flex-direction:column; gap:8px; }
+    .iconBtn, .toggleBtn { border:1px solid #00000022; background:#ffffff; color:#0b0b0b; border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .toggleBtn { justify-content:space-between; min-width:160px; }
+    .switch { width:44px; height:24px; border-radius:999px; border:1px solid #00000022; background:#f0f0f0; position:relative; }
+    .knob { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; border:1px solid #00000022; transition:all .18s; }
+    .switch.on { background:#d3f8df; } .switch.on .knob { left:22px; }
+
+    .clearLayupFloating { display:none; position:absolute; left:50%; transform:translateX(-50%); bottom:72px; z-index:1060; padding:10px 14px; border-radius:999px; border:1px solid #00000022; background:#ffffff; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .layupLabel { background:#000; color:#fff; padding:4px 12px; border-radius:999px; font-size:13px; font-weight:800; border:1px solid #00000055; white-space:nowrap; }
+</style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
 
   <!-- Top course banner -->
   <div class="banner">
+
+  <div class="topRight">
+    <button class="iconBtn" id="rulesBtn">📘 Rules & Tips</button>
+    <div class="toggleBtn" id="penToggle"><span>Penalties</span><div class="switch" id="penSwitch"><div class="knob"></div></div></div>
+  </div>
+
     <div class="left"></div>
     <h1 id="courseTitle">Course</h1>
     <div class="right">
@@ -916,5 +934,19 @@
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
   </script>
+
+  <!-- Rules / Tips modal -->
+  <div class="modalBack" id="rulesModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); place-items:center; z-index:1400;">
+    <div class="modal" style="width:min(92vw, 720px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25);">
+      <h2 style="margin:0 0 10px; font-size:18px; display:flex; align-items:center; justify-content:space-between;">
+        <span>Quick Rules & Tips</span>
+        <button class="btn close" id="closeRules" style="border:1px solid #00000022; background:#f3f4f6; border-radius:10px; padding:8px 10px; font-weight:800; cursor:pointer;">Close</button>
+      </h2>
+      <div id="rulesBody">
+        <p style="margin:8px 0; color:#374151;">Placeholder — add your local rules or quick tips here.</p>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
