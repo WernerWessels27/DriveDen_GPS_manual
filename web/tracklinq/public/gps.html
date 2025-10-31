@@ -162,17 +162,28 @@ This is an example of simple text.
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
   
-/* —— TrackLinq patch —— */
-.topRight { position:absolute; top:108px; right:8px; z-index:1120; display:flex; flex-direction:column; gap:8px; }
-.iconBtn, .toggleBtn { border:1px solid #00000022; background:#ffffff; color:#0b0b0b; border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+/* ==== TrackLinq patch (Rules/Toggle lower; bigger layup labels) ==== */
+.topRight { position:absolute; top:108px; right:10px; z-index:1120; display:flex; flex-direction:column; gap:8px; }
+.iconBtn, .toggleBtn {
+  border:1px solid #00000022; background:#ffffff; color:#0b0b0b;
+  border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer;
+  display:flex; align-items:center; gap:8px; box-shadow:0 1px 2px rgba(0,0,0,.05);
+}
 .toggleBtn { justify-content:space-between; min-width:170px; }
 .switch { width:48px; height:26px; border-radius:999px; border:1px solid #00000022; background:#f0f0f0; position:relative; }
 .knob { position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:1px solid #00000022; transition:all .18s; }
 .switch.on { background:#d3f8df; } .switch.on .knob { left:24px; }
-/* floating clear layup */
-.clearLayupFloating { display:none; position:absolute; left:50%; transform:translateX(-50%); bottom:72px; z-index:1060; padding:10px 16px; border-radius:999px; border:1px solid #00000022; background:#ffffff; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.05); }
-/* bigger/roomier layup labels */
-.layupLabel { background:#000; color:#fff; padding:6px 14px; border-radius:999px; font-size:14px; font-weight:800; border:1px solid #00000066; white-space:nowrap; }
+
+.clearLayupFloating {
+  display:none; position:absolute; left:50%; transform:translateX(-50%);
+  bottom:72px; z-index:1060; padding:10px 16px; border-radius:999px;
+  border:1px solid #00000022; background:#ffffff; font-weight:800; cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+}
+.layupLabel {
+  background:#000; color:#fff; padding:6px 14px; border-radius:999px;
+  font-size:14px; font-weight:800; border:1px solid #00000066; white-space:nowrap;
+}
 </style>
 </head>
 <body data-theme="light">
@@ -180,9 +191,13 @@ This is an example of simple text.
 
   <!-- Top course banner -->
   <div class="banner">
+
   <div class="topRight">
     <button class="iconBtn" id="rulesBtn">Rules</button>
-    <div class="toggleBtn" id="penToggle"><span>Penalties</span><div class="switch" id="penSwitch"><div class="knob"></div></div></div>
+    <div class="toggleBtn" id="penToggle">
+      <span>Penalties</span>
+      <div class="switch" id="penSwitch"><div class="knob"></div></div>
+    </div>
   </div>
 
     <div class="left"></div>
@@ -937,172 +952,20 @@ This is an example of simple text.
 
   <!-- Rules Modal -->
   <div class="modalBack" id="rulesModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); place-items:center; z-index:1400;">
-    <div class="modal" style="width:min(92vw, 820px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25);">
+    <div class="modal" style="width:min(92vw, 860px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25);">
       <h2 style="margin:0 0 10px; font-size:18px; display:flex; align-items:center; justify-content:space-between;">
         <span>Rules</span>
         <button class="btn close" id="closeRules" style="border:1px solid #00000022; background:#f3f4f6; border-radius:10px; padding:8px 10px; font-weight:800; cursor:pointer;">Close</button>
       </h2>
       <div id="rulesBody">
-        <p style="margin:8px 0; color:#374151;">This panel supports <strong>rich HTML</strong> content. You can paste text, images, or even small videos (hosted) here.</p>
-        <ul>
-          <li>Local rules can go here</li>
-          <li>Embedded links to R&A / USGA sections</li>
-          <li>Club-specific etiquette reminders</li>
-        </ul>
+        <p style="margin:8px 0; color:#374151;">This panel supports <strong>rich HTML</strong> content. Paste text, images, or embed hosted videos here.</p>
+        <div style="display:grid; gap:6px; margin-top:8px;">
+          <div><strong>Local Rule A:</strong> Example placeholder text.</div>
+          <div><strong>Local Rule B:</strong> Example placeholder text.</div>
+        </div>
       </div>
     </div>
   </div>
 
-<script>
-// ==== TrackLinq runtime patch ====
-(function(){
-  const $ = s => document.querySelector(s);
-
-  // Ensure globals
-  window.__tracklinq = window.__tracklinq || {};
-  const TL = window.__tracklinq;
-  TL.followCart = TL.followCart !== false; // default true
-  TL.stakeLayers = TL.stakeLayers || [];
-  TL.layupGroup = TL.layupGroup || (window.L ? L.layerGroup().addTo(window.map) : null);
-
-  // 5a) Rules modal
-  const rulesBtn = document.getElementById('rulesBtn');
-  const rulesModal = document.getElementById('rulesModal');
-  const closeRules = document.getElementById('closeRules');
-  if (rulesBtn && rulesModal) { rulesBtn.addEventListener('click', ()=> rulesModal.style.display='grid'); }
-  if (closeRules) closeRules.addEventListener('click', ()=> rulesModal.style.display='none');
-
-  // 5b) Penalties toggle — show/hide stake markers
-  const penToggle = document.getElementById('penToggle');
-  const penSwitch = document.getElementById('penSwitch');
-  if (penToggle && penSwitch){
-    penToggle.addEventListener('click', ()=>{
-      const on = !penSwitch.classList.contains('on');
-      penSwitch.classList.toggle('on', on);
-      TL.stakeLayers.forEach(m => {
-        try { if (on) { if (!m._map) m.addTo(window.map); } else { if (m._map) m.remove(); } } catch(e){}
-      });
-    });
-  }
-
-  // 5c) Override icons to match Mapper: tee icon, flagstick for MID, modern toilet/tap, nicer cart
-  function svgIcon(pathStr, w=28, h=28, anchor=[14,14]){
-    const svg = encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 24 24'>${pathStr}</svg>`);
-    return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[w,h], iconAnchor:anchor });
-  }
-  function dotIcon(color='#ffffff', size=12){
-    const r=Math.floor(size/2);
-    const svg=encodeURIComponent(`<?xml version="1.0"?><svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'><circle cx='${r}' cy='${r}' r='${r}' fill='${color}' /></svg>`);
-    return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] });
-  }
-  if (window.ICONS){
-    // Tee icon
-    window.ICONS.TEE = svgIcon("<path d='M8 2h8v3l-4 3-4-3V2zm4 8c.6 0 1 .4 1 1v7l2 3H9l2-3v-7c0-.6.4-1 1-1z' fill='#16a34a'/>", 28,28,[14,26]);
-    // Mid flagstick (taller so visible on hole view)
-    window.ICONS.MID = svgIcon("<path d='M11 3h1v18h-1z' fill='#fbbf24'/><path d='M12 4l7 3-7 3z' fill='#fbbf24'/>", 36,36,[12,34]);
-    // Keep FRONT/BACK dots small but colored
-    window.ICONS.FRONT = dotIcon('#ffffff', 10);
-    window.ICONS.BACK  = dotIcon('#ef4444', 10);
-    // Toilets & taps (cleaner glyphs)
-    window.ICONS.TOILET = svgIcon(\"<text x='12' y='15' text-anchor='middle' font-size='16'>🚻</text>\", 32,32,[16,16]);
-    window.ICONS.TAPS   = svgIcon(\"<text x='12' y='15' text-anchor='middle' font-size='16'>🚰</text>\", 32,32,[16,16]);
-    // Cart icon (clean modern)
-    const CART_PATH = "<path d='M4 6h2l2.2 8.5c.1.4.5.7.9.7h7.6c.5 0 .9-.3 1-.8l1.2-5.4c.1-.6-.3-1.1-.9-1.1H8.4l-.4-2H4zm4.5 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm8 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z' fill='#16a34a'/>";
-    window.ICONS.CART = svgIcon(CART_PATH, 30,30,[15,15]);
-    // If cart marker already exists, swap its icon
-    try { if (window.state?.cartMarker) window.state.cartMarker.setIcon(window.ICONS.CART); } catch(e){}
-  }
-
-  // 5d) After each hole render, register stake markers so Penalties toggle can hide them
-  if (window.renderHole){
-    const _origRender = window.renderHole;
-    window.renderHole = function(){
-      const result = _origRender.apply(this, arguments);
-      try {
-        const markers = (window.state && window.state.markers) ? window.state.markers : [];
-        TL.stakeLayers = markers.filter(m => (m.options && m.options.title && /Stake/i.test(m.options.title)));
-      } catch(e){}
-      return result;
-    }
-  }
-
-  // 5e) Layup visuals: our own (solid CART->P, dashed P->MID) with roomy labels and floating clear button
-  const clearLayupBtn = document.getElementById('clearLayupBtn');
-  if (window.map && clearLayupBtn){
-    let layupPoint = null, line1=null, line2=null, lab1=null, lab2=null;
-    function toRad(d){ return d*Math.PI/180; }
-    function hav(a,b){ const R=6371000, dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng); const s1=Math.sin(dLat/2), s2=Math.sin(dLng/2); const aa=s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2; return 2*R*Math.atan2(Math.sqrt(aa),Math.sqrt(1-aa)); }
-    function fmt(m){ return (window.state?.unit==='yd') ? Math.round(m*1.09361)+' yd' : Math.round(m)+' m'; }
-
-    function redraw(){
-      // clear old
-      [line1,line2,lab1,lab2].forEach(l=>{ try{ if(l){ window.map.removeLayer(l);} }catch(e){} });
-      line1=line2=lab1=lab2=null;
-      if (!layupPoint) { if (clearLayupBtn) clearLayupBtn.style.display='none'; return; }
-
-      const hole = window.state?.course?.holes?.[String(window.state?.hole)];
-      const mid  = hole?.pins?.MID || null;
-      const cart = window.state?.cartMarker ? window.state.cartMarker.getLatLng() : null;
-      if (cart){
-        line1 = L.polyline([[cart.lat,cart.lng],[layupPoint.lat,layupPoint.lng]], { color:'#111', weight:3 }).addTo(window.map);
-        const m1 = [(cart.lat+layupPoint.lat)/2,(cart.lng+layupPoint.lng)/2];
-        const d1 = fmt(hav({lat:cart.lat,lng:cart.lng},{lat:layupPoint.lat,lng:layupPoint.lng}));
-        lab1 = L.marker(m1,{ icon:L.divIcon({className:'', html:`<div class="layupLabel">CART→P ${d1}</div>`}) }).addTo(window.map);
-      }
-      if (mid){
-        line2 = L.polyline([[layupPoint.lat,layupPoint.lng],[mid.lat,mid.lng]], { color:'#111', weight:3, dashArray:'6,6' }).addTo(window.map);
-        const m2 = [(layupPoint.lat+mid.lat)/2,(layupPoint.lng+mid.lng)/2];
-        const d2 = fmt(hav({lat:layupPoint.lat,lng:layupPoint.lng},{lat:mid.lat,lng:mid.lng}));
-        lab2 = L.marker(m2,{ icon:L.divIcon({className:'', html:`<div class="layupLabel">P→MID ${d2}</div>`}) }).addTo(window.map);
-      }
-      clearLayupBtn.style.display='block';
-    }
-
-    // add click handler (separate from any existing one)
-    window.map.on('click', (e)=>{
-      layupPoint = { lat:e.latlng.lat, lng:e.latlng.lng };
-      redraw();
-    });
-
-    clearLayupBtn.addEventListener('click', ()=>{
-      layupPoint=null;
-      redraw();
-    });
-
-    // watch unit changes: monkey-patch updateChips if present to refresh labels
-    if (window.updateChips){
-      const _orig = window.updateChips;
-      window.updateChips = function(){
-        const r = _orig.apply(this, arguments);
-        redraw();
-        return r;
-      };
-    }
-  }
-
-  // 5f) Follow CART↔BACK without centering (fitBounds with padding), but only when TL.followCart === true
-  function fitCartBack(){
-    try {
-      const hole = window.state?.course?.holes?.[String(window.state?.hole)];
-      const back = hole?.pins?.BACK;
-      const cm   = window.state?.cartMarker;
-      if (!back || !cm) return;
-      const ll   = cm.getLatLng();
-      const bnds = L.latLngBounds(L.latLng(ll.lat,ll.lng), L.latLng(back.lat,back.lng));
-      window.map.fitBounds(bnds, { padding:[70,70], animate:false });
-    } catch(e){}
-  }
-  // tie into "Cart View" button if present
-  const cartBtn = document.getElementById('cartViewBtn');
-  if (cartBtn) cartBtn.addEventListener('click', ()=>{ TL.followCart=true; fitCartBack(); });
-  const holeBtn = document.getElementById('holeViewBtn');
-  if (holeBtn) holeBtn.addEventListener('click', ()=>{ TL.followCart=false; });
-
-  // gentle poll to keep in frame while moving
-  if (!TL.__followTimer){
-    TL.__followTimer = setInterval(()=>{ if (TL.followCart) fitCartBack(); }, 1200);
-  }
-
-})();</script>
 </body>
 </html>
