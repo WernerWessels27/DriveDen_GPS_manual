@@ -161,12 +161,15 @@
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
   
-/* Minimal rules modal & placement */
-.topRightMini { position:absolute; top:108px; right:10px; z-index:1200; display:flex; flex-direction:column; gap:8px; }
-.btnMini { border:1px solid #00000022; background:#ffffff; color:#0b0b0b; border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
-.modalBackMini { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); place-items:center; z-index:1400; }
-.modalMini { width:min(92vw, 880px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-.modalMini h2 { margin:0 0 10px; font-size:18px; display:flex; align-items:center; justify-content:space-between; }
+/* PATCH: labels + rules UI */
+.layupLabel{background:#000;color:#fff;padding:6px 14px;border-radius:999px;font-size:14px;font-weight:800;border:1px solid #00000066;white-space:nowrap;}
+.topRightMini{position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;}
+.btnMini{border:1px solid #00000022;background:#ffffff;color:#0b0b0b;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+.modalBackMini{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);place-items:center;z-index:1600;}
+.modalMini{width:min(92vw,880px);max-height:84vh;overflow:auto;background:#fff;color:#0b0b0b;border:1px solid #00000022;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);}
+.modalMini h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;justify-content:space-between;}
+.clearLayupFloating{display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:72px;z-index:1400;padding:10px 16px;border-radius:999px;border:1px solid #00000022;background:#ffffff;font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+
 </style>
 </head>
 <body data-theme="light">
@@ -337,16 +340,16 @@
     `;
 
     const ICONS = {
-      TEE: dotIcon('#16a34a', 14),
+      TEE: L.icon({iconUrl:'data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 24 24'><path d='M8 2h8v3l-4 3-4-3V2zm4 8c.6 0 1 .4 1 1v7l2 3H9l2-3v-7c0-.6.4-1 1-1z' fill='#16a34a'/></svg>', iconSize:[30,30], iconAnchor:[15,28]}),
       FRONT: dotIcon('#ffffff', 12),
-      MID: dotIcon('#fbbf24', 12),
+      MID: L.icon({iconUrl:'data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24'><path d='M11 3h1v18h-1z' fill='#fbbf24'/><path d='M12 4l7 3-7 3z' fill='#fbbf24'/></svg>', iconSize:[36,36], iconAnchor:[12,34]}),
       BACK: dotIcon('#ef4444', 12),
-      TOILET: largeSymbolIcon(TOILET_SVG, 36),
-      TAPS: largeSymbolIcon(TAP_SVG, 36),
+      TOILET: L.icon({iconUrl:'data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24'><text x='12' y='15' text-anchor='middle' font-size='16'>🚻</text></svg>', iconSize:[28,28], iconAnchor:[14,14]}),
+      TAPS: L.icon({iconUrl:'data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24'><text x='12' y='15' text-anchor='middle' font-size='16'>🚰</text></svg>', iconSize:[28,28], iconAnchor:[14,14]}),
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: dotIcon('#3b82f6', 12),
+      CART: L.icon({iconUrl:'data:image/svg+xml;utf8,<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 24 24'><path d='M4 6h2l2.2 8.5c.1.4.5.7.9.7h7.6c.5 0 .9-.3 1-.8l1.2-5.4c.1-.6-.3-1.1-.9-1.1H8.4l-.4-2H4zm4.5 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm8 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z' fill='#16a34a'/></svg>', iconSize:[30,30], iconAnchor:[15,15]}),
       LAYUP: dotIcon('#111111', 12)
     };
 
@@ -929,7 +932,6 @@
     })();
   </script>
 
-  <!-- Rules Modal (rich HTML) -->
   <div class="modalBackMini" id="rulesModalMini">
     <div class="modalMini">
       <h2>
@@ -944,14 +946,6 @@
           <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
           <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
         </ul>
-        <h3>Quick Pointers</h3>
-        <ol>
-          <li>Play the ball as it lies unless a Rule permits relief.</li>
-          <li>Relief areas: nearest point of complete relief.</li>
-          <li>Penalty areas: red vs yellow stakes determine options.</li>
-          <li>Out of bounds: white stakes/lines — stroke-and-distance.</li>
-          <li>Unplayable ball: 1-stroke penalty, three options (Rule 19.2).</li>
-        </ol>
       </div>
     </div>
   </div>
