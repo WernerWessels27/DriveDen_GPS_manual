@@ -1,5 +1,5 @@
 /* TrackLinq Service Worker
-   v2.2 — App shell + course JSON precache, OSM/Esri tile cache, offline login
+   v2.3 — App shell + course JSON precache, OSM/Esri tile cache, offline login
 */
 
 const VERSION = 'v2.2';
