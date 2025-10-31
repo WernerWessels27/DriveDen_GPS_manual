@@ -1,4 +1,3 @@
-This is an example of simple text.
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,13 +161,13 @@ This is an example of simple text.
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
   
-/* == Minimal patch: Rules button, modal, safe placement, no other UI shifts == */
+/* Minimal rules modal & placement */
 .topRightMini { position:absolute; top:108px; right:10px; z-index:1200; display:flex; flex-direction:column; gap:8px; }
 .btnMini { border:1px solid #00000022; background:#ffffff; color:#0b0b0b; border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
 .modalBackMini { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); place-items:center; z-index:1400; }
 .modalMini { width:min(92vw, 880px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
 .modalMini h2 { margin:0 0 10px; font-size:18px; display:flex; align-items:center; justify-content:space-between; }
-\1
+</style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -943,17 +942,16 @@ This is an example of simple text.
         <ul>
           <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
           <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
-          <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules & Resources</a></li>
+          <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
         </ul>
         <h3>Quick Pointers</h3>
         <ol>
           <li>Play the ball as it lies unless a Rule permits relief.</li>
-          <li>Relief areas: know your nearest point of complete relief.</li>
-          <li>Penalty areas: red vs yellow stakes determine your options.</li>
+          <li>Relief areas: nearest point of complete relief.</li>
+          <li>Penalty areas: red vs yellow stakes determine options.</li>
           <li>Out of bounds: white stakes/lines — stroke-and-distance.</li>
-          <li>Unplayable ball: 1-stroke penalty, three relief options (Rule 19.2).</li>
+          <li>Unplayable ball: 1-stroke penalty, three options (Rule 19.2).</li>
         </ol>
-        <p style="color:#6b7280;">(Replace this with your club’s local rules or visuals.)</p>
       </div>
     </div>
   </div>
