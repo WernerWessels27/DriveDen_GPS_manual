@@ -160,13 +160,28 @@
 
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
-  </style>
+  
+/* === PATCH: Rules modal + minor styles === */
+.topRightMini{position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;}
+.btnMini{border:1px solid #00000022;background:#ffffff;color:#0b0b0b;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+.modalBackMini{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);place-items:center;z-index:1600;}
+.modalMini{width:min(92vw,880px);max-height:84vh;overflow:auto;background:#fff;color:#0b0b0b;border:1px solid #00000022;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);}
+.modalMini h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;justify-content:space-between;}
+/* More generous layup text bubble if class exists in base */
+.layupLabel{padding:6px 14px;border-radius:999px;font-size:14px;font-weight:800;white-space:nowrap;}
+
+</style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
 
   <!-- Top course banner -->
   <div class="banner">
+
+  <div class="topRightMini">
+    <button class="btnMini" id="rulesBtnMini">Rules</button>
+  </div>
+
     <div class="left"></div>
     <h1 id="courseTitle">Course</h1>
     <div class="right">
@@ -916,5 +931,26 @@
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
   </script>
+
+<!-- Rules Modal (rich HTML; closes on button or backdrop) -->
+<div class="modalBackMini" id="rulesModalMini">
+  <div class="modalMini">
+    <h2>
+      <span>Official Rules (Reference)</span>
+      <button class="btnMini" id="rulesCloseMini">Close</button>
+    </h2>
+    <div id="rulesBodyMini">
+      <p>This panel supports <strong>rich HTML</strong> (images, links, embeds).</p>
+      <p>Authoritative sources:</p>
+      <ul>
+        <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
+        <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
+        <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
+      </ul>
+      <p style="color:#6b7280;margin-top:8px;">(Replace with your local rules, images, or videos.)</p>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
