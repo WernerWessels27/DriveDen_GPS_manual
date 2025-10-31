@@ -2,7 +2,7 @@
    v2.3 — App shell + course JSON precache, OSM/Esri tile cache, offline login
 */
 
-const VERSION = 'v2.2';
+const VERSION = 'v2.3';
 const STATIC_CACHE = `static-${VERSION}`;
 const RUNTIME_CACHE = `runtime-${VERSION}`;
 const TILE_CACHE = `tiles-${VERSION}`;
