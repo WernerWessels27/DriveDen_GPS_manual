@@ -162,29 +162,13 @@ This is an example of simple text.
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
   
-/* ==== TrackLinq patch (Rules/Toggle lower; bigger layup labels) ==== */
-.topRight { position:absolute; top:108px; right:10px; z-index:1120; display:flex; flex-direction:column; gap:8px; }
-.iconBtn, .toggleBtn {
-  border:1px solid #00000022; background:#ffffff; color:#0b0b0b;
-  border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer;
-  display:flex; align-items:center; gap:8px; box-shadow:0 1px 2px rgba(0,0,0,.05);
-}
-.toggleBtn { justify-content:space-between; min-width:170px; }
-.switch { width:48px; height:26px; border-radius:999px; border:1px solid #00000022; background:#f0f0f0; position:relative; }
-.knob { position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:1px solid #00000022; transition:all .18s; }
-.switch.on { background:#d3f8df; } .switch.on .knob { left:24px; }
-
-.clearLayupFloating {
-  display:none; position:absolute; left:50%; transform:translateX(-50%);
-  bottom:72px; z-index:1060; padding:10px 16px; border-radius:999px;
-  border:1px solid #00000022; background:#ffffff; font-weight:800; cursor:pointer;
-  box-shadow:0 1px 2px rgba(0,0,0,.06);
-}
-.layupLabel {
-  background:#000; color:#fff; padding:6px 14px; border-radius:999px;
-  font-size:14px; font-weight:800; border:1px solid #00000066; white-space:nowrap;
-}
-</style>
+/* == Minimal patch: Rules button, modal, safe placement, no other UI shifts == */
+.topRightMini { position:absolute; top:108px; right:10px; z-index:1200; display:flex; flex-direction:column; gap:8px; }
+.btnMini { border:1px solid #00000022; background:#ffffff; color:#0b0b0b; border-radius:12px; padding:8px 12px; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.modalBackMini { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); place-items:center; z-index:1400; }
+.modalMini { width:min(92vw, 880px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+.modalMini h2 { margin:0 0 10px; font-size:18px; display:flex; align-items:center; justify-content:space-between; }
+\1
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -192,12 +176,8 @@ This is an example of simple text.
   <!-- Top course banner -->
   <div class="banner">
 
-  <div class="topRight">
-    <button class="iconBtn" id="rulesBtn">Rules</button>
-    <div class="toggleBtn" id="penToggle">
-      <span>Penalties</span>
-      <div class="switch" id="penSwitch"><div class="knob"></div></div>
-    </div>
+  <div class="topRightMini">
+    <button class="btnMini" id="rulesBtnMini">Rules</button>
   </div>
 
     <div class="left"></div>
@@ -950,19 +930,30 @@ This is an example of simple text.
     })();
   </script>
 
-  <!-- Rules Modal -->
-  <div class="modalBack" id="rulesModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); place-items:center; z-index:1400;">
-    <div class="modal" style="width:min(92vw, 860px); max-height:84vh; overflow:auto; background:#fff; color:#0b0b0b; border:1px solid #00000022; border-radius:16px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25);">
-      <h2 style="margin:0 0 10px; font-size:18px; display:flex; align-items:center; justify-content:space-between;">
-        <span>Rules</span>
-        <button class="btn close" id="closeRules" style="border:1px solid #00000022; background:#f3f4f6; border-radius:10px; padding:8px 10px; font-weight:800; cursor:pointer;">Close</button>
+  <!-- Rules Modal (rich HTML) -->
+  <div class="modalBackMini" id="rulesModalMini">
+    <div class="modalMini">
+      <h2>
+        <span>Official Rules (Reference)</span>
+        <button class="btnMini" id="rulesCloseMini">Close</button>
       </h2>
-      <div id="rulesBody">
-        <p style="margin:8px 0; color:#374151;">This panel supports <strong>rich HTML</strong> content. Paste text, images, or embed hosted videos here.</p>
-        <div style="display:grid; gap:6px; margin-top:8px;">
-          <div><strong>Local Rule A:</strong> Example placeholder text.</div>
-          <div><strong>Local Rule B:</strong> Example placeholder text.</div>
-        </div>
+      <div id="rulesBodyMini">
+        <p>This panel supports <strong>rich HTML</strong> (images, links, embeds).</p>
+        <p>Authoritative sources:</p>
+        <ul>
+          <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
+          <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
+          <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules & Resources</a></li>
+        </ul>
+        <h3>Quick Pointers</h3>
+        <ol>
+          <li>Play the ball as it lies unless a Rule permits relief.</li>
+          <li>Relief areas: know your nearest point of complete relief.</li>
+          <li>Penalty areas: red vs yellow stakes determine your options.</li>
+          <li>Out of bounds: white stakes/lines — stroke-and-distance.</li>
+          <li>Unplayable ball: 1-stroke penalty, three relief options (Rule 19.2).</li>
+        </ol>
+        <p style="color:#6b7280;">(Replace this with your club’s local rules or visuals.)</p>
       </div>
     </div>
   </div>
