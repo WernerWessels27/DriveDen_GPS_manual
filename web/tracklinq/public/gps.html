@@ -131,20 +131,23 @@
     }
     .clearLayupFloating .btn { background: var(--panel); }
 
+    /* Top-right column: Rules + Penalties toggle */
+    .topRightCol{position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;}
+    .btnMini{border:1px solid #00000022;background:#ffffff;color:#0b0b0b;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+    .toggleRow{display:flex;align-items:center;gap:8px;}
+    .toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;}
+    .toggle input{appearance:none;width:38px;height:22px;border-radius:999px;background:#ddd;position:relative;outline:none;border:1px solid #ccc;}
+    .toggle input:checked{background:#16a34a;}
+    .toggle input::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:all .2s;}
+    .toggle input:checked::after{transform:translateX(16px);}
+
     /* Modals */
-    .modalBack {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: none; place-items: center; z-index: 1200;
-    }
-    .modal {
-      width: min(92vw, 920px); max-height: 84vh; overflow: auto;
-      background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--shadow);
-    }
+    .modalBack { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: none; place-items: center; z-index: 1200; }
+    .modal { width: min(92vw, 920px); max-height: 84vh; overflow: auto; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); }
     .modal h2 { margin: 0 0 10px; font-size: 18px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 8px; border-bottom: 1px solid var(--border); text-align: center; }
-    input.strokes, input.nameInp, input.hcapInp {
-      width: 70px; padding: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--chip); color: var(--text); text-align: center;
-    }
+    input.strokes, input.nameInp, input.hcapInp { width: 70px; padding: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--chip); color: var(--text); text-align: center; }
     .modalActions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 
     /* Hide Leaflet UI */
@@ -152,42 +155,34 @@
     .leaflet-bottom.leaflet-right { display: none !important; }
 
     /* Layup label bubble (bigger) */
-    .layupLabel {
-      background: var(--panel); color: var(--text);
-      border: 1px solid var(--chip-border); padding: 6px 8px; border-radius: 10px;
-      font-size: 14px; font-weight: 900; box-shadow: var(--shadow);
-    }
+    .layupLabel { background: var(--panel); color: var(--text); border: 1px solid var(--chip-border); padding: 6px 12px; border-radius: 12px; font-size: 14px; font-weight: 900; box-shadow: var(--shadow); white-space:nowrap; }
 
-    /* Theme toggle */
-    .themeBtn { border-color: var(--accent-3); }
-  
-/* === PATCH: Rules modal + minor styles === */
-.topRightMini{position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;}
-.btnMini{border:1px solid #00000022;background:#ffffff;color:#0b0b0b;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06);}
-.modalBackMini{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);place-items:center;z-index:1600;}
-.modalMini{width:min(92vw,880px);max-height:84vh;overflow:auto;background:#fff;color:#0b0b0b;border:1px solid #00000022;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);}
-.modalMini h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;justify-content:space-between;}
-/* More generous layup text bubble if class exists in base */
-.layupLabel{padding:6px 14px;border-radius:999px;font-size:14px;font-weight:800;white-space:nowrap;}
-
-</style>
+    /* Rules modal */
+    .modalBackMini{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);place-items:center;z-index:1600;}
+    .modalMini{width:min(92vw,880px);max-height:84vh;overflow:auto;background:#fff;color:#0b0b0b;border:1px solid #00000022;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);}
+    .modalMini h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;justify-content:space-between;}
+  </style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
 
   <!-- Top course banner -->
   <div class="banner">
-
-  <div class="topRightMini">
-    <button class="btnMini" id="rulesBtnMini">Rules</button>
-  </div>
-
     <div class="left"></div>
     <h1 id="courseTitle">Course</h1>
     <div class="right">
       <button class="btn themeBtn" id="themeBtn">🌞</button>
       <button class="btn" id="exitBtn">Exit</button>
     </div>
+  </div>
+
+  <!-- Top-right: Rules + Penalties toggle -->
+  <div class="topRightCol">
+    <button class="btnMini" id="rulesBtnMini">Rules</button>
+    <label class="toggle">
+      <input type="checkbox" id="penToggle">
+      <span>Penalties</span>
+    </label>
   </div>
 
   <!-- Center hole bar -->
@@ -258,6 +253,7 @@
         <div id="playersGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:10px;"></div>
         <div class="modalActions">
           <button class="btn" id="createCard">Create scorecard</button>
+          <button class="btn" id="closeSetup">Close</button>
         </div>
         <hr style="border-color:var(--border); margin:12px 0;">
       </div>
@@ -284,6 +280,26 @@
       <div class="modalActions">
         <button class="btn" id="closeHist">Close</button>
         <button class="btn" id="clearHist">Clear History</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rules Modal (rich HTML; closes on button or backdrop) -->
+  <div class="modalBackMini" id="rulesModalMini">
+    <div class="modalMini">
+      <h2>
+        <span>Official Rules (Reference)</span>
+        <button class="btnMini" id="rulesCloseMini">Close</button>
+      </h2>
+      <div id="rulesBodyMini">
+        <p>This panel supports <strong>rich HTML</strong> (images, links, embeds).</p>
+        <p>Authoritative sources:</p>
+        <ul>
+          <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
+          <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
+          <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
+        </ul>
+        <p style="color:#6b7280;margin-top:8px;">(Replace with your local rules, images, or videos.)</p>
       </div>
     </div>
   </div>
@@ -316,7 +332,13 @@
       });
     })();
 
-    // Icons
+    // Icons (cart SVG nicer than dot)
+    function svgIcon(svgPath, size=28, anchor='center'){
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 48 48'>${svgPath}</svg>`);
+      const a = anchor==='center' ? [size/2,size/2] : [size/2,size];
+      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:a });
+    }
     function dotIcon(color='#ffffff', size=12){
       const r=Math.floor(size/2);
       const svg=encodeURIComponent(`<?xml version="1.0"?>
@@ -338,18 +360,27 @@
       <rect x='2' y='2' width='36' height='36' rx='8' fill='#0ea5e9'/>
       <path d='M10 18h10v-2h2v-2h8v2h-6v2h-4v4h4v2h-8v-2h2v-4h-8v-2h0Z' fill='white'/>
     `;
+    const CART_SVG = `
+      <g fill="#16a34a">
+        <path d="M8 16h26l3 10H12z"/>
+        <circle cx="16" cy="32" r="4" fill="#0a0a0a"/>
+        <circle cx="34" cy="32" r="4" fill="#0a0a0a"/>
+      </g>
+    `;
+    const FLAG_SVG = `<path d="M12 36V8h2l12 6-12 6" stroke="#ef4444" stroke-width="3" fill="none"/><circle cx="12" cy="36" r="3" fill="#0a0a0a"/>`;
 
     const ICONS = {
-      TEE: dotIcon('#16a34a', 14),
-      FRONT: dotIcon('#ffffff', 12),
-      MID: dotIcon('#fbbf24', 12),
-      BACK: dotIcon('#ef4444', 12),
-      TOILET: largeSymbolIcon(TOILET_SVG, 36),
-      TAPS: largeSymbolIcon(TAP_SVG, 36),
+      TEE: svgIcon(FLAG_SVG, 28),
+      // Hide FRONT/BACK markers on map; still compute distances. We'll not add them as markers.
+      FRONT: dotIcon('#ffffff', 1), // placeholder if needed
+      MID: svgIcon(FLAG_SVG, 36),   // prominent flag at MID
+      BACK: dotIcon('#ef4444', 1),  // placeholder
+      TOILET: largeSymbolIcon(TOILET_SVG, 32),
+      TAPS: largeSymbolIcon(TAP_SVG, 32),
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: dotIcon('#3b82f6', 12),
+      CART: svgIcon(CART_SVG, 30, 'bottom'),
       LAYUP: dotIcon('#111111', 12)
     };
 
@@ -432,7 +463,11 @@
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
-      initialFramed:false
+      initialFramed:false,
+      stakeMarkers:[],
+      noGoPolys:[],
+      inNoGo:false,
+      lastFitTs:0
     };
 
     // Distance helpers
@@ -468,19 +503,30 @@
     }
 
     // Markers & fitting
-    function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
-    function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
-    function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
+    function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; state.stakeMarkers=[]; }
+    function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}); m.addTo(map); state.markers.push(m); return m; }
+    function fitBetween(a,b){
+      const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
+      map.fitBounds(bounds,{padding:[60,60]});
+    }
+    function fitCartBack(){
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      const cart = fromCart();
+      if (cart && p.BACK){
+        const now = Date.now();
+        if (now - state.lastFitTs > 750){ // throttle to avoid jitter
+          fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]);
+          state.lastFitTs = now;
+        }
+      }
+    }
 
     function doHoleView(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     }
     function doCartView(){
-      const p = state.course.holes[String(state.hole)]?.pins || {};
-      const cart = fromCart();
-      if (cart && p.BACK){ fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
-      else if (p.TEE && p.BACK){ fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); } // fallback
+      fitCartBack();
     }
     function ensureInitialFraming(){
       if (state.initialFramed) return;
@@ -497,20 +543,28 @@
       if(!h) return;
 
       const p = h.pins || {};
+
+      // TEE and MID flagstick; hide FRONT/BACK markers on map (but keep for math)
       if (p.TEE)   addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
-      if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
       if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
-      if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
+      //if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
+      //if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
 
       if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
-      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
-      (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
-      (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
+
+      // Stakes captured for toggle
+      (p.STAKE_WHITE || []).forEach(s => { const m = addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'); state.stakeMarkers.push(m); });
+      (p.STAKE_RED   || []).forEach(s => { const m = addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)');   state.stakeMarkers.push(m); });
+      (p.STAKE_YELLOW|| []).forEach(s => { const m = addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'); state.stakeMarkers.push(m); });
+
+      // No-go polygons
+      state.noGoPolys = (p.NO_GO_POLY || []).map(poly => L.polygon(poly.map(x=>[x.lat,x.lng]), { color:'#ef4444', fillColor:'#ef4444', fillOpacity:0.12, weight:1, interactive:false }).addTo(map));
 
       updateChips(p);
       ensureInitialFraming();
       updateLayupUI();
+      applyPenToggle(); // enforce persisted toggle
     }
 
     // View buttons
@@ -536,11 +590,32 @@
     // Exit -> back to login
     $('#exitBtn').addEventListener('click', ()=>{ location.href = '/index.html'; });
 
-    // Geolocation (watch for live CART updates)
+    // Rules open/close
+    (function(){
+      const modal = $('#rulesModalMini');
+      $('#rulesBtnMini').addEventListener('click', ()=> modal.style.display='grid');
+      $('#rulesCloseMini').addEventListener('click', ()=> modal.style.display='none');
+      modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.style.display='none'; });
+    })();
+
+    // Penalties toggle
+    const penKey = 'penalties_show';
+    const penToggle = $('#penToggle');
+    penToggle.checked = localStorage.getItem(penKey) === '1';
+    function applyPenToggle(){
+      const show = penToggle.checked;
+      state.stakeMarkers.forEach(m => show ? m.addTo(map) : map.removeLayer(m));
+      localStorage.setItem(penKey, show ? '1' : '0');
+    }
+    penToggle.addEventListener('change', applyPenToggle);
+
+    // Geolocation (watch for live CART updates + follow + no-go check)
     function updateCartAndChips(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
+      fitCartBack();
+      checkNoGo();
     }
     if (navigator.geolocation){
       navigator.geolocation.watchPosition((pos)=>{
@@ -548,7 +623,7 @@
         if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
         updateCartAndChips();
-      }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
+      }, ()=>{}, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
     }
 
     // LAYUP with lines and labels
@@ -577,12 +652,12 @@
 
       if (cartSrc){
         const cartDist = fmt(haversine(cartSrc, P));
-        state.layupSolid = L.polyline([[cartSrc.lat,cartSrc.lng],[P.lat,P.lng]], { color:'#111', weight:3, opacity:1 }).addTo(map);
+        state.layupSolid = L.polyline([[cartSrc.lat,cartSrc.lng],[P.lat,P.lng]], { color:'#0a0a0a', weight:3, opacity:1 }).addTo(map);
         state.layupLabel1 = labelAt(midPoint(cartSrc,P), `${cartDist} ${state.unit}`).addTo(map);
       }
       if (mid){
         const midDist  = fmt(haversine(P, mid));
-        state.layupDash = L.polyline([[P.lat,P.lng],[mid.lat,mid.lng]], { color:'#111', weight:3, opacity:1, dashArray:'6,6' }).addTo(map);
+        state.layupDash = L.polyline([[P.lat,P.lng],[mid.lat,mid.lng]], { color:'#0a0a0a', weight:3, opacity:1, dashArray:'6,6' }).addTo(map);
         state.layupLabel2 = labelAt(midPoint(P,mid), `${midDist} ${state.unit}`).addTo(map);
       }
       toggleClearLayupBtn();
@@ -806,6 +881,7 @@
       $('#scoreBody').style.display  = 'block';
       persistScoreStateFromUI(ps, useH);
     });
+    $('#closeSetup').addEventListener('click', ()=> $('#scoreModal').style.display='none');
 
     $('#clearScore').addEventListener('click', ()=>{
       if (!confirm('Clear current scorecard?')) return;
@@ -930,27 +1006,39 @@
       renderHole();
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
+
+    // --- No-go detection ---
+    function pointInPoly(pt, polyLatLngs){
+      let inside = false;
+      for (let i=0, j=polyLatLngs.length-1; i<polyLatLngs.length; j=i++){
+        const xi = polyLatLngs[i][1], yi = polyLatLngs[i][0];
+        const xj = polyLatLngs[j][1], yj = polyLatLngs[j][0];
+        const intersect = ((yi>pt.lat)!=(yj>pt.lat)) && (pt.lng < (xj - xi)*(pt.lat - yi)/(yj - yi + 1e-12) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    function checkNoGo(){
+      if (!state.cartMarker || !state.noGoPolys.length) return;
+      const ll = state.cartMarker.getLatLng();
+      let inside = false;
+      for (const poly of state.noGoPolys){
+        const latlngs = poly.getLatLngs()[0] || [];
+        if (latlngs.length >= 3 && pointInPoly({lat:ll.lat,lng:ll.lng}, latlngs.map(p=>[p.lat,p.lng]))){ inside = true; break; }
+      }
+      if (inside && !state.inNoGo){
+        state.inNoGo = true;
+        try {
+          const ctx = new (window.AudioContext||window.webkitAudioContext)();
+          const o = ctx.createOscillator(); const g = ctx.createGain();
+          o.type='sine'; o.frequency.value = 880; g.gain.value = 0.05;
+          o.connect(g); g.connect(ctx.destination); o.start(); setTimeout(()=>{o.stop(); ctx.close();}, 200);
+        } catch(_) {}
+        toast('Please stay clear of Greens or other no-go zones.', 2500);
+      } else if (!inside && state.inNoGo){
+        state.inNoGo = false;
+      }
+    }
   </script>
-
-<!-- Rules Modal (rich HTML; closes on button or backdrop) -->
-<div class="modalBackMini" id="rulesModalMini">
-  <div class="modalMini">
-    <h2>
-      <span>Official Rules (Reference)</span>
-      <button class="btnMini" id="rulesCloseMini">Close</button>
-    </h2>
-    <div id="rulesBodyMini">
-      <p>This panel supports <strong>rich HTML</strong> (images, links, embeds).</p>
-      <p>Authoritative sources:</p>
-      <ul>
-        <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
-        <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
-        <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
-      </ul>
-      <p style="color:#6b7280;margin-top:8px;">(Replace with your local rules, images, or videos.)</p>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
