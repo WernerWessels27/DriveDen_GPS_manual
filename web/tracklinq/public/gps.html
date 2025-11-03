@@ -161,6 +161,12 @@
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
   </style>
+
+/* Layup text no-wrap and wider */
+#layupText { white-space: nowrap; }
+#layupBox, .layupBox { max-width: 88vw; }
+
+
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -271,7 +277,7 @@
         </div>
         <div id="playersGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:10px;"></div>
         <div class="modalActions">
-          <button class="btn" id="createCard">Create scorecard</button>
+          <button class="btn" id="createCard">Create scorecard</button> <button class="btn" id="closeSetup">Close</button>
         </div>
         <hr style="border-color:var(--border); margin:12px 0;">
       </div>
@@ -368,7 +374,7 @@
     };
 
     // Map (Esri; no visible Leaflet controls)
-    const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
+    window.__leafletMap = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19 }
@@ -945,7 +951,151 @@
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
   </script>
-</body>
+
+<script>
+
+// After renderHole, collect stake markers by title and apply current visibility
+(function(){
+  if (!window.__collectStakesOnce){
+    window.__collectStakesOnce = true;
+    const origRender = window.renderHole;
+    if (typeof origRender === 'function'){
+      window.renderHole = function(){
+        origRender();
+        try{
+          const map = window.__leafletMap;
+          window.__stakeMarkers = [];
+          // find markers on map by scanning state.markers if available
+          if (window.state && Array.isArray(state.markers)){
+            state.markers.forEach(m => {
+              const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+              if (t.includes('stake')) window.__stakeMarkers.push(m);
+              // hide FRONT/BACK pins on map to declutter while still using for fit/distances
+              if (t === 'front' || t === 'back'){
+                if (m._map) map.removeLayer(m);
+              }
+            });
+          }
+          if (window.__applyPenToggle && window.__penaltiesOn) {
+            window.__applyPenToggle(window.__penaltiesOn());
+          }
+        }catch(e){ console.warn('collect stakes error', e); }
+      }
+    }
+  }
+})();
+
+</script>
+
+<script>
+
+// No-go zones detection (supports pins.NOGO, pins.NO_GO, pins.NO_GO_ZONES)
+// Expects each zone as an array of {lat,lng} points (polygon)
+(function(){
+  function pointInPoly(pt, poly){
+    // ray casting
+    let x = pt.lat, y = pt.lng;
+    let inside = false;
+    for (let i=0,j=poly.length-1; i<poly.length; j=i++){
+      let xi = poly[i].lat, yi = poly[i].lng;
+      let xj = poly[j].lat, yj = poly[j].lng;
+      let intersect = ((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+  window.__nogoZones = [];
+  window.__loadNoGoForHole = function(hole){
+    window.__nogoZones = [];
+    try{
+      const pins = (hole && hole.pins) || {};
+      const candidates = [].concat(
+        pins.NOGO || [],
+        pins.NO_GO || [],
+        pins.NO_GO_ZONES || []
+      );
+      // candidates may be array of polygons OR single polygon
+      candidates.forEach(zone => {
+        if (!zone) return;
+        if (Array.isArray(zone) && zone.length && zone[0].lat!==undefined) {
+          window.__nogoZones.push(zone);
+        } else if (Array.isArray(zone)) {
+          // array of arrays
+          zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
+        }
+      });
+      // console.log('No-go zones loaded:', window.__nogoZones.length);
+    }catch(e){}
+  };
+  // Hook renderHole to refresh zones
+  (function(){
+    const orig = window.renderHole;
+    if (typeof orig === 'function'){
+      window.renderHole = function(){
+        orig();
+        const h = window.state && window.state.course && window.state.course.holes
+                  ? window.state.course.holes[String(window.state.hole)] : null;
+        window.__loadNoGoForHole(h || {});
+      };
+    }
+  })();
+  // Geolocation watcher hook to alert if inside
+  (function(){
+    const origCartUpdate = window.updateCartAndChips;
+    window.__wasInNoGo = false;
+    window.updateCartAndChips = function(){
+      if (typeof origCartUpdate === 'function') origCartUpdate();
+      try{
+        const cm = window.state && window.state.cartMarker;
+        if (!cm) return;
+        const ll = cm.getLatLng();
+        const pt = {lat: ll.lat, lng: ll.lng};
+        let inside = false;
+        for (const poly of (window.__nogoZones||[])){
+          if (pointInPoly(pt, poly)) { inside = true; break; }
+        }
+        if (inside && !window.__wasInNoGo){
+          window.__wasInNoGo = true;
+          try{
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
+            o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 350);
+          }catch(e){}
+          const t = document.getElementById('toast');
+          if (t){ t.textContent = 'Please stay clear of greens / no-go zones.'; t.style.display='block'; setTimeout(()=> t.style.display='none', 2500); }
+        }
+        if (!inside) window.__wasInNoGo = false;
+      }catch(e){}
+    };
+  })();
+})();
+
+</script>
+
+<script>
+
+// Hide FRONT/BACK markers from map after render to reduce clutter; keep for distances
+(function(){
+  const orig = window.renderHole;
+  if (typeof orig === 'function'){
+    window.renderHole = function(){
+      orig();
+      try{
+        const map = window.__leafletMap;
+        if (window.state && Array.isArray(state.markers)){
+          state.markers.forEach(m => {
+            const t = (m && m.options && m.options.title) ? String(m.options.title).toUpperCase() : '';
+            if (t==='FRONT' || t==='BACK'){ if (m._map) map.removeLayer(m); }
+          });
+        }
+      }catch(e){}
+    }
+  }
+})();
+
+</script>
+</body></body></body></body>
 <script>
 // Rules modal logic
 (function(){
