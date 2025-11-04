@@ -464,7 +464,7 @@
     }
 
     // State
-    const state = {
+    const state = { inNoGo:false, 
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
@@ -1137,7 +1137,98 @@ window.__patchBlock = true;
 
 // Layup width fix (ensure no wrap at runtime too)
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
+
+  // ---- NO-GO ZONE HELPERS ----
+  function normRings(noGoRaw){
+    if(!noGoRaw) return [];
+    let rings = [];
+    const asPair = (v) => Array.isArray(v) ? [Number(v[0]), Number(v[1])] : [Number(v.lat), Number(v.lng)];
+    if(Array.isArray(noGoRaw) && noGoRaw.length){
+      if(noGoRaw[0] && (noGoRaw[0].lat!==undefined || Array.isArray(noGoRaw[0]))){
+        rings = [ noGoRaw.map(asPair) ];
+      } else {
+        rings = noGoRaw.map(r => (r||[]).map(asPair));
+      }
+    }
+    rings = rings.map(r => {
+      if(!r.length) return r;
+      const [a0,a1] = r[0]; const [b0,b1] = r[r.length-1];
+      if(a0!==b0 || a1!==b1) r = r.concat([[a0,a1]]);
+      return r;
+    });
+    return rings;
+  }
+  function pointInRing(lat, lng, ring){
+    let inside = false;
+    for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi>lng)!=(yj>lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi + 1e-12) + xi);
+      if(intersect) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInRings(lat,lng,rings){
+    for(const r of rings){ if(r.length>=4 && pointInRing(lat,lng,r)) return true; }
+    return false;
+  }
+  let _beepCtx = null;
+  function ensureBeepReady(){
+    try{ if(!_beepCtx) _beepCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  }
+  function playBeep(){
+    try{
+      if(!_beepCtx) return;
+      const o=_beepCtx.createOscillator(), g=_beepCtx.createGain();
+      o.type='sine'; o.frequency.value=880;
+      o.connect(g); g.connect(_beepCtx.destination);
+      g.gain.setValueAtTime(0.001, _beepCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.3, _beepCtx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, _beepCtx.currentTime+0.45);
+      o.start(); o.stop(_beepCtx.currentTime+0.5);
+    }catch(e){}
+  }
+
+
+  // ---- NO-GO ZONE UI WIRING ----
+  (function(){
+    const close = document.getElementById('nogoClose');
+    if(close){ close.addEventListener('click', ()=>{ const m=document.getElementById('nogoModal'); if(m) m.style.display='none'; }); }
+    const prime = ()=>{ try{ ensureBeepReady(); document.removeEventListener('touchstart', prime, {passive:true}); document.removeEventListener('click', prime, true);}catch(e){} };
+    document.addEventListener('touchstart', prime, {passive:true});
+    document.addEventListener('click', prime, true);
+  })();
+
+
+  // ---- NO-GO ZONE CHECK ----
+  function checkNoGoAt(lat,lng){
+    try{
+      const hole = state.course?.holes?.[String(state.hole)];
+      const raw = hole?.pins?.NO_GO;
+      const rings = normRings(raw);
+      const inside = rings.length ? pointInRings(lat,lng,rings) : false;
+      if(inside && !state.inNoGo){
+        state.inNoGo = true;
+        const m = document.getElementById('nogoModal'); if(m) m.style.display='grid';
+        playBeep();
+        toast('No-go zone! Please keep off greens/marked areas.', 2500);
+      } else if(!inside && state.inNoGo){
+        state.inNoGo = false;
+      }
+    }catch(e){}
+  }
+
 </script>
+
+
+  <!-- No-Go Warning Modal -->
+  <div class="modalBack" id="nogoModal" style="display:none; place-items:center; z-index:1300;">
+    <div class="modal">
+      <h2>Restricted Area</h2>
+      <p>Please stay clear of greens and other no-go zones.</p>
+      <div class="modalActions"><button class="btn" id="nogoClose">OK</button></div>
+    </div>
+  </div>
 
 </body>
 </html>
