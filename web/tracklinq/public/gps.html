@@ -464,9 +464,11 @@
     }
 
     // State
-
-const state = { showStakes: true, stakeMs: [],
-
+    const state = {
+      meta:null, course:null, hole:1, markers:[], cartMarker:null,
+      unit:'m', // 'm' or 'yd'
+      layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
+      initialFramed:false
     };
 
     // Distance helpers
@@ -538,12 +540,9 @@ const state = { showStakes: true, stakeMs: [],
 
       if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
-state.stakeMs = [];
-(p.STAKE_WHITE||[]).forEach(s => state.stakeMs.push(addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)')));
-(p.STAKE_RED  ||[]).forEach(s => state.stakeMs.push(addMarker(s.lat, s.lng, ICONS.STAKE_RED,   'Stake (red)')));
-(p.STAKE_YELLOW||[]).forEach(s => state.stakeMs.push(addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW,'Stake (yellow)')));
-state.stakeMs.forEach(m => m.setOpacity(state.showStakes ? 1 : 0));
-
+      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
+      (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
+      (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
       updateChips(p);
       ensureInitialFraming();
@@ -1138,26 +1137,6 @@ window.__patchBlock = true;
 
 // Layup width fix (ensure no wrap at runtime too)
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
-
-
-
-  // Penalties toggle (hide/show stakes) – minimal & isolated
-  (function(){
-    var btn = document.getElementById('stakesBtnMini');
-    if(!btn) return;
-    function refresh(){ try{ btn.textContent = 'Penalties: ' + (state.showStakes ? 'On' : 'Off'); }catch(e){} }
-    btn.addEventListener('click', function(){
-      state.showStakes = !state.showStakes;
-      if (state.stakeMs && Array.isArray(state.stakeMs)){
-        state.stakeMs.forEach(function(m){ if(m && m.setOpacity) m.setOpacity(state.showStakes?1:0); });
-      }
-      refresh();
-    });
-    refresh();
-  })();
-
-
-  
 </script>
 
 </body>
