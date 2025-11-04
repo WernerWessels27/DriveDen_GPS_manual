@@ -391,9 +391,6 @@
 
     // Map (Esri; no visible Leaflet controls)
     const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
-    // Expose map for penalties toggle & helpers
-    window.__leafletMap = map; window.map = map;
-
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19 }
@@ -1028,12 +1025,17 @@ window.__patchBlock = true;
   }
   window.__applyPenToggle = function(show){
     try{
-      const map = window.__leafletMap || window.map;
-      if (!map) return;
+      // Non-destructive show/hide so we can always bring stakes back without re-adding layers
+      // 1) Ensure our stake cache is up-to-date
       window.__stakeMarkers = discoverStakeMarkers();
-      window.__stakeMarkers.forEach(m => {
-        if (show) { if (!m._map) m.addTo(map); }
-        else { if (m._map) map.removeLayer(m); }
+      (window.__stakeMarkers || []).forEach(m => {
+        // If the marker already has a DOM icon rendered, toggle its display
+        const icon = m && m._icon;
+        const shadow = m && m._shadow;
+        if (icon) icon.style.display = show ? '' : 'none';
+        if (shadow) shadow.style.display = show ? '' : 'none';
+        // Fallback: if no icon exists yet (not rendered), add to map once when showing
+        if (show && !m._map) { try { m.addTo(window.__leafletMap || window.map || m._map); } catch(e){} }
       });
     }catch(e){ console.warn('pen toggle error', e); }
   };
