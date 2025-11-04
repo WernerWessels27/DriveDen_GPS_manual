@@ -454,35 +454,6 @@ window.__leafletMap = map;
       initialFramed:false
     };
 
-/*** PATCH: stake tracking + visibility ***/
-state.stakeMarkers = [];
-
-function addStakeMarker(lat, lng, color){
-  const icon = color==='red' ? ICONS.STAKE_RED
-            : color==='yellow' ? ICONS.STAKE_YELLOW
-            : ICONS.STAKE_WHITE;
-  const m = L.marker([lat, lng], { icon, title: `stake-${color}` }).addTo(map);
-  state.markers.push(m);
-  state.stakeMarkers.push(m);
-  return m;
-}
-
-let penaltiesOn = (localStorage.getItem('penalties_show') === '1'); // default persist
-function applyPenaltiesVisibility(){
-  try{
-    state.stakeMarkers.forEach(m => {
-      if (penaltiesOn) { if (!map.hasLayer(m)) m.addTo(map); }
-      else             { if (map.hasLayer(m))  map.removeLayer(m); }
-    });
-  }catch(e){}
-}
-window.__applyPenToggle = function(on){
-  penaltiesOn = !!on;
-  localStorage.setItem('penalties_show', penaltiesOn ? '1' : '0');
-  applyPenaltiesVisibility();
-};
-
-
     // Distance helpers
     const toRad = d => d*Math.PI/180;
     function haversine(a,b){
@@ -538,8 +509,7 @@ window.__applyPenToggle = function(on){
 
     function renderHole(){
       clearMarkers();
-      state.stakeMarkers.forEach(m=>m.remove()); state.stakeMarkers=[];
-const h = state.course.holes[String(state.hole)];
+      const h = state.course.holes[String(state.hole)];
       $('#holeNo').textContent = state.hole;
       $('#par').textContent = h?.par ?? '-';
       $('#stroke').textContent = h?.stroke ?? '-';
@@ -980,9 +950,92 @@ const h = state.course.holes[String(state.hole)];
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
   </script>
-
 <script>
-// --- No-go detection: pins.NOGO / NO_GO / NO_GO_ZONES ---
+
+// Hide FRONT/BACK dots on GPS after render
+(function(){
+  function hideFrontBack(){
+    try{
+      const __map = window.__leafletMap || window.map;
+      if (window.state && Array.isArray(state.markers)){
+        state.markers.forEach(m=>{
+          const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+          if (t==='front' || t==='back'){
+            if (m._map) __map.removeLayer(m);
+          }
+        });
+      }
+    }catch(e){}
+  }
+  if (!window.__patchedRenderHoleHideFB && typeof window.renderHole === 'function'){
+    window.__patchedRenderHoleHideFB = true;
+    const orig = window.renderHole;
+    window.renderHole = function(){
+      orig();
+      hideFrontBack();
+    };
+  } else {
+    // run once on boot in case first render already happened
+    hideFrontBack();
+  }
+})();
+
+</script>
+<script>
+
+// -- Penalties robust cache --
+(function(){
+  function collectFromState(){
+    const arr = [];
+    try{
+      if (window.state && Array.isArray(state.markers)){
+        state.markers.forEach(m=>{
+          const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+          if (t.includes('stake')) arr.push(m);
+        });
+      }
+    }catch(e){}
+    return arr;
+  }
+  window.__allStakeMarkers = window.__allStakeMarkers || [];
+  if (!window.__patchedRenderHoleStakeCache && typeof window.renderHole === 'function'){
+    window.__patchedRenderHoleStakeCache = true;
+    const orig = window.renderHole;
+    window.renderHole = function(){
+      orig();
+      try {
+        const fresh = collectFromState();
+        window.__allStakeMarkers = fresh.slice();
+        const on = (localStorage.getItem('penalties_show') === '1');
+        const mapRef = window.__leafletMap || window.map;
+        if (mapRef){
+          window.__allStakeMarkers.forEach(m=>{
+            if (on) { if (!m._map) m.addTo(mapRef); }
+            else    { if (m._map) mapRef.removeLayer(m); }
+          });
+        }
+      } catch(e){}
+    };
+  }
+  window.__applyPenToggle = function(show){
+    try{
+      const mapRef = window.__leafletMap || window.map;
+      if (!mapRef) return;
+      if (!window.__allStakeMarkers || !window.__allStakeMarkers.length){
+        window.__allStakeMarkers = collectFromState();
+      }
+      window.__allStakeMarkers.forEach(m=>{
+        if (show) { if (!m._map) m.addTo(mapRef); }
+        else      { if (m._map) mapRef.removeLayer(m); }
+      });
+    }catch(e){ console.warn('pen toggle error', e); }
+  };
+})();
+
+</script>
+<script>
+
+// --- No-go detection: accepts pins.NOGO / NO_GO / NO_GO_ZONES ---
 (function(){
   function pointInPoly(pt, poly){
     let x=pt.lat, y=pt.lng, inside=false;
@@ -1044,7 +1097,7 @@ const h = state.course.holes[String(state.hole)];
     };
   }
 })();
-</script>
 
+</script>
 </body>
 </html>
