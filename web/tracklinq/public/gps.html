@@ -160,7 +160,20 @@
 
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
-  </style>
+  
+/* --- Layup box sizing fix --- */
+#layupBox, .layupBox { 
+  display: grid;
+  align-self: start;
+  width: auto;
+  max-width: none;
+}
+#layupText { 
+  white-space: nowrap;
+  overflow: visible;
+}
+
+</style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -969,21 +982,44 @@ window.__patchBlock = true;
   const scoreModal = document.getElementById('scoreModal') || document.getElementById('scorecardModal');
   if (closeSetup && scoreModal) closeSetup.addEventListener('click', ()=> scoreModal.style.display='none');
 
-  // Penalties toggle + hook
-  const key = 'penalties_show';
-  const penBtn = document.getElementById('penBtnMini');
-  const penSwitch = document.getElementById('penSwitch');
-  window.__stakeMarkers = window.__stakeMarkers || [];
+  // --- Robust penalties toggle: discover stake markers dynamically ---
+  function discoverStakeMarkers(){
+    const map = window.__leafletMap || window.map;
+    const arr = [];
+    if (!map) return arr;
+    try{
+      if (window.state && Array.isArray(state.markers)){
+        state.markers.forEach(m=>{
+          const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+          if (t.includes('stake')) arr.push(m);
+        });
+      }
+    }catch(e){}
+    try{
+      map.eachLayer(layer=>{
+        if (layer && layer.options && layer.options.title){
+          const t = String(layer.options.title).toLowerCase();
+          if (t.includes('stake') && !arr.includes(layer)) arr.push(layer);
+        }
+      });
+    }catch(e){}
+    return arr;
+  }
   window.__applyPenToggle = function(show){
     try{
-      const m = window.__leafletMap || window.map;
-      if (!m) return;
-      window.__stakeMarkers.forEach(marker => {
-        if (show) { if (!marker._map) marker.addTo(m); }
-        else { if (marker._map) m.removeLayer(marker); }
+      const map = window.__leafletMap || window.map;
+      if (!map) return;
+      window.__stakeMarkers = discoverStakeMarkers();
+      window.__stakeMarkers.forEach(m => {
+        if (show) { if (!m._map) m.addTo(map); }
+        else { if (m._map) map.removeLayer(m); }
       });
     }catch(e){ console.warn('pen toggle error', e); }
   };
+  // Toggle UI & persistence
+  const key = 'penalties_show';
+  const penBtn = document.getElementById('penBtnMini');
+  const penSwitch = document.getElementById('penSwitch');
   function setPen(on){
     if (penSwitch){
       penSwitch.style.background = on ? '#16a34a' : '#ddd';
@@ -1005,13 +1041,13 @@ window.__patchBlock = true;
     window.renderHole = function(){
       orig();
       try{
-        const m = window.__leafletMap || window.map;
+        const map = window.__leafletMap || window.map;
         window.__stakeMarkers = [];
         if (window.state && Array.isArray(state.markers)){
-          state.markers.forEach(mm => {
-            const t = (mm && mm.options && mm.options.title) ? String(mm.options.title).toLowerCase() : '';
-            if (t.includes('stake')) window.__stakeMarkers.push(mm);
-            if (t==='front' || t==='back'){ if (mm._map) m.removeLayer(mm); }
+          state.markers.forEach(m => {
+            const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+            if (t.includes('stake')) window.__stakeMarkers.push(m);
+            if (t==='front' || t==='back'){ if (m._map) map.removeLayer(m); }
           });
         }
         setPen(localStorage.getItem(key) === '1'); // apply current state
@@ -1081,7 +1117,7 @@ window.__patchBlock = true;
   }
 })();
 
-// Layup width fix (ensure no wrap)
+// Layup width fix (ensure no wrap at runtime too)
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
 </script>
 
