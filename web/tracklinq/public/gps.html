@@ -223,12 +223,17 @@
 }
 
 
-/* === Penalties toggle ON background fix === */
-#penBtnMini.active .penSwitch,
-#penSwitch[data-on="true"],
-.penSwitch.on {
+/* === Penalties switch theme-safe styles === */
+#penSwitch {
+  background: var(--chip) !important;
+  border: 1px solid var(--chip-border) !important;
+}
+#penSwitch.on {
   background: var(--accent) !important;
   border-color: var(--accent-2) !important;
+}
+#penSwitch [data-role="knob"] {
+  background: var(--panel) !important;
 }
 
 </style>
@@ -1095,9 +1100,11 @@ window.__patchBlock = true;
   const penSwitch = document.getElementById('penSwitch');
   function setPen(on){
     if (penSwitch){
-      penSwitch.style.background = on ? '#16a34a' : '#ddd';
-      penSwitch.style.borderColor = on ? '#16a34a' : '#cfcfcf';
-      const knob = penSwitch.querySelector('[data-role="knob"]');
+      
+      penSwitch.classList.toggle('on', !!on);
+      penSwitch.style.background = '';
+      penSwitch.style.borderColor = '';
+    const knob = penSwitch.querySelector('[data-role="knob"]');
       if (knob) knob.style.transform = on ? 'translateX(20px)' : 'translateX(0)';
     }
     localStorage.setItem(key, on ? '1' : '0');
