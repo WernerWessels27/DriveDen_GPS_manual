@@ -173,7 +173,15 @@
   overflow: visible;
 }
 
-</style>
+
+    /* rules/penalties theme fix v2 */
+    #rulesBtn.bubbleBtn, #penaltiesBox.bubbleBtn {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--chip-border);
+      transition: background 0.3s, color 0.3s;
+    }
+  </style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -541,7 +549,17 @@
       updateLayupUI();
     }
 
+    
     // View buttons
+    function toggleStakes(show){
+      (state.stakeMarkers || []).forEach(m=>{
+        if(show){
+          if(!map.hasLayer(m)) m.addTo(map);
+        } else {
+          if(map.hasLayer(m)) m.remove();
+        }
+      });
+    }
     $('#holeViewBtn').addEventListener('click', doHoleView);
     $('#cartViewBtn').addEventListener('click', doCartView);
 
