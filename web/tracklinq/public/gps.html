@@ -390,11 +390,9 @@
     };
 
     // Map (Esri; no visible Leaflet controls)
-    const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19 }
-    ).addTo(map);
+const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([...], 17);
+window.__leafletMap = map; window.map = map; // expose map globally for toggles
+
 
     // Data (cache-first)
     async function getIndex(){
