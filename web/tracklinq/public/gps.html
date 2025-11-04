@@ -390,9 +390,14 @@
     };
 
     // Map (Esri; no visible Leaflet controls)
-const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([...], 17);
-window.__leafletMap = map; window.map = map; // expose map globally for toggles
+    const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
+    // Expose map for penalties toggle & helpers
+    window.__leafletMap = map; window.map = map;
 
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19 }
+    ).addTo(map);
 
     // Data (cache-first)
     async function getIndex(){
@@ -1139,65 +1144,3 @@ try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace=
 
 </body>
 </html>
-
-<!-- Stakes toggle hardening block -->
-<script>
-(function(){
-  function getMap(){ return window.__leafletMap || window.map; }
-  function ensureStakeGroup(){
-    const map = getMap(); if (!map) return null;
-    if (!window.__stakeGroup){
-      window.__stakeGroup = L.layerGroup().addTo(map);
-    }
-    return window.__stakeGroup;
-  }
-  function collectIntoGroup(){
-    const map = getMap(); const g = ensureStakeGroup();
-    if (!map || !g) return;
-    g.clearLayers();
-    const candidates = [];
-    try {
-      if (window.state && Array.isArray(state.markers)){
-        state.markers.forEach(m=>{
-          const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
-          if (t.includes('stake')) candidates.push(m);
-        });
-      } else {
-        map.eachLayer(l=>{
-          const t = (l && l.options && l.options.title) ? String(l.options.title).toLowerCase() : '';
-          if (t.includes('stake')) candidates.push(l);
-        });
-      }
-      candidates.forEach(m=>{ try{ if (m._map) map.removeLayer(m); window.__stakeGroup.addLayer(m); }catch(e){} });
-    } catch(e){}
-  }
-  window.__applyPenToggle = function(show){
-    const map = getMap(); const g = ensureStakeGroup();
-    if (!map || !g) return;
-    if (g.getLayers().length === 0) collectIntoGroup();
-    if (show){
-      if (!map.hasLayer(g)) g.addTo(map);
-    } else {
-      if (map.hasLayer(g)) map.removeLayer(g);
-    }
-  };
-  if (!window.__patchedRenderHole2 && typeof window.renderHole === 'function'){
-    window.__patchedRenderHole2 = true;
-    const orig = window.renderHole;
-    window.renderHole = function(){
-      orig();
-      try{
-        collectIntoGroup();
-        const on = (localStorage.getItem('penalties_show') === '1');
-        window.__applyPenToggle(on);
-      }catch(e){}
-    };
-  }
-  // Also apply once on load in case renderHole already ran
-  try {
-    collectIntoGroup();
-    const on = (localStorage.getItem('penalties_show') === '1');
-    window.__applyPenToggle(on);
-  } catch(e){}
-})();
-</script>
