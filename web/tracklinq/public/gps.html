@@ -152,11 +152,11 @@
     .leaflet-bottom.leaflet-right { display: none !important; }
 
     /* Layup label bubble (bigger) */
-    .layupLabel {
+    .layupLabel{
       background: var(--panel); color: var(--text);
       border: 1px solid var(--chip-border); padding: 6px 8px; border-radius: 10px;
       font-size: 14px; font-weight: 900; box-shadow: var(--shadow);
-    }
+     white-space:nowrap; padding-left:14px; padding-right:14px; line-height:1;}
 
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
@@ -173,7 +173,15 @@
   overflow: visible;
 }
 
-</style>
+
+    /* rules/penalties theme fix v2 */
+    #rulesBtn.bubbleBtn, #penaltiesBox.bubbleBtn {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--chip-border);
+      transition: background 0.3s, color 0.3s;
+    }
+  </style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -377,7 +385,7 @@
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: dotIcon('#3b82f6', 12),
+      CART: L.divIcon({className:'', html:'<div style=\"font-size:26px;line-height:1\">🛺</div>', iconSize:[26,26], iconAnchor:[13,13]}),
       LAYUP: dotIcon('#111111', 12)
     };
 
@@ -456,7 +464,7 @@
     }
 
     // State
-    const state = { inNoGo:false, 
+    const state = {
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
@@ -475,7 +483,7 @@
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
     function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
     function labelAt(ll, text){
-      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>` });
+      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>`, iconSize:null });
       return L.marker([ll.lat, ll.lng], { icon: div, interactive:false });
     }
 
@@ -541,7 +549,17 @@
       updateLayupUI();
     }
 
+    
     // View buttons
+    function toggleStakes(show){
+      (state.stakeMarkers || []).forEach(m=>{
+        if(show){
+          if(!map.hasLayer(m)) m.addTo(map);
+        } else {
+          if(map.hasLayer(m)) m.remove();
+        }
+      });
+    }
     $('#holeViewBtn').addEventListener('click', doHoleView);
     $('#cartViewBtn').addEventListener('click', doCartView);
 
@@ -1119,98 +1137,7 @@ window.__patchBlock = true;
 
 // Layup width fix (ensure no wrap at runtime too)
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
-
-  /* === NO-GO ZONES: helpers (normalize, PIP, audio) === */
-  function _normNoGoRings(raw){
-    if(!raw) return [];
-    let rings = [];
-    const toPair = (v) => Array.isArray(v) ? [Number(v[0]), Number(v[1])] : [Number(v.lat), Number(v.lng)];
-    if(Array.isArray(raw)){
-      // single ring as [{lat,lng}...] or [[lat,lng]...]
-      if(raw.length && (raw[0]?.lat !== undefined || Array.isArray(raw[0]))){
-        rings = [ raw.map(toPair) ];
-      } else {
-        // array of rings
-        rings = raw.map(r => (r||[]).map(toPair));
-      }
-    }
-    // auto-close rings
-    rings = rings.map(r => {
-      if(!r.length) return r;
-      const [a0,a1] = r[0]; const [b0,b1] = r[r.length-1];
-      if(a0!==b0 || a1!==b1) r = r.concat([[a0,a1]]);
-      return r;
-    });
-    return rings;
-  }
-  function _pipRing(lat,lng,ring){
-    let inside=false;
-    for(let i=0,j=ring.length-1;i<ring.length;j=i++){
-      const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
-      const inter = ((yi>lng)!=(yj>lng)) && (lat < (xj-xi)*(lng-yi)/(yj-yi+1e-12)+xi);
-      if(inter) inside=!inside;
-    }
-    return inside;
-  }
-  function _pipRings(lat,lng,rings){
-    for(const r of rings){ if(r.length>=4 && _pipRing(lat,lng,r)) return true; }
-    return false;
-  }
-  let __beepCtx=null;
-  function _primeBeep(){ try{ if(!__beepCtx) __beepCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
-  function _beep(){
-    try{
-      if(!__beepCtx) return;
-      const o=__beepCtx.createOscillator(), g=__beepCtx.createGain();
-      o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(__beepCtx.destination);
-      g.gain.setValueAtTime(0.001,__beepCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.3,__beepCtx.currentTime+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,__beepCtx.currentTime+0.45);
-      o.start(); o.stop(__beepCtx.currentTime+0.5);
-    }catch(e){}
-  }
-
-
-  /* === NO-GO ZONES: UI wiring === */
-  (function(){
-    const c=document.getElementById('nogoClose');
-    if(c){ c.addEventListener('click', ()=>{ const m=document.getElementById('nogoModal'); if(m) m.style.display='none'; }); }
-    const prime = ()=>{ try{ _primeBeep(); document.removeEventListener('touchstart', prime, {passive:true}); document.removeEventListener('click', prime, true);}catch(e){} };
-    document.addEventListener('touchstart', prime, {passive:true});
-    document.addEventListener('click', prime, true);
-  })();
-
-
-  /* === NO-GO ZONES: checker === */
-  function _checkNoGo(lat,lng){
-    try{
-      const hole = state.course?.holes?.[String(state.hole)];
-      const pins = hole?.pins || {};
-      const raw = pins.NO_GO || pins.NOGO || pins.NO_GO_ZONES || pins.NO_GO_ZONE;
-      const rings = _normNoGoRings(raw);
-      const inside = rings.length ? _pipRings(lat,lng,rings) : false;
-      if(inside && !state.inNoGo){
-        state.inNoGo = true;
-        const m=document.getElementById('nogoModal'); if(m) m.style.display='grid';
-        if(typeof toast==='function') toast('No-go zone! Please keep off greens/marked areas.', 2500);
-        _beep();
-      } else if(!inside && state.inNoGo){
-        state.inNoGo = false;
-      }
-    }catch(e){}
-  }
-
 </script>
-
-
-  <!-- No-Go Warning Modal -->
-  <div class="modalBack" id="nogoModal" style="display:none; place-items:center; z-index:1300;">
-    <div class="modal">
-      <h2>Restricted Area</h2>
-      <p>Please stay clear of greens and other no-go zones.</p>
-      <div class="modalActions"><button class="btn" id="nogoClose">OK</button></div>
-    </div>
-  </div>
 
 </body>
 </html>
