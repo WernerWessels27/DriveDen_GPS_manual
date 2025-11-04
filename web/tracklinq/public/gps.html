@@ -435,7 +435,7 @@
         <svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'>${svgPath}</svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[width,height], iconAnchor:[Math.floor(width/2), height] });
     }
-    ' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
+' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
     }
     const TOILET_SVG = `
@@ -457,10 +457,10 @@
       <!-- flag -->
       <path d='M12 6 L22 10 L12 14 Z' fill='#f59e0b'/>
     `;
-    const ICONS = {
+const ICONS = {
       TEE: dotIcon('#16a34a', 14),
       FRONT: dotIcon('#ffffff', 12),
-      MID: poleSymbolIcon(FLAG_SVG, 22, 44), 12),
+      MID: poleSymbolIcon(FLAG_SVG, 22, 44),
       BACK: dotIcon('#ef4444', 12),
       TOILET: largeSymbolIcon(TOILET_SVG, 36),
       TAPS: largeSymbolIcon(TAP_SVG, 36),
