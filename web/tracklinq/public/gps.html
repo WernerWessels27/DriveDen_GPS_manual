@@ -464,12 +464,9 @@
     }
 
     // State
-    const state = {
-      meta:null, course:null, hole:1, markers:[], cartMarker:null,
-      unit:'m', // 'm' or 'yd'
-      layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
-      initialFramed:false
+ const state = { showStakes: true, stakeMs: [],
     };
+
 
     // Distance helpers
     const toRad = d => d*Math.PI/180;
