@@ -181,7 +181,48 @@
       border: 1px solid var(--chip-border);
       transition: background 0.3s, color 0.3s;
     }
-  </style>
+  
+/* === Rules & Penalties theme integration (override inline light styles) === */
+#rulesBtnMini,
+#penBtnMini {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--chip-border) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+#penBtnMini .penSwitch {
+  background: var(--chip) !important;
+  border: 1px solid var(--chip-border) !important;
+}
+
+#penBtnMini .penSwitch [data-role="knob"] {
+  background: var(--panel) !important;
+}
+
+#rulesModalMini .modalMini {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--chip-border) !important;
+}
+
+#rulesModalMini .modalMini h2,
+#rulesModalMini .modalMini h3,
+#rulesModalMini .modalMini p,
+#rulesModalMini .modalMini li,
+#rulesModalMini .modalMini span,
+#rulesModalMini .modalMini div {
+  color: var(--text) !important;
+}
+
+/* Optional: bubbleBtn variants if ever applied */
+#rulesBtn.bubbleBtn, #penaltiesBox.bubbleBtn {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--chip-border) !important;
+}
+
+</style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
