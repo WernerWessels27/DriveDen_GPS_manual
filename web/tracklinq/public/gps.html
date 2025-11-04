@@ -551,15 +551,9 @@
 
     
     // View buttons
-    function toggleStakes(show){
-      (state.stakeMarkers || []).forEach(m=>{
-        if(show){
-          if(!map.hasLayer(m)) m.addTo(map);
-        } else {
-          if(map.hasLayer(m)) m.remove();
-        }
-      });
-    }
+        // View buttons
+    // (Legacy toggleStakes removed; penalties toggle uses dynamic discovery)
+
     $('#holeViewBtn').addEventListener('click', doHoleView);
     $('#cartViewBtn').addEventListener('click', doCartView);
 
