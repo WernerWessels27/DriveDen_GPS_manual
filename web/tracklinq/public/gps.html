@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TrackLinq GPS</title>
+
   <link rel="manifest" href="/manifest.webmanifest">
 
   <!-- Leaflet -->
@@ -20,81 +21,99 @@
   ></script>
 
   <style>
+    /* THEME */
     :root{
-      --black:#0b0b0b; --white:#ffffff; --border:#e5e7eb33;
-      --brand:#14532d; --brand-2:#166534; --accent:#16a34a;
+      /* light-green default */
+      --bg: #f7faf7;
+      --panel: #ffffff;
+      --text: #0a0a0a;
       --muted:#6b7280;
-      --chip:#e6f6ea; --chipText:#14532d;
+      --border:#dbe5d9;
+      --chip:#ffffff;
+      --chip-border:#dbe5d9;
+      --accent:#16a34a;
+      --accent-2:#22c55e;
+      --accent-3:#86efac;
+      --danger:#ef4444;
+      --warning:#f59e0b;
+      --info:#0ea5e9;
+      --shadow: 0 6px 18px rgba(0,0,0,0.08);
     }
-    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
+    body[data-theme="dark"]{
+      --bg:#000;
+      --panel:#0b0b0b;
+      --text:#fff;
+      --muted:#9ca3af;
+      --border:#2a2a2a;
+      --chip:#0b0b0b;
+      --chip-border:#2a2a2a;
+      --accent:#16a34a;
+      --accent-2:#10b981;
+      --accent-3:#064e3b;
+      --danger:#ef4444;
+      --warning:#fbbf24;
+      --info:#60a5fa;
+      --shadow: 0 6px 18px rgba(0,0,0,0.4);
+    }
+
+    html, body { height: 100%; margin: 0; background: var(--bg); color:var(--text); font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
     #map { width: 100%; height: 100%; }
 
     /* Top full-width course banner */
     .banner {
       position: absolute; top: 0; left: 0; right: 0; z-index: 1100;
-      background: #111; color: var(--white);
+      background: var(--panel); color: var(--text);
       border-bottom: 1px solid var(--border);
       display: grid; grid-template-columns: 80px 1fr 80px; align-items: center;
-      padding: 8px 10px;
+      padding: 8px 10px; box-shadow: var(--shadow);
     }
     .banner h1 { margin: 0; text-align: center; font-size: 16px; font-weight: 800; }
     .banner .left, .banner .right { display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .exitBtn {
+    .btn {
       cursor: pointer; padding: 8px 10px; border-radius: 10px;
-      border: 1px solid var(--border); background: #111; color: #fff; font-weight: 800;
+      border: 1px solid var(--border); background: var(--chip); color: var(--text); font-weight: 800;
     }
 
-    /* Hole number bar */
+    /* Hole bar: Par | HOLE | Stroke */
     .holeBar {
       position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
-      z-index: 1050; display: inline-flex; align-items: center; gap: 10px;
-      background: #111; color: #fff; border: 1px solid var(--border);
-      padding: 6px 10px; border-radius: 12px; font-weight: 800;
+      z-index: 1050; display: inline-flex; align-items: center; gap: 14px;
+      background: var(--panel); color: var(--text); border: 1px solid var(--border);
+      padding: 8px 12px; border-radius: 12px; font-weight: 800; box-shadow: var(--shadow);
     }
-    .holeBtn {
-      cursor: pointer; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border);
-      background: #111; color: #fff; font-weight: 800;
-    }
+    .holeMeta { display:flex; gap:18px; align-items:center; }
+    .holeMeta .par, .holeMeta .stroke { font-size: 12px; color: var(--muted); }
+    .holeMeta .holeNo { font-size: 20px; font-weight: 900; }
 
-    /* Distances stack (top-left) */
+    /* Distances (top-left) stacked vertical, MID larger; unit toggle here */
     .distStack {
       position: absolute; top: 112px; left: 12px; z-index: 1050;
-      display: grid; gap: 8px; min-width: 180px;
+      display: grid; gap: 8px; min-width: 170px;
     }
     .chipV {
       display: grid; grid-template-columns: 14px 1fr auto; align-items: center;
       gap: 8px; padding: 10px 12px; border-radius: 14px;
-      background: #111; border: 1px solid var(--border); color: #fff;
+      background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); box-shadow: var(--shadow);
     }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-    .midTxt { font-size: 18px; font-weight: 900; }
+    .midTxt { font-size: 18px; font-weight: 900; }  /* MID larger */
     .smallTxt { font-size: 12px; font-weight: 700; }
     .unitToggle {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 10px; border-radius: 999px; background: #111;
-      border: 1px solid var(--border); color: #fff; font-weight: 800; cursor: pointer; width: max-content;
+      padding: 8px 10px; border-radius: 999px; background: var(--panel);
+      border: 1px solid var(--chip-border); color: var(--text); font-weight: 800; cursor: pointer; width: max-content; box-shadow: var(--shadow);
     }
 
-    /* Layup info chip */
-    .layupBox {
-      display:none; grid-template-columns: 1fr auto; align-items:center; gap:8px;
-      padding: 8px 10px; border-radius: 12px; background: #111; color:#fff; border:1px solid var(--border);
-      width: max-content; max-width: 92vw;
-    }
-    #layupText { white-space: nowrap; overflow: hidden; text-overflow: clip; font-weight: 800; }
-    .clearLayupBtn { cursor:pointer; padding:6px 10px; border-radius:10px; background:#111; color:#fff; border:1px solid var(--border); }
-
-    /* Bottom-left stacked icons: flag & cart */
+    /* Bottom-left stacked icons: flag & cart (lowered to match bottom padding) */
     .viewIcons {
       position: absolute; left: 12px; bottom: 12px; z-index: 1050;
       display: grid; gap: 8px;
     }
     .viewBtn {
       width: 52px; height: 52px; display: grid; place-items: center;
-      border-radius: 14px; background: #111; border: 1px solid var(--border); color: #fff; cursor: pointer;
-      font-size: 24px; user-select: none;
+      border-radius: 14px; background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); cursor: pointer;
+      font-size: 24px; user-select: none; box-shadow: var(--shadow);
     }
-    .viewBtn:active { transform: translateY(1px); }
 
     /* Bottom-center bubbles: Scorecard & History */
     .bottomBubbles {
@@ -102,58 +121,112 @@
       display: flex; gap: 10px;
     }
     .bubbleBtn {
-      cursor: pointer; padding: 10px 14px; border-radius: 999px; background: #111; border: 1px solid var(--border); color: #fff; font-weight: 800;
+      cursor: pointer; padding: 10px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); font-weight: 800; box-shadow: var(--shadow);
     }
 
-    /* Top-right: Penalties toggle */
-    .topRightCol { position:absolute; top:108px; right:10px; z-index:1300; display:flex; flex-direction:column; gap:8px; }
-    .btnMini {
-      border:1px solid #e5e7eb; background:#ffffffee; color:#111827;
-      border-radius:12px; padding:10px 14px; font-weight:800; cursor:pointer;
-      box-shadow:0 4px 16px rgba(0,0,0,.12);
+    /* Floating clear layup button just above bottom bubbles */
+    .clearLayupFloating {
+      position: absolute; left: 50%; transform: translateX(-50%); bottom: 64px; z-index: 1050;
+      display:none;
     }
-    .penRow{ display:flex; align-items:center; gap:10px; }
-    .penSwitch{ position:relative; width:48px; height:26px; border-radius:999px; background:#ddd; border:1px solid #cfcfcf; flex:0 0 auto; }
-    .penSwitch .knob{ position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:999px; background:#fff; transition:all .2s; }
+    .clearLayupFloating .btn { background: var(--panel); }
 
-    /* Modals (score/history) */
-    .modalBack { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; place-items: center; z-index: 1600; }
-    .modal { width: min(92vw, 920px); max-height: 84vh; overflow: auto; background: #0b0b0b; color: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+    /* Modals */
+    .modalBack {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: none; place-items: center; z-index: 1200;
+    }
+    .modal {
+      width: min(92vw, 920px); max-height: 84vh; overflow: auto;
+      background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--shadow);
+    }
     .modal h2 { margin: 0 0 10px; font-size: 18px; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px; border-bottom: 1px solid #1f2937; text-align: center; }
-    input.strokes, input.nameInp, input.hcapInp { width: 70px; padding: 6px; border-radius: 8px; border: 1px solid #374151; background: #111; color: #fff; text-align: center; }
+    th, td { padding: 8px; border-bottom: 1px solid var(--border); text-align: center; }
+    input.strokes, input.nameInp, input.hcapInp {
+      width: 70px; padding: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--chip); color: var(--text); text-align: center;
+    }
     .modalActions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
-    .btn { cursor: pointer; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: #111; color: #fff; font-weight: 800; }
-    .btn.green { background: #14532d; border-color: #166534; }
-    .btn.red   { background: #3f1b1b; border-color: #7f1d1d; }
 
-    /* Hide Leaflet default UI */
+    /* Hide Leaflet UI */
     .leaflet-control-container { display: none !important; }
     .leaflet-bottom.leaflet-right { display: none !important; }
-  </style>
+
+    /* Layup label bubble (bigger) */
+    .layupLabel {
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--chip-border); padding: 6px 8px; border-radius: 10px;
+      font-size: 14px; font-weight: 900; box-shadow: var(--shadow);
+    }
+
+    /* Theme toggle */
+    .themeBtn { border-color: var(--accent-3); }
+  
+/* --- Layup box sizing fix --- */
+#layupBox, .layupBox { 
+  display: grid;
+  align-self: start;
+  width: auto;
+  max-width: none;
+}
+#layupText { 
+  white-space: nowrap;
+  overflow: visible;
+}
+
+</style>
 </head>
-<body>
+<body data-theme="light">
   <div id="map"></div>
+
+  <!-- Rules & Penalties (top-right) -->
+  <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;">
+    <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
+    <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
+      <span>Penalties</span>
+      <div class="penSwitch" id="penSwitch" style="position:relative;width:44px;height:24px;border-radius:999px;background:#ddd;border:1px solid #cfcfcf;flex:0 0 auto;">
+        <div style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;transition:all .2s;" data-role="knob"></div>
+      </div>
+    </button>
+  </div>
+
+  <!-- Rules modal -->
+  <div class="modalBackMini" id="rulesModalMini" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);place-items:center;z-index:1600;">
+    <div class="modalMini" style="width:min(92vw,880px);max-height:84vh;overflow:auto;background:#fff;color:#0b0b0b;border:1px solid #00000022;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);">
+      <h2 style="margin:0 0 10px;font-size:18px;display:flex;align-items:center;justify-content:space-between;">
+        <span>Official Rules (Reference)</span>
+        <button class="btnMini" id="rulesCloseMini" style="border:1px solid #ddd;background:#f5f5f5;color:#111;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;">Close</button>
+      </h2>
+      <div id="rulesBodyMini">
+        <p>This panel supports <strong>rich HTML</strong> (images, links, embeds).</p>
+        <ul>
+          <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
+          <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
+          <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Top course banner -->
   <div class="banner">
     <div class="left"></div>
     <h1 id="courseTitle">Course</h1>
     <div class="right">
-      <button class="exitBtn" id="exitBtn">Exit</button>
+      <button class="btn themeBtn" id="themeBtn">🌞</button>
+      <button class="btn" id="exitBtn">Exit</button>
     </div>
   </div>
 
   <!-- Center hole bar -->
   <div class="holeBar">
-    <button class="holeBtn" id="prevHole">◀︎</button>
-    <div>
-      <span class="smallTxt">Par</span> <span id="par">4</span> &nbsp; • &nbsp;
-      <span style="font-size:18px;font-weight:900;">Hole <span id="holeNo">1</span></span> &nbsp; • &nbsp;
-      <span class="smallTxt">Stroke</span> <span id="stroke">1</span>
+    <button class="btn" id="prevHole">◀︎</button>
+    <div class="holeMeta">
+      <div class="par">Par <span id="par">4</span></div>
+      <div class="holeNo">Hole <span id="holeNo">1</span></div>
+      <div class="stroke">Stroke <span id="stroke">1</span></div>
     </div>
-    <button class="holeBtn" id="nextHole">▶︎</button>
+    <button class="btn" id="nextHole">▶︎</button>
   </div>
 
   <!-- Distances stack -->
@@ -175,12 +248,6 @@
     </div>
 
     <div class="unitToggle" id="unitBtn">Units: <span id="unitChip">m</span></div>
-
-    <!-- Layup info appears when there is a layup point -->
-    <div class="layupBox" id="layupBox">
-      <div id="layupText">Layup: CART→P —  •  P→MID —</div>
-      <button class="clearLayupBtn" id="clearLayupBtn">CLEAR LAYUP</button>
-    </div>
   </div>
 
   <!-- Bottom-left stacked view icons -->
@@ -189,26 +256,23 @@
     <button title="Cart View (CART↔BACK)" class="viewBtn" id="cartViewBtn">🛺</button>
   </div>
 
+  <!-- Floating clear layup -->
+  <div class="clearLayupFloating" id="clearLayupFloating">
+    <button class="btn" id="clearLayupBtn">CLEAR LAYUP</button>
+  </div>
+
   <!-- Bottom-center bubbles -->
   <div class="bottomBubbles">
     <button class="bubbleBtn" id="scoreBtn">Scorecard</button>
     <button class="bubbleBtn" id="historyBtn">History</button>
   </div>
 
-  <!-- Top-right controls -->
-  <div class="topRightCol">
-    <button class="btnMini" id="penBtnMini">
-      <div class="penRow">
-        <span>Penalties</span>
-        <div class="penSwitch" id="penSwitch"><div class="knob"></div></div>
-      </div>
-    </button>
-  </div>
-
   <!-- Scorecard modal -->
   <div class="modalBack" id="scoreModal">
     <div class="modal">
       <h2 id="scoreTitle">Scorecard</h2>
+
+      <!-- Setup panel -->
       <div id="scoreSetup">
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
           <label>Players:</label>
@@ -216,23 +280,25 @@
             <option>1</option><option>2</option><option selected>3</option><option>4</option>
           </select>
           <label style="display:flex;align-items:center;gap:6px;">
-            <input type="checkbox" id="useHandicaps" checked/> Use handicaps
+            <input type="checkbox" id="useHandicaps" checked/> Use handicaps (for points only)
           </label>
         </div>
         <div id="playersGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:10px;"></div>
         <div class="modalActions">
-          <button class="btn green" id="createCard">Create scorecard</button>
-          <button class="btn" id="closeSetup">Close</button>
+          <button class="btn" id="createCard">Create scorecard</button> <button class="btn" id="closeSetup">Close</button>
         </div>
-        <hr style="border-color:#1f2937; margin:12px 0;">
+        <hr style="border-color:var(--border); margin:12px 0;">
       </div>
+
+      <!-- Card table -->
       <div id="scoreBody" style="display:none;">
         <div style="overflow:auto;">
           <table id="scoreTable"></table>
         </div>
         <div class="modalActions">
+          <button class="btn" id="clearScore">Clear Scorecard</button>
           <button class="btn" id="closeScore">Close</button>
-          <button class="btn green" id="saveRound">Save Round</button>
+          <button class="btn" id="saveRound">Save Round</button>
         </div>
       </div>
     </div>
@@ -245,18 +311,18 @@
       <div id="histList"></div>
       <div class="modalActions">
         <button class="btn" id="closeHist">Close</button>
-        <button class="btn red" id="clearHist">Clear History</button>
+        <button class="btn" id="clearHist">Clear History</button>
       </div>
     </div>
   </div>
 
   <!-- Toast -->
-  <div id="toast" style="display:none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 1300; background: #000; color:#fff; border:1px solid var(--border); padding:8px 12px; border-radius:10px; font-size:12px;"></div>
+  <div id="toast" style="display:none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 1300; background: var(--panel); color:var(--text); border:1px solid var(--chip-border); padding:8px 12px; border-radius:10px; font-size:12px; box-shadow:var(--shadow);"></div>
 
   <script>
-    // Register SW (PWA)
+    // Register SW
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
     }
 
     // Helpers
@@ -265,7 +331,20 @@
     function q(name){ return new URL(location.href).searchParams.get(name); }
     function toast(msg, ms=1600){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', ms); }
 
-    // Dot icon
+    // Theme toggle
+    (function(){
+      const saved = localStorage.getItem('tl_theme') || 'light';
+      document.body.setAttribute('data-theme', saved);
+      $('#themeBtn').textContent = saved==='dark'?'🌚':'🌞';
+      $('#themeBtn').addEventListener('click', ()=>{
+        const cur = document.body.getAttribute('data-theme')==='dark'?'light':'dark';
+        document.body.setAttribute('data-theme', cur);
+        localStorage.setItem('tl_theme', cur);
+        $('#themeBtn').textContent = cur==='dark'?'🌚':'🌞';
+      });
+    })();
+
+    // Icons
     function dotIcon(color='#ffffff', size=12){
       const r=Math.floor(size/2);
       const svg=encodeURIComponent(`<?xml version="1.0"?>
@@ -274,35 +353,7 @@
         </svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] });
     }
-
-    // Modern cart icon (SVG)
-    const CART_SVG = `
-      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'>
-        <rect x='6' y='10' width='36' height='12' rx='4' fill='#10b981' stroke='#065f46' stroke-width='2'/>
-        <circle cx='18' cy='28' r='6' fill='#111' stroke='#444' stroke-width='2'/>
-        <circle cx='36' cy='28' r='6' fill='#111' stroke='#444' stroke-width='2'/>
-        <path d='M42 12h12l4 8h-10' fill='none' stroke='#065f46' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>
-        <path d='M10 10v-6h8' fill='none' stroke='#065f46' stroke-width='3' stroke-linecap='round'/>
-      </svg>`;
-    function cartIcon(size=44){
-      const svg=encodeURIComponent(CART_SVG);
-      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size, size*0.625], iconAnchor:[size*0.5, size*0.625] });
-    }
-
-    // Mid flag icon (modern)
-    const MID_FLAG_SVG = `
-      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>
-        <path d='M12 6v36' stroke='#0f172a' stroke-width='4' stroke-linecap='round'/>
-        <path d='M14 8h18l-4 6 4 6H14z' fill='#fbbf24' stroke='#0f172a' stroke-width='2' />
-        <circle cx='12' cy='42' r='3' fill='#0f172a'/>
-      </svg>`;
-    function flagIcon(size=42){
-      const svg=encodeURIComponent(MID_FLAG_SVG);
-      return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[10,40] });
-    }
-
-    // Toilet / Taps icons (square sign)
-    function largeSymbolIcon(svgPath, size=44){
+    function largeSymbolIcon(svgPath, size=36){
       const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
@@ -317,28 +368,27 @@
     `;
 
     const ICONS = {
-      TEE: dotIcon('#16a34a', 14),            // mapper tee; hidden on GPS
-      FRONT: dotIcon('#ffffff', 12),          // hidden on GPS
-      MID: flagIcon(42),                      // visible on GPS
-      BACK: dotIcon('#ef4444', 12),           // hidden on GPS
-      TOILET: largeSymbolIcon(TOILET_SVG, 44),
-      TAPS: largeSymbolIcon(TAP_SVG, 44),
-      STAKE_WHITE: dotIcon('#ffffff', 10),
-      STAKE_RED: dotIcon('#ef4444', 10),
-      STAKE_YELLOW: dotIcon('#fbbf24', 10),
-      CART: cartIcon(46),
-      LAYUP: dotIcon('#ffffff', 12)
+      TEE: dotIcon('#16a34a', 14),
+      FRONT: dotIcon('#ffffff', 12),
+      MID: dotIcon('#fbbf24', 12),
+      BACK: dotIcon('#ef4444', 12),
+      TOILET: largeSymbolIcon(TOILET_SVG, 36),
+      TAPS: largeSymbolIcon(TAP_SVG, 36),
+      STAKE_WHITE: dotIcon('#ffffff', 8),
+      STAKE_RED: dotIcon('#ef4444', 8),
+      STAKE_YELLOW: dotIcon('#fbbf24', 8),
+      CART: dotIcon('#3b82f6', 12),
+      LAYUP: dotIcon('#111111', 12)
     };
 
-    // Map
+    // Map (Esri; no visible Leaflet controls)
     const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
-    window.__leafletMap = map;
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19 }
     ).addTo(map);
 
-    // Data helpers (cache-first)
+    // Data (cache-first)
     async function getIndex(){
       let res=await caches.match('/courses/index.json');
       if(!res) res=await fetch('/courses/index.json', { cache:'reload' });
@@ -359,16 +409,61 @@
       return (idx.courses||[])[0]||null;
     }
 
+    // PIN/guest
+    function isGuestMode(){
+      const g = (q('guest')||'').trim();
+      return g === '1';
+    }
+
+    async function validatePinFlow(courseId, courseJson){
+      if(isGuestMode()){
+        localStorage.setItem(`mode_${courseId}`, 'guest');
+        return true;
+      }
+      const pinFromUrl=(q('pin')||'').trim().toUpperCase();
+      if(pinFromUrl.length===10){
+        localStorage.setItem(`pin_${courseId}`, pinFromUrl);
+        const ok = await isPinValid(courseId, courseJson, pinFromUrl);
+        localStorage.setItem(`mode_${courseId}`, ok ? 'club' : 'guest');
+        return ok;
+      }
+      const stored=(localStorage.getItem(`pin_${courseId}`)||'').trim().toUpperCase();
+      if(stored.length===10 && await isPinValid(courseId, courseJson, stored)){
+        localStorage.setItem(`mode_${courseId}`, 'club');
+        return true;
+      }
+      const entered=(prompt(`Enter PIN for ${courseJson?.course?.name || courseId}:`)||'').trim().toUpperCase();
+      if(entered.length!==10) return false;
+      const ok=await isPinValid(courseId, courseJson, entered);
+      if(ok){
+        localStorage.setItem(`pin_${courseId}`, entered);
+        localStorage.setItem(`mode_${courseId}`, 'club');
+      }else{
+        alert('Invalid PIN');
+      }
+      return ok;
+    }
+    async function isPinValid(courseId, courseJson, candidate){
+      if(!candidate||candidate.length!==10) return false;
+      try{
+        const idx=await getIndex();
+        const c=(idx.courses||[]).find(x=>x.id===courseId);
+        if(c?.pin && c.pin.trim().toUpperCase()===candidate) return true;
+      }catch(_){}
+      const metaPin=(courseJson?.course?.pin||'').trim().toUpperCase();
+      if(metaPin && metaPin===candidate) return true;
+      return false;
+    }
+
     // State
     const state = {
-      meta:null, course:null, hole:1,
-      markers:[], cartMarker:null,
-      unit:'m',
-      layupMarker:null,
-      stakeMarkers:[]
+      meta:null, course:null, hole:1, markers:[], cartMarker:null,
+      unit:'m', // 'm' or 'yd'
+      layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
+      initialFramed:false
     };
 
-    // Distances
+    // Distance helpers
     const toRad = d => d*Math.PI/180;
     function haversine(a,b){
       const R=6371000, dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
@@ -378,6 +473,12 @@
     }
     const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
+    function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
+    function labelAt(ll, text){
+      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>` });
+      return L.marker([ll.lat, ll.lng], { icon: div, interactive:false });
+    }
+
     function fromPoint(pins, pref='CART'){
       if(pref==='TEE' && pins.TEE) return { lat:pins.TEE.lat, lng:pins.TEE.lng };
       return fromCart();
@@ -391,49 +492,32 @@
       if(pins.MID)   m.textContent=fmt(haversine(from, pins.MID));
       if(pins.BACK)  b.textContent=fmt(haversine(from, pins.BACK));
       $('#unitChip').textContent = state.unit;
-      updateLayupBox();
+      updateLayupUI(); // keep layup distances/labels in sync
     }
 
-    // Markers
+    // Markers & fitting
     function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
-    function addStakeMarker(lat,lng,color){
-      const icon = color==='red' ? ICONS.STAKE_RED : (color==='yellow'? ICONS.STAKE_YELLOW : ICONS.STAKE_WHITE);
-      const m=L.marker([lat,lng],{icon,title:`stake-${color}`}).addTo(map);
-      state.markers.push(m); state.stakeMarkers.push(m); return m;
-    }
     function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
 
-    // Penalties toggle
-    let penaltiesOn = (localStorage.getItem('penalties_show') === '1');
-    function paintPenToggle(){
-      const sw = $('#penSwitch'); if(!sw) return;
-      sw.style.background = penaltiesOn ? '#16a34a' : '#ddd';
-      sw.style.borderColor = penaltiesOn ? '#16a34a' : '#cfcfcf';
-      const k = sw.querySelector('.knob');
-      if(k) k.style.transform = penaltiesOn ? 'translateX(22px)' : 'translateX(0)';
+    function doHoleView(){
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     }
-    function applyPenaltiesVisibility(){
-      try{
-        state.stakeMarkers.forEach(m => {
-          if (penaltiesOn) { if (!map.hasLayer(m)) m.addTo(map); }
-          else             { if (map.hasLayer(m))  map.removeLayer(m); }
-        });
-      }catch(e){}
+    function doCartView(){
+      const p = state.course.holes[String(state.hole)]?.pins || {};
+      const cart = fromCart();
+      if (cart && p.BACK){ fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
+      else if (p.TEE && p.BACK){ fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); } // fallback
     }
-    $('#penBtnMini').addEventListener('click', ()=>{
-      penaltiesOn = !penaltiesOn;
-      localStorage.setItem('penalties_show', penaltiesOn ? '1' : '0');
-      paintPenToggle();
-      applyPenaltiesVisibility();
-    });
-    paintPenToggle();
+    function ensureInitialFraming(){
+      if (state.initialFramed) return;
+      state.initialFramed = true;
+      doCartView();
+    }
 
-    // Render
     function renderHole(){
       clearMarkers();
-      state.stakeMarkers.forEach(m=>m.remove()); state.stakeMarkers=[];
-
       const h = state.course.holes[String(state.hole)];
       $('#holeNo').textContent = state.hole;
       $('#par').textContent = h?.par ?? '-';
@@ -448,49 +532,26 @@
 
       if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
-      (p.STAKE_WHITE || []).forEach(s => addStakeMarker(s.lat, s.lng, 'white'));
-      (p.STAKE_RED   || []).forEach(s => addStakeMarker(s.lat, s.lng, 'red'));
-      (p.STAKE_YELLOW|| []).forEach(s => addStakeMarker(s.lat, s.lng, 'yellow'));
-
-      // Hole fit preference
-      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
-      else {
-        const latlngs = state.markers.map(m => m.getLatLng());
-        if (latlngs.length) map.fitBounds(L.latLngBounds(latlngs), { padding: [40,40] });
-      }
-
-      // Hide FRONT/BACK on GPS view
-      try{
-        state.markers.forEach(m=>{
-          const t=(m && m.options && m.options.title)? String(m.options.title).toLowerCase() : '';
-          if (t==='front' || t==='back'){ if (m._map) map.removeLayer(m); }
-        });
-      }catch(e){}
+      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
+      (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
+      (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
       updateChips(p);
-      updateLayupBox();
-      applyPenaltiesVisibility();
+      ensureInitialFraming();
+      updateLayupUI();
     }
 
     // View buttons
-    $('#holeViewBtn').addEventListener('click', ()=>{
-      const p = state.course.holes[String(state.hole)]?.pins || {};
-      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
-    });
-    $('#cartViewBtn').addEventListener('click', ()=>{
-      const p = state.course.holes[String(state.hole)]?.pins || {};
-      if (!p.BACK || !state.cartMarker) return;
-      const ll = state.cartMarker.getLatLng();
-      fitBetween([ll.lat,ll.lng],[p.BACK.lat,p.BACK.lng]);
-    });
+    $('#holeViewBtn').addEventListener('click', doHoleView);
+    $('#cartViewBtn').addEventListener('click', doCartView);
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
-      const min=1; state.hole=Math.max(min, state.hole-1); renderHole();
+      const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole();
     });
     $('#nextHole').addEventListener('click', ()=>{
       const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
-      state.hole=Math.min(max||state.hole+1, state.hole+1); renderHole();
+      state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole();
     });
 
     // Units
@@ -507,6 +568,7 @@
     function updateCartAndChips(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
+      updateLayupUI();
     }
     if (navigator.geolocation){
       navigator.geolocation.watchPosition((pos)=>{
@@ -514,64 +576,81 @@
         if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
         updateCartAndChips();
-
-        // Keep CART & BACK in frame while moving
-        const p = state.course.holes[String(state.hole)]?.pins || {};
-        if (p.BACK){
-          const ll = state.cartMarker.getLatLng();
-          fitBetween([ll.lat,ll.lng],[p.BACK.lat,p.BACK.lng]);
-        }
       }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
     }
 
-    // LAYUP: click map to drop a layup marker + distances CART→Layup and Layup→MID
+    // LAYUP with lines and labels
+    function toggleClearLayupBtn(){
+      $('#clearLayupFloating').style.display = state.layupMarker ? 'block' : 'none';
+    }
+    function clearLayupGraphics(){
+      if (state.layupSolid){ state.layupSolid.remove(); state.layupSolid=null; }
+      if (state.layupDash){ state.layupDash.remove(); state.layupDash=null; }
+      if (state.layupLabel1){ state.layupLabel1.remove(); state.layupLabel1=null; }
+      if (state.layupLabel2){ state.layupLabel2.remove(); state.layupLabel2=null; }
+    }
+    function updateLayupUI(){
+      const h = state.course?.holes?.[String(state.hole)];
+      const p = h?.pins || {};
+      const mid = p.MID || null;
+
+      clearLayupGraphics();
+      if (!state.layupMarker){ toggleClearLayupBtn(); return; }
+
+      const ll = state.layupMarker.getLatLng();
+      const P = { lat: ll.lat, lng: ll.lng };
+
+      let cartSrc = fromCart();
+      if (!cartSrc && p.TEE) cartSrc = { lat:p.TEE.lat, lng:p.TEE.lng }; // fallback when GPS not available
+
+      if (cartSrc){
+        const cartDist = fmt(haversine(cartSrc, P));
+        state.layupSolid = L.polyline([[cartSrc.lat,cartSrc.lng],[P.lat,P.lng]], { color:'#111', weight:3, opacity:1 }).addTo(map);
+        state.layupLabel1 = labelAt(midPoint(cartSrc,P), `${cartDist} ${state.unit}`).addTo(map);
+      }
+      if (mid){
+        const midDist  = fmt(haversine(P, mid));
+        state.layupDash = L.polyline([[P.lat,P.lng],[mid.lat,mid.lng]], { color:'#111', weight:3, opacity:1, dashArray:'6,6' }).addTo(map);
+        state.layupLabel2 = labelAt(midPoint(P,mid), `${midDist} ${state.unit}`).addTo(map);
+      }
+      toggleClearLayupBtn();
+    }
     map.on('click', (e)=>{
       const { lat, lng } = e.latlng;
       if (state.layupMarker) state.layupMarker.remove();
       state.layupMarker = L.marker([lat,lng], { icon: ICONS.LAYUP, title:'LAYUP' }).addTo(map);
-      updateLayupBox();
+      updateLayupUI();
     });
-    function updateLayupBox(){
-      const box = $('#layupBox');
-      const text = $('#layupText');
-      const h = state.course?.holes?.[String(state.hole)];
-      const mid = h?.pins?.MID || null;
-      if (!state.layupMarker){ box.style.display='none'; return; }
-      const ll = state.layupMarker.getLatLng();
-      const P = { lat: ll.lat, lng: ll.lng };
-      let cartDist = '—', midDist = '—';
-      const cart = fromCart();
-      if (cart) cartDist = fmt(haversine(cart, P));
-      if (mid)  midDist  = fmt(haversine(P, mid));
-      text.textContent = `Layup: CART→P ${cartDist} ${state.unit}   •   P→MID ${midDist} ${state.unit}`;
-      box.style.display='grid';
-    }
     $('#clearLayupBtn').addEventListener('click', ()=>{
       if (state.layupMarker){ state.layupMarker.remove(); state.layupMarker=null; }
-      updateLayupBox();
+      clearLayupGraphics();
+      updateLayupUI();
     });
 
-    // ---------- Scorecard ----------
-    function scoreKey(){ return `score_${state.course?.course?.id || state.meta?.id || 'course'}`; }
+    // ---------- Scorecard (classic) with persistence, reopen, clear, and auto-advance ----------
     function histKey(){ return `history_${state.course?.course?.id || state.meta?.id || 'course'}`; }
+    function scStateKey(){ return `sc_state_${state.course?.course?.id || state.meta?.id || 'course'}`; }
 
-    function rebuildPlayersGrid(){
+    function rebuildPlayersGrid(saved){
       const grid = $('#playersGrid');
-      const count = parseInt($('#playerCount').value,10);
-      grid.innerHTML = '';
+      const count = saved ? saved.players.length : parseInt($('#playerCount').value,10);
+      if (!saved) { grid.innerHTML = ''; }
+      else { $('#playerCount').value = String(count); grid.innerHTML=''; }
       for (let i=0;i<count;i++){
         const wrap = document.createElement('div');
+        const nameVal = saved ? (saved.players[i]?.name || `P${i+1}`) : `P${i+1}`;
+        const hVal = saved ? (saved.players[i]?.hcap ?? 0) : (i===0?12: (i===1?18:(i===2?24:10)));
         wrap.innerHTML = `
-          <div style="display:grid; gap:6px; padding:8px; border:1px solid #1f2937; border-radius:12px; background:#0f0f0f;">
+          <div style="display:grid; gap:6px; padding:8px; border:1px solid var(--border); border-radius:12px; background: var(--chip);">
             <div style="font-weight:800; text-align:center;">Player ${i+1}</div>
-            <input class="nameInp" placeholder="Name" value="P${i+1}">
-            <input class="hcapInp" type="number" step="1" min="0" max="54" placeholder="Handicap" value="${i===0?12: (i===1?18:(i===2?24:10))}">
+            <input class="nameInp" placeholder="Name" value="${nameVal}">
+            <input class="hcapInp" type="number" step="1" min="0" max="54" placeholder="Handicap" value="${hVal}">
           </div>
         `;
         grid.appendChild(wrap);
       }
     }
-    $('#playerCount').addEventListener('change', rebuildPlayersGrid);
+    $('#playerCount').addEventListener('change', ()=>rebuildPlayersGrid(null));
 
     function strokesReceived(hcap, holeStrokeIndex){
       const base = Math.floor(hcap / 18);
@@ -589,31 +668,59 @@
       if (diff === -2) return 4;
       return 5;
     }
-    function buildScoreTable(players, useHcaps){
+
+    function buildScoreTable(players, useHcaps, saved){
       const holes = state.course?.holes || {};
       const ordered = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
+      const front9 = ordered.filter(n => n <= 9);
+      const back9  = ordered.filter(n => n > 9);
       const tbl = $('#scoreTable');
-      let html = '<tr><th>Hole</th>';
-      ordered.forEach(n=> html += `<th>${n}</th>`);
-      html += '</tr><tr><th>Par</th>';
-      ordered.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += '</tr><tr><th>Stroke</th>';
-      ordered.forEach(n=> html += `<td>${holes[n]?.stroke ?? ''}</td>`);
-      html += '</tr>';
+
+      let html = '<tr><th style="text-align:left;padding-left:12px;">Player</th>';
+      front9.forEach(n=> html += `<th>${n}</th>`);
+      html += `<th>OUT</th>`;
+      back9.forEach(n=> html += `<th>${n}</th>`);
+      html += `<th>IN</th><th>TOTAL</th><th>NET</th><th>PTS</th></tr>`;
+
+      html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
+      front9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
+      html += `<td>–</td>`;
+      back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
+      html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
+
       players.forEach((p, idx)=>{
-        html += `<tr><th style="text-align:left">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
-        ordered.forEach(n=>{ html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" value=""></td>`; });
-        html += '</tr>';
+        html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
+        ordered.forEach(n=>{
+          const val = saved?.strokes?.[idx]?.[n] ?? '';
+          html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"></td>`;
+        });
+        html += `<td class="outCell" data-player="${idx}">0</td>`;
+        html += `<td class="inCell" data-player="${idx}">0</td>`;
+        html += `<td class="totCell" data-player="${idx}">0</td>`;
+        html += `<td class="netCell" data-player="${idx}">0</td>`;
+        html += `<td class="ptsCell" data-player="${idx}">0</td>`;
+        html += `</tr>`;
       });
-      html += '<tr><th>Gross</th>' + ordered.map(()=>'<td class="grossCell">–</td>').join('') + '</tr>';
-      html += '<tr><th>Net</th>'   + ordered.map(()=>'<td class="netCell">–</td>').join('')   + '</tr>';
-      html += '<tr><th>Points</th>'+ ordered.map(()=>'<td class="ptsCell">–</td>').join('')   + '</tr>';
+
       tbl.innerHTML = html;
+      $$('#scoreTable input.strokes').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          recalcLive(players, useHcaps);
+          persistScoreStateFromUI(players, useHcaps);
+          autoAdvanceIfHoleComplete();
+        });
+      });
+      recalcLive(players, useHcaps);
     }
-    function collectRound(players, useHcaps){
+
+    function recalcLive(players, useHcaps){
       const holes = state.course?.holes || {};
       const ordered = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
-      const round = players.map(p => ({ name:p.name, hcap:p.hcap, gross:0, net:0, points:0 }));
+      const front9 = ordered.filter(n => n <= 9);
+      const back9  = ordered.filter(n => n > 9);
+
+      const agg = players.map(p => ({ gross:0, net:0, points:0, out:0, inn:0 }));
+
       $$('#scoreTable input.strokes').forEach(inp=>{
         const playerIdx = parseInt(inp.dataset.player,10);
         const holeNo = parseInt(inp.dataset.hole,10);
@@ -621,21 +728,88 @@
         if (!Number.isFinite(v)) return;
         const par = holes[holeNo]?.par ?? null;
         const strokeIdx = holes[holeNo]?.stroke ?? null;
-        const recv = useHcaps ? strokesReceived(round[playerIdx].hcap, strokeIdx||18) : 0;
-        const net = v - recv;
+        const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, strokeIdx||18) : 0;
         const pts = stablefordPoints(par, v, recv);
-        round[playerIdx].gross += v;
-        round[playerIdx].net   += Number.isFinite(net) ? net : 0;
-        round[playerIdx].points+= pts;
+
+        agg[playerIdx].gross += v;
+        agg[playerIdx].points+= pts;
+        if (front9.includes(holeNo)) agg[playerIdx].out += v;
+        else agg[playerIdx].inn += v;
       });
-      return round;
+
+      agg.forEach((a, idx)=>{
+        const grossTotal = (a.out + a.inn) || 0;
+        const netTotal = Math.max(0, grossTotal - (players[idx].hcap||0));
+        const outCell = document.querySelector(`.outCell[data-player="${idx}"]`);
+        const inCell  = document.querySelector(`.inCell[data-player="${idx}"]`);
+        const totCell = document.querySelector(`.totCell[data-player="${idx}"]`);
+        const netCell = document.querySelector(`.netCell[data-player="${idx}"]`);
+        const ptsCell = document.querySelector(`.ptsCell[data-player="${idx}"]`);
+        if (outCell) outCell.textContent = a.out || 0;
+        if (inCell)  inCell.textContent  = a.inn || 0;
+        if (totCell) totCell.textContent = grossTotal;
+        if (netCell) netCell.textContent = netTotal;
+        if (ptsCell) ptsCell.textContent = a.points || 0;
+      });
+    }
+
+    function persistScoreStateFromUI(players, useHcaps){
+      const strokes = {};
+      $$('#scoreTable input.strokes').forEach(inp=>{
+        const pi = parseInt(inp.dataset.player,10);
+        const h  = parseInt(inp.dataset.hole,10);
+        const v  = parseInt(inp.value,10);
+        if (!strokes[pi]) strokes[pi] = {};
+        if (Number.isFinite(v)) strokes[pi][h] = v;
+      });
+      const stateObj = { players, useHcaps, strokes, ts: Date.now(), active:true };
+      localStorage.setItem(scStateKey(), JSON.stringify(stateObj));
+    }
+
+    function loadScoreState(){
+      try {
+        const raw = localStorage.getItem(scStateKey());
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch { return null; }
+    }
+
+    function autoAdvanceIfHoleComplete(){
+      const hNo = state.hole;
+      const inputs = $$('#scoreTable input.strokes');
+      if (!inputs.length) return;
+      const playersSet = new Set([...inputs].map(i=>i.dataset.player));
+      for (const pi of playersSet){
+        const cell = document.querySelector(`#scoreTable input.strokes[data-player="${pi}"][data-hole="${hNo}"]`);
+        if (!cell || !cell.value || isNaN(parseInt(cell.value,10))) return;
+      }
+      setTimeout(()=>{
+        const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
+        if (hNo < max){
+          state.hole = hNo + 1;
+          state.initialFramed=false;
+          renderHole();
+        }
+      }, 100);
     }
 
     function openScore(){
       $('#scoreTitle').textContent = `Scorecard — ${state.course?.course?.name || 'Course'}`;
-      $('#scoreSetup').style.display = 'block';
-      $('#scoreBody').style.display  = 'none';
-      rebuildPlayersGrid();
+      const saved = loadScoreState();
+      if (saved && saved.active){
+        // jump straight into the active scorecard
+        $('#useHandicaps').checked = !!saved.useHcaps;
+        rebuildPlayersGrid(saved);
+        buildScoreTable(saved.players, saved.useHcaps, saved);
+        $('#scoreBody').dataset.players = JSON.stringify(saved.players);
+        $('#scoreBody').dataset.useH = saved.useHcaps ? '1' : '0';
+        $('#scoreSetup').style.display = 'none';
+        $('#scoreBody').style.display  = 'block';
+      } else {
+        rebuildPlayersGrid(null);
+        $('#scoreSetup').style.display = 'block';
+        $('#scoreBody').style.display  = 'none';
+      }
       $('#scoreModal').style.display='grid';
     }
     function closeScore(){ $('#scoreModal').style.display='none'; }
@@ -652,19 +826,53 @@
         if (!Number.isFinite(hcap) || hcap<0) hcap = 0;
         ps.push({ name, hcap });
       }
-      buildScoreTable(ps, useH);
+      const saved = loadScoreState();
+      buildScoreTable(ps, useH, saved);
       $('#scoreBody').dataset.players = JSON.stringify(ps);
       $('#scoreBody').dataset.useH = useH ? '1' : '0';
       $('#scoreSetup').style.display = 'none';
       $('#scoreBody').style.display  = 'block';
+      persistScoreStateFromUI(ps, useH);
     });
-    $('#closeSetup').addEventListener('click', closeScore);
+
+    $('#clearScore').addEventListener('click', ()=>{
+      if (!confirm('Clear current scorecard?')) return;
+      localStorage.removeItem(scStateKey());
+      // Return to setup
+      rebuildPlayersGrid(null);
+      $('#scoreSetup').style.display = 'block';
+      $('#scoreBody').style.display  = 'none';
+    });
+
     $('#closeScore').addEventListener('click', closeScore);
 
     $('#saveRound').addEventListener('click', ()=>{
       const ps = JSON.parse($('#scoreBody').dataset.players || '[]');
       const useH = $('#scoreBody').dataset.useH === '1';
-      const results = collectRound(ps, useH);
+
+      const holes = state.course?.holes || {};
+      const ordered = Object.keys(holes).map(k=>+k).sort((a,b)=>a-b);
+      const front9 = ordered.filter(n => n <= 9);
+      const back9  = ordered.filter(n => n > 9);
+
+      const results = ps.map((p, idx)=>({ name:p.name, hcap:p.hcap, gross:0, net:0, points:0, out:0, inn:0 }));
+
+      $$('#scoreTable input.strokes').forEach(inp=>{
+        const i = parseInt(inp.dataset.player,10);
+        const holeNo = parseInt(inp.dataset.hole,10);
+        const v = parseInt(inp.value,10);
+        if (!Number.isFinite(v)) return;
+        const par = holes[holeNo]?.par ?? null;
+        const strokeIdx = holes[holeNo]?.stroke ?? null;
+        const recv = useH ? strokesReceived(ps[i].hcap, strokeIdx||18) : 0;
+        const pts = stablefordPoints(par, v, recv);
+        results[i].gross += v;
+        results[i].points+= pts;
+        if (front9.includes(holeNo)) results[i].out += v;
+        else results[i].inn += v;
+      });
+      results.forEach((r,i)=>{ r.net = Math.max(0, (r.out + r.inn) - (ps[i].hcap||0)); });
+
       const entry = {
         course: state.course?.course?.name || 'Course',
         id    : state.course?.course?.id   || state.meta?.id || 'course',
@@ -677,6 +885,7 @@
       arr.unshift(entry);
       while (arr.length>10) arr.pop();
       localStorage.setItem(key, JSON.stringify(arr));
+      localStorage.removeItem(scStateKey()); // reset in-progress
       toast('Round saved');
       closeScore();
     });
@@ -684,23 +893,25 @@
     function openHist(){
       const div = $('#histList');
       const arr = JSON.parse(localStorage.getItem(histKey()) || '[]');
-      if (!arr.length){ div.innerHTML = '<p style="margin:10px 0; color:#9ca3af;">No rounds yet.</p>'; }
+      if (!arr.length){ div.innerHTML = '<p style="margin:10px 0; color:var(--muted);">No rounds yet.</p>'; }
       else {
         const out = arr.map(r=>{
           const dt = new Date(r.ts).toLocaleString();
           const rows = r.players.map(p=>`
-            <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:10px;">
-              <div><strong>${p.name}</strong>${r.useHandicaps?` <span style="color:#9ca3af;">(H${p.hcap})</span>`:''}</div>
-              <div>Gross: <strong>${p.gross}</strong></div>
+            <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;">
+              <div><strong>${p.name}</strong>${r.useHandicaps?` <span style="color:var(--muted);">(H${p.hcap})</span>`:''}</div>
+              <div>Out: <strong>${p.out||0}</strong></div>
+              <div>In: <strong>${p.inn||0}</strong></div>
+              <div>Total: <strong>${(p.out||0)+(p.inn||0)}</strong></div>
               <div>Net: <strong>${p.net}</strong></div>
               <div>Pts: <strong>${p.points}</strong></div>
             </div>
           `).join('');
           return `
-            <div style="border-bottom:1px solid #1f2937; padding:10px 0;">
+            <div style="border-bottom:1px solid var(--border); padding:10px 0;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <div><strong>${r.course}</strong></div>
-                <div style="color:#9ca3af;font-size:12px;">${dt}</div>
+                <div style="color:var(--muted);font-size:12px;">${dt}</div>
               </div>
               ${rows}
             </div>
@@ -712,107 +923,203 @@
     }
     function closeHist(){ $('#histModal').style.display='none'; }
     function clearHistory(){
-      if (!confirm('Clear the last 10 rounds history?')) return;
+      if (!confirm('Clear all saved rounds?')) return;
       localStorage.removeItem(histKey());
-      $('#histList').innerHTML = '<p style="margin:10px 0; color:#9ca3af;">History cleared.</p>';
+      $('#histList').innerHTML = '<p style="margin:10px 0; color:var(--muted);">History cleared.</p>';
     }
     $('#historyBtn').addEventListener('click', openHist);
     $('#closeHist').addEventListener('click', closeHist);
     $('#clearHist').addEventListener('click', clearHistory);
     $('#scoreBtn').addEventListener('click', openScore);
 
-    // No-go zones (NOGO / NO_GO / NO_GO_ZONES)
-    function pointInPoly(pt, poly){
-      let x=pt.lat, y=pt.lng, inside=false;
-      for (let i=0,j=poly.length-1; i<poly.length; j=i++){
-        let xi=poly[i].lat, yi=poly[i].lng, xj=poly[j].lat, yj=poly[j].lng;
-        let intersect=((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
-        if (intersect) inside=!inside;
-      }
-      return inside;
-    }
-    window.__nogoZones = [];
-    function loadNoGoForHole(h){
-      window.__nogoZones = [];
-      const pins = (h && h.pins) || {};
-      const cand = [].concat(pins.NOGO||[], pins.NO_GO||[], pins.NO_GO_ZONES||[]);
-      cand.forEach(zone => {
-        if (Array.isArray(zone) && zone.length && zone[0].lat!==undefined) window.__nogoZones.push(zone);
-        else if (Array.isArray(zone)) zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
-      });
-    }
-
     // Boot
     (async function boot(){
-      try{
-        const idx = await getIndex();
-        const meta = await pickCourseFromIndex(idx);
-        if (!meta){ alert('No courses in index.json'); return; }
-        const course = await loadCourseJson(meta.id);
+      const idx = await getIndex();
+      const meta = await pickCourseFromIndex(idx);
+      if (!meta){ alert('No courses in index.json'); return; }
+      const course = await loadCourseJson(meta.id);
 
-        state.meta = meta; state.course = course;
-        $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
+      const ok = await validatePinFlow(meta.id, course);
+      if (!ok) return;
 
-        const startHole = parseInt(q('hole') || '1', 10);
-        state.hole = startHole;
+      state.meta = meta; state.course = course;
+      $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
 
-        // Load initial no-go data
-        const h0 = course.holes[String(state.hole)];
-        loadNoGoForHole(h0||{});
-
-        renderHole();
-        toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
-      }catch(e){
-        console.error(e);
-        alert('Failed to load course data');
+      // Hide history for clubs
+      const mode = localStorage.getItem(`mode_${meta.id}`) || (isGuestMode() ? 'guest' : 'club');
+      if (mode !== 'guest') {
+        const hb = document.getElementById('historyBtn');
+        if (hb) hb.style.display = 'none';
       }
+
+      const startHole = parseInt(q('hole') || '1', 10);
+      state.hole = startHole;
+
+      renderHole();
+      toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
+  </script>
 
-    // Track cart movement for no-go alert + dynamic frame
-    if (!window.__patchedUpdateCart){
-      window.__patchedUpdateCart = true;
-      window.__wasInNoGo = false;
-      const origUpdate = updateCartAndChips;
-      updateCartAndChips = function(){
-        origUpdate();
-        try{
-          const cm = state.cartMarker;
-          if (!cm) return;
-          const ll = cm.getLatLng();
-          const pt = {lat: ll.lat, lng: ll.lng};
-          let inside = false;
-          for (const poly of (window.__nogoZones||[])){ if (pointInPoly(pt, poly)) { inside = true; break; } }
-          if (inside && !window.__wasInNoGo){
-            window.__wasInNoGo = true;
-            try{
-              const ctx = new (window.AudioContext || window.webkitAudioContext)();
-              const o = ctx.createOscillator(); const g = ctx.createGain();
-              o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
-              o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 350);
-            }catch(e){}
-            const t = document.getElementById('toast');
-            if (t){ t.textContent='Please stay clear of greens / no-go zones.'; t.style.display='block'; setTimeout(()=> t.style.display='none', 2500); }
-          }
-          if (!inside) window.__wasInNoGo = false;
+<script>
+// === Additive handlers (safe) ===
+window.__patchBlock = true;
+(function(){
+  // Expose map safely without renaming 'map'
+  try {
+    if (!window.__leafletMap && typeof map !== 'undefined') window.__leafletMap = map;
+  } catch(e){}
 
-          // Keep CART & BACK in frame when moving
-          const p = state.course.holes[String(state.hole)]?.pins || {};
-          if (p.BACK){
-            fitBetween([ll.lat,ll.lng],[p.BACK.lat,p.BACK.lng]);
-          }
-        }catch(e){}
-      };
+  // Rules modal logic
+  const modal = document.getElementById('rulesModalMini');
+  const openBtn = document.getElementById('rulesBtnMini');
+  const closeBtn = document.getElementById('rulesCloseMini');
+  if (openBtn && modal) openBtn.addEventListener('click', ()=> modal.style.display='grid');
+  if (closeBtn && modal) closeBtn.addEventListener('click', ()=> modal.style.display='none');
+  if (modal) modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.style.display='none'; });
+
+  // Scorecard setup close
+  const closeSetup = document.getElementById('closeSetup');
+  const scoreModal = document.getElementById('scoreModal') || document.getElementById('scorecardModal');
+  if (closeSetup && scoreModal) closeSetup.addEventListener('click', ()=> scoreModal.style.display='none');
+
+  // --- Robust penalties toggle: discover stake markers dynamically ---
+  function discoverStakeMarkers(){
+    const map = window.__leafletMap || window.map;
+    const arr = [];
+    if (!map) return arr;
+    try{
+      if (window.state && Array.isArray(state.markers)){
+        state.markers.forEach(m=>{
+          const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+          if (t.includes('stake')) arr.push(m);
+        });
+      }
+    }catch(e){}
+    try{
+      map.eachLayer(layer=>{
+        if (layer && layer.options && layer.options.title){
+          const t = String(layer.options.title).toLowerCase();
+          if (t.includes('stake') && !arr.includes(layer)) arr.push(layer);
+        }
+      });
+    }catch(e){}
+    return arr;
+  }
+  window.__applyPenToggle = function(show){
+    try{
+      const map = window.__leafletMap || window.map;
+      if (!map) return;
+      window.__stakeMarkers = discoverStakeMarkers();
+      window.__stakeMarkers.forEach(m => {
+        if (show) { if (!m._map) m.addTo(map); }
+        else { if (m._map) map.removeLayer(m); }
+      });
+    }catch(e){ console.warn('pen toggle error', e); }
+  };
+  // Toggle UI & persistence
+  const key = 'penalties_show';
+  const penBtn = document.getElementById('penBtnMini');
+  const penSwitch = document.getElementById('penSwitch');
+  function setPen(on){
+    if (penSwitch){
+      penSwitch.style.background = on ? '#16a34a' : '#ddd';
+      penSwitch.style.borderColor = on ? '#16a34a' : '#cfcfcf';
+      const knob = penSwitch.querySelector('[data-role="knob"]');
+      if (knob) knob.style.transform = on ? 'translateX(20px)' : 'translateX(0)';
     }
+    localStorage.setItem(key, on ? '1' : '0');
+    if (window.__applyPenToggle) window.__applyPenToggle(on);
+  }
+  const initPen = (localStorage.getItem(key) === '1');
+  setPen(initPen);
+  if (penBtn) penBtn.addEventListener('click', ()=> setPen(!(localStorage.getItem(key) === '1')));
 
-    // Re-load no-go when hole changes (after renderHole runs)
-    const _origRender = renderHole;
-    renderHole = function(){
-      _origRender();
+  // After each renderHole, collect stake markers by title and hide FRONT/BACK dots to declutter
+  if (!window.__patchedRenderHole && typeof window.renderHole === 'function'){
+    window.__patchedRenderHole = true;
+    const orig = window.renderHole;
+    window.renderHole = function(){
+      orig();
       try{
-        const h = state.course?.holes?.[String(state.hole)];
+        const map = window.__leafletMap || window.map;
+        window.__stakeMarkers = [];
+        if (window.state && Array.isArray(state.markers)){
+          state.markers.forEach(m => {
+            const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
+            if (t.includes('stake')) window.__stakeMarkers.push(m);
+            if (t==='front' || t==='back'){ if (m._map) map.removeLayer(m); }
+          });
+        }
+        setPen(localStorage.getItem(key) === '1'); // apply current state
+      }catch(e){}
+    };
+  }
+
+  // No-go zone detection (supports pins.NOGO/NO_GO/NO_GO_ZONES)
+  function pointInPoly(pt, poly){
+    let x=pt.lat, y=pt.lng, inside=false;
+    for (let i=0,j=poly.length-1; i<poly.length; j=i++){
+      let xi=poly[i].lat, yi=poly[i].lng, xj=poly[j].lat, yj=poly[j].lng;
+      let intersect=((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
+      if (intersect) inside=!inside;
+    }
+    return inside;
+  }
+  window.__nogoZones = [];
+  function loadNoGoForHole(h){
+    window.__nogoZones = [];
+    const pins = (h && h.pins) || {};
+    const cand = [].concat(pins.NOGO||[], pins.NO_GO||[], pins.NO_GO_ZONES||[]);
+    cand.forEach(zone => {
+      if (Array.isArray(zone) && zone.length && zone[0].lat!==undefined) window.__nogoZones.push(zone);
+      else if (Array.isArray(zone)) zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
+    });
+  }
+  if (!window.__patchedRenderHoleNoGo && typeof window.renderHole === 'function'){
+    window.__patchedRenderHoleNoGo = true;
+    const orig2 = window.renderHole;
+    window.renderHole = function(){
+      orig2();
+      try{
+        const h = window.state && window.state.course && window.state.course.holes
+                  ? window.state.course.holes[String(window.state.hole)] : null;
         loadNoGoForHole(h||{});
       }catch(e){}
     };
-  </script>
+  }
+  if (!window.__patchedUpdateCart && typeof window.updateCartAndChips === 'function'){
+    window.__patchedUpdateCart = true;
+    const orig3 = window.updateCartAndChips;
+    window.__wasInNoGo = false;
+    window.updateCartAndChips = function(){
+      orig3();
+      try{
+        const cm = window.state && window.state.cartMarker;
+        if (!cm) return;
+        const ll = cm.getLatLng();
+        const pt = {lat: ll.lat, lng: ll.lng};
+        let inside = false;
+        for (const poly of (window.__nogoZones||[])){ if (pointInPoly(pt, poly)) { inside = true; break; } }
+        if (inside && !window.__wasInNoGo){
+          window.__wasInNoGo = true;
+          try{
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
+            o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 350);
+          }catch(e){}
+          const t = document.getElementById('toast');
+          if (t){ t.textContent='Please stay clear of greens / no-go zones.'; t.style.display='block'; setTimeout(()=> t.style.display='none', 2500); }
+        }
+        if (!inside) window.__wasInNoGo = false;
+      }catch(e){}
+    };
+  }
+})();
+
+// Layup width fix (ensure no wrap at runtime too)
+try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
+</script>
+
 </body>
 </html>
