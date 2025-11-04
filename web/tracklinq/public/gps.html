@@ -152,11 +152,9 @@
     .leaflet-bottom.leaflet-right { display: none !important; }
 
     /* Layup label bubble (bigger) */
-    .layupLabel {
-      background: var(--panel); color: var(--text);
-      border: 1px solid var(--chip-border); padding: 6px 8px; border-radius: 10px;
-      font-size: 14px; font-weight: 900; box-shadow: var(--shadow);
-    }
+    .layupLabel { background: var(--panel); color: var(--text);
+      border: 1px solid var(--chip-border); padding: 6px 14px; border-radius: 999px;
+      font-size: 14px; font-weight: 900; box-shadow: var(--shadow); white-space: nowrap; line-height:1; }
 
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
@@ -171,16 +169,13 @@
 .layupLabel{padding:6px 14px;border-radius:999px;font-size:14px;font-weight:800;white-space:nowrap;}
 
 
-    /* iOS-style toggle */
+    /* Toggle */
     .switch{position:relative;display:inline-block;width:46px;height:26px}
     .switch input{opacity:0;width:0;height:0}
-    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#e5e7eb;border-radius:999px;transition:.2s}
-    .slider:before{position:absolute;content:"";height:22px;width:22px;left:2px;top:2px;background:white;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
-    input:checked + .slider{background:#16a34a}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--soft);border:1px solid var(--chip-border);border-radius:999px;transition:.2s}
+    .slider:before{position:absolute;content:"";height:22px;width:22px;left:2px;top:2px;background:var(--panel);border:1px solid var(--chip-border);border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+    input:checked + .slider{background:#16a34a;border-color:#14532d}
     input:checked + .slider:before{transform:translateX(20px)}
-  
-    /* layup nowrap fix */
-    .layupLabel{white-space:nowrap}
   </style>
 </head>
 <body data-theme="light">
@@ -213,6 +208,17 @@
   </div>
 
   <!-- Distances stack -->
+  <!-- Top-right Rules + Penalties -->
+  <div id="topRightTools" style="position:absolute; top:112px; right:12px; z-index:1050; display:grid; gap:10px; min-width:200px;">
+    <button id="rulesBtn" class="bubbleBtn" style="width:100%; text-align:center;">Rules</button>
+    <div id="penaltiesBox" class="bubbleBtn" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Penalties</span>
+      <label class="switch" style="margin-left:12px;">
+        <input type="checkbox" id="penToggle"><span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
   <div class="distStack">
     <div class="chipV">
       <span class="dot" style="background:#ffffff"></span>
@@ -314,7 +320,7 @@
       </div>
     </div>
   </div>
-        
+
   <!-- Toast -->
   <div id="toast" style="display:none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 1300; background: var(--panel); color:var(--text); border:1px solid var(--chip-border); padding:8px 12px; border-radius:10px; font-size:12px; box-shadow:var(--shadow);"></div>
 
@@ -376,7 +382,7 @@
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: L.divIcon({className:'', html:'<div style="font-size:26px;line-height:1">🛺</div>', iconSize:[26,26], iconAnchor:[13,13]}), 12),
+      CART: L.divIcon({className:'', html:'<div style=\"font-size:26px;line-height:1\">🛺</div>', iconSize:[26,26], iconAnchor:[13,13]}),
       LAYUP: dotIcon('#111111', 12)
     };
 
@@ -475,7 +481,7 @@
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
     function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
     function labelAt(ll, text){
-      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>` });
+      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>`, iconSize:null });
       return L.marker([ll.lat, ll.lng], { icon: div, interactive:false });
     }
 
@@ -532,9 +538,9 @@
 
       if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
-      (p.STAKE_WHITE || []).forEach(s => state.stakeMarkers.push(addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, "Stake (white)")));
-      (p.STAKE_RED   || []).forEach(s => state.stakeMarkers.push(addMarker(s.lat, s.lng, ICONS.STAKE_RED, "Stake (red)")));
-      (p.STAKE_YELLOW || []).forEach(s => state.stakeMarkers.push(addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, "Stake (yellow)")));
+      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
+      (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
+      (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
       updateChips(p);
       ensureInitialFraming();
@@ -550,16 +556,10 @@
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
       const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole();
-      const pen = document.getElementById("penToggle"); if(pen){ pen.addEventListener("change",()=>{ toggleStakes(pen.checked); localStorage.setItem("showStakes", pen.checked? "1":"0"); }); const saved = localStorage.getItem("showStakes"); if(saved!==null){ pen.checked = saved==="1"; toggleStakes(pen.checked);} }
-      const rb=document.getElementById("rulesBtn"); if(rb){ rb.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="grid"); }
-      const cr=document.getElementById("closeRules"); if(cr){ cr.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="none"); }
     });
     $('#nextHole').addEventListener('click', ()=>{
       const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
       state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole();
-      const pen = document.getElementById("penToggle"); if(pen){ pen.addEventListener("change",()=>{ toggleStakes(pen.checked); localStorage.setItem("showStakes", pen.checked? "1":"0"); }); const saved = localStorage.getItem("showStakes"); if(saved!==null){ pen.checked = saved==="1"; toggleStakes(pen.checked);} }
-      const rb=document.getElementById("rulesBtn"); if(rb){ rb.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="grid"); }
-      const cr=document.getElementById("closeRules"); if(cr){ cr.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="none"); }
     });
 
     // Units
@@ -797,9 +797,6 @@
           state.hole = hNo + 1;
           state.initialFramed=false;
           renderHole();
-      const pen = document.getElementById("penToggle"); if(pen){ pen.addEventListener("change",()=>{ toggleStakes(pen.checked); localStorage.setItem("showStakes", pen.checked? "1":"0"); }); const saved = localStorage.getItem("showStakes"); if(saved!==null){ pen.checked = saved==="1"; toggleStakes(pen.checked);} }
-      const rb=document.getElementById("rulesBtn"); if(rb){ rb.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="grid"); }
-      const cr=document.getElementById("closeRules"); if(cr){ cr.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="none"); }
         }
       }, 100);
     }
@@ -967,9 +964,6 @@
       state.hole = startHole;
 
       renderHole();
-      const pen = document.getElementById("penToggle"); if(pen){ pen.addEventListener("change",()=>{ toggleStakes(pen.checked); localStorage.setItem("showStakes", pen.checked? "1":"0"); }); const saved = localStorage.getItem("showStakes"); if(saved!==null){ pen.checked = saved==="1"; toggleStakes(pen.checked);} }
-      const rb=document.getElementById("rulesBtn"); if(rb){ rb.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="grid"); }
-      const cr=document.getElementById("closeRules"); if(cr){ cr.addEventListener("click", ()=> document.getElementById("rulesModal").style.display="none"); }
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
   </script>
