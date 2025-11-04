@@ -152,11 +152,11 @@
     .leaflet-bottom.leaflet-right { display: none !important; }
 
     /* Layup label bubble (bigger) */
-    .layupLabel{
+    .layupLabel {
       background: var(--panel); color: var(--text);
       border: 1px solid var(--chip-border); padding: 6px 8px; border-radius: 10px;
       font-size: 14px; font-weight: 900; box-shadow: var(--shadow);
-     white-space:nowrap; padding-left:14px; padding-right:14px; line-height:1;}
+    }
 
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
@@ -173,15 +173,7 @@
   overflow: visible;
 }
 
-
-    /* rules/penalties theme fix v2 */
-    #rulesBtn.bubbleBtn, #penaltiesBox.bubbleBtn {
-      background: var(--panel);
-      color: var(--text);
-      border: 1px solid var(--chip-border);
-      transition: background 0.3s, color 0.3s;
-    }
-  </style>
+</style>
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -385,7 +377,7 @@
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: L.divIcon({className:'', html:'<div style=\"font-size:26px;line-height:1\">🛺</div>', iconSize:[26,26], iconAnchor:[13,13]}),
+      CART: dotIcon('#3b82f6', 12),
       LAYUP: dotIcon('#111111', 12)
     };
 
@@ -464,7 +456,7 @@
     }
 
     // State
-    const state = { showStakes:true, stakeMs:[],
+    const state = {
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
@@ -483,7 +475,7 @@
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
     function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
     function labelAt(ll, text){
-      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>`, iconSize:null });
+      const div = L.divIcon({ className:'', html:`<div class="layupLabel">${text}</div>` });
       return L.marker([ll.lat, ll.lng], { icon: div, interactive:false });
     }
 
@@ -549,17 +541,7 @@
       updateLayupUI();
     }
 
-    
     // View buttons
-    function toggleStakes(show){
-      (state.stakeMarkers || []).forEach(m=>{
-        if(show){
-          if(!map.hasLayer(m)) m.addTo(map);
-        } else {
-          if(map.hasLayer(m)) m.remove();
-        }
-      });
-    }
     $('#holeViewBtn').addEventListener('click', doHoleView);
     $('#cartViewBtn').addEventListener('click', doCartView);
 
@@ -1139,21 +1121,45 @@ window.__patchBlock = true;
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
 </script>
 
-<!-- Penalties toggle handler (isolated) -->
+
+<!-- Penalties toggle handler (robust scan) -->
 <script>
 (function(){
-  var btn = document.getElementById('stakesBtnMini') || document.getElementById('penaltiesBtn') || document.querySelector('[data-role="penalties"]');
-  if(!btn || typeof state === 'undefined') return;
-  function refresh(){ try{ btn.textContent = 'Penalties: ' + (state.showStakes ? 'On' : 'Off'); }catch(e){} }
+  var btn = document.getElementById('stakesBtnMini')
+         || document.getElementById('penaltiesBtn')
+         || document.querySelector('[data-role="penalties"]');
+  if (!btn || typeof state === 'undefined') return;
+
+  if (typeof state.showStakes === 'undefined') state.showStakes = true;
+
+  function setStakeOpacity(op){
+    try{
+      if (Array.isArray(state.markers)){
+        state.markers.forEach(function(m){
+          try{
+            var t = (m && m.options && m.options.title) ? String(m.options.title) : '';
+            if (/Stake/i.test(t)) m.setOpacity(op);
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+  }
+
+  function refreshBtn(){
+    try{ btn.textContent = 'Penalties: ' + (state.showStakes ? 'On' : 'Off'); }catch(e){}
+  }
+
+  // initialize on load
+  refreshBtn();
+  setStakeOpacity(state.showStakes ? 1 : 0);
+
   btn.addEventListener('click', function(){
     state.showStakes = !state.showStakes;
-    if (state.stakeMs && Array.isArray(state.stakeMs)){
-      state.stakeMs.forEach(function(m){ if(m && m.setOpacity) m.setOpacity(state.showStakes?1:0); });
-    }
-    refresh();
+    setStakeOpacity(state.showStakes ? 1 : 0);
+    refreshBtn();
   });
-  refresh();
 })();
 </script>
+
 </body>
 </html>
