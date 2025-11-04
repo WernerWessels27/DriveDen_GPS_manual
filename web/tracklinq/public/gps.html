@@ -19,19 +19,18 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   >
-  // Penalties toggle
-  const stakesBtn = document.getElementById('stakesBtnMini');
-  if (stakesBtn){
-    const refreshStakesBtn = ()=>{ stakesBtn.textContent = 'Penalties: ' + (state.showStakes ? 'On' : 'Off'); };
-    stakesBtn.addEventListener('click', ()=>{
-      state.showStakes = !state.showStakes;
-      // if markers exist already, update opacity
-      if (state.stakeMs){ state.stakeMs.forEach(m => m.setOpacity(state.showStakes?1:0)); }
-      refreshStakesBtn();
-    });
-    refreshStakesBtn();
-  }
-
+  // Rules modal open/close
+  (function(){
+    const btn = document.getElementById('rulesBtnMini');
+    const modal = document.getElementById('rulesModal');
+    const closeBtn = document.getElementById('rulesClose');
+    if(btn && modal){
+      btn.addEventListener('click', ()=>{ modal.style.display='grid'; });
+    }
+    if(closeBtn){
+      closeBtn.addEventListener('click', ()=>{ modal.style.display='none'; });
+    }
+  })();
 </script>
 
   <style>
@@ -182,8 +181,10 @@
 .modalMini{width:min(92vw,880px);max-height:84vh;overflow:auto;background:#fff;color:#0b0b0b;border:1px solid #00000022;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);}
 .modalMini h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;justify-content:space-between;}
 /* More generous layup text bubble if class exists in base */
-.layupLabel{padding:8px 16px;border-radius:999px;font-size:14px;font-weight:800;white-space:nowrap;display:inline-block;max-width:60vw;overflow:hidden;text-overflow:ellipsis;}
+.layupLabel{padding:8px 16px;border-radius:999px;font-size:14px;font-weight:800;white-space:nowrap;display:inline-block;max-width:70vw;overflow:hidden;text-overflow:ellipsis;}
 
+
+    .cartEmoji{font-size:28px; line-height:28px; transform: translate(-50%, -70%);}
 </style>
 </head>
 <body data-theme="light">
@@ -194,7 +195,6 @@
 
   <div class="topRightMini">
     <button class="btnMini" id="rulesBtnMini">Rules</button>
-    <button class="btnMini" id="stakesBtnMini">Penalties: On</button>
   </div>
 
     <div class="left"></div>
@@ -340,7 +340,9 @@
         </svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[r,r] });
     }
-    function largeSymbolIcon(svgPath, size=36){
+    function emojiIcon(char='🛺', size=32){ return L.divIcon({className:'cartEmoji', html: char, iconSize:[size,size], iconAnchor:[size/2, size*0.75]}); }
+
+function largeSymbolIcon(svgPath, size=36){
       const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
@@ -357,14 +359,14 @@
     const ICONS = {
       TEE: dotIcon('#16a34a', 14),
       FRONT: dotIcon('#ffffff', 12),
-      MID: largeSymbolIcon(`<path d='M12 4v28h-2V4h2Zm2 2h14l-3 4 3 4H14V6Z' fill='#fbbf24'/><circle cx='12' cy='34' r='3' fill='#4b5563'/>`, 40),
+      MID: dotIcon('#fbbf24', 12),
       BACK: dotIcon('#ef4444', 12),
       TOILET: largeSymbolIcon(TOILET_SVG, 36),
       TAPS: largeSymbolIcon(TAP_SVG, 36),
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: largeSymbolIcon(`<path d='M6 10h3l3 14h14l3-10H12' fill='#16a34a'/><circle cx='14' cy='28' r='3' fill='#111'/><circle cx='26' cy='28' r='3' fill='#111'/><rect x='5' y='8' width='6' height='2' rx='1' fill='#111'/>`, 40),
+      CART: emojiIcon('🛺', 32), 12),
       LAYUP: dotIcon('#111111', 12)
     };
 
@@ -447,8 +449,8 @@
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
-      initialFramed:false, showStakes:true, stakeMs:[]
-    };
+      initialFramed:false
+    , showStakes:true, stakeMs:[]};
 
     // Distance helpers
     const toRad = d => d*Math.PI/180;
@@ -520,12 +522,9 @@ if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
       // if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
 if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
-      state.stakeMs = [];
-      (p.STAKE_WHITE||[]).forEach(s => state.stakeMs.push(addMarker(s.lat,s.lng,ICONS.STAKE_WHITE,'Stake (white)')));
-      (p.STAKE_RED  ||[]).forEach(s => state.stakeMs.push(addMarker(s.lat,s.lng,ICONS.STAKE_RED,'Stake (red)')));
-      (p.STAKE_YELLOW||[]).forEach(s => state.stakeMs.push(addMarker(s.lat,s.lng,ICONS.STAKE_YELLOW,'Stake (yellow)')));
-      // apply visibility per toggle
-      state.stakeMs.forEach(m => m.setOpacity(state.showStakes?1:0));
+      (p.STAKE_WHITE || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_WHITE, 'Stake (white)'));
+      (p.STAKE_RED   || []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_RED, 'Stake (red)'));
+      (p.STAKE_YELLOW|| []).forEach(s => addMarker(s.lat, s.lng, ICONS.STAKE_YELLOW, 'Stake (yellow)'));
 
       updateChips(p);
       ensureInitialFraming();
@@ -836,6 +835,7 @@ if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
     });
 
     $('#closeScore').addEventListener('click', closeScore);
+    const closeSetupBtn = document.getElementById('closeSetup'); if (closeSetupBtn){ closeSetupBtn.addEventListener('click', ()=>{ document.getElementById('scoreModal').style.display='none'; }); }
 
     $('#saveRound').addEventListener('click', ()=>{
       const ps = JSON.parse($('#scoreBody').dataset.players || '[]');
@@ -950,19 +950,18 @@ if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
   
-  // Penalties toggle
-  const stakesBtn = document.getElementById('stakesBtnMini');
-  if (stakesBtn){
-    const refreshStakesBtn = ()=>{ stakesBtn.textContent = 'Penalties: ' + (state.showStakes ? 'On' : 'Off'); };
-    stakesBtn.addEventListener('click', ()=>{
-      state.showStakes = !state.showStakes;
-      // if markers exist already, update opacity
-      if (state.stakeMs){ state.stakeMs.forEach(m => m.setOpacity(state.showStakes?1:0)); }
-      refreshStakesBtn();
-    });
-    refreshStakesBtn();
-  }
-
+  // Rules modal open/close
+  (function(){
+    const btn = document.getElementById('rulesBtnMini');
+    const modal = document.getElementById('rulesModal');
+    const closeBtn = document.getElementById('rulesClose');
+    if(btn && modal){
+      btn.addEventListener('click', ()=>{ modal.style.display='grid'; });
+    }
+    if(closeBtn){
+      closeBtn.addEventListener('click', ()=>{ modal.style.display='none'; });
+    }
+  })();
 </script>
 
 <!-- Rules Modal (rich HTML; closes on button or backdrop) -->
@@ -984,6 +983,20 @@ if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
     </div>
   </div>
 </div>
+
+
+  <!-- Rules Modal -->
+  <div class="modalBack" id="rulesModal" style="display:none; place-items:center;">
+    <div class="modal">
+      <h2>Rules & Tips</h2>
+      <div id="rulesContent">
+        <p style="margin:0;">This is placeholder content for quick rules/tips. You can replace this with HTML (images, videos, links) later.</p>
+      </div>
+      <div class="modalActions">
+        <button class="btn" id="rulesClose">Close</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
