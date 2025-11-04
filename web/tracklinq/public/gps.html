@@ -464,7 +464,7 @@
     }
 
     // State
-    const state = {
+    const state = { showStakes:true, stakeMs:[],
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
@@ -1139,5 +1139,21 @@ window.__patchBlock = true;
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
 </script>
 
+<!-- Penalties toggle handler (isolated) -->
+<script>
+(function(){
+  var btn = document.getElementById('stakesBtnMini') || document.getElementById('penaltiesBtn') || document.querySelector('[data-role="penalties"]');
+  if(!btn || typeof state === 'undefined') return;
+  function refresh(){ try{ btn.textContent = 'Penalties: ' + (state.showStakes ? 'On' : 'Off'); }catch(e){} }
+  btn.addEventListener('click', function(){
+    state.showStakes = !state.showStakes;
+    if (state.stakeMs && Array.isArray(state.stakeMs)){
+      state.stakeMs.forEach(function(m){ if(m && m.setOpacity) m.setOpacity(state.showStakes?1:0); });
+    }
+    refresh();
+  });
+  refresh();
+})();
+</script>
 </body>
 </html>
