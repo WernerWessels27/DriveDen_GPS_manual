@@ -161,19 +161,14 @@
     /* Theme toggle */
     .themeBtn { border-color: var(--accent-3); }
   </style>
-
-/* Layup text no-wrap and wider */
-#layupText { white-space: nowrap; }
-#layupBox, .layupBox { max-width: 88vw; }
-
-
 </head>
 <body data-theme="light">
   <div id="map"></div>
+
   <!-- Rules & Penalties (top-right) -->
   <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;">
-    <button class="btnMini" id="rulesBtnMini" style="border:1px solid var(--chip-border);background:var(--panel);color:var(--text);border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:var(--shadow);">Rules</button>
-    <button class="btnMini" id="penBtnMini" style="border:1px solid var(--chip-border);background:var(--panel);color:var(--text);border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
+    <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
       <span>Penalties</span>
       <div class="penSwitch" id="penSwitch" style="position:relative;width:44px;height:24px;border-radius:999px;background:#ddd;border:1px solid #cfcfcf;flex:0 0 auto;">
         <div style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;transition:all .2s;" data-role="knob"></div>
@@ -374,7 +369,7 @@
     };
 
     // Map (Esri; no visible Leaflet controls)
-    window.__leafletMap = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
+    const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19 }
@@ -953,107 +948,122 @@
   </script>
 
 <script>
-
-// After renderHole, collect stake markers by title and apply current visibility
+// === Additive handlers (safe) ===
+window.__patchBlock = true;
 (function(){
-  if (!window.__collectStakesOnce){
-    window.__collectStakesOnce = true;
-    const origRender = window.renderHole;
-    if (typeof origRender === 'function'){
-      window.renderHole = function(){
-        origRender();
-        try{
-          const map = window.__leafletMap;
-          window.__stakeMarkers = [];
-          // find markers on map by scanning state.markers if available
-          if (window.state && Array.isArray(state.markers)){
-            state.markers.forEach(m => {
-              const t = (m && m.options && m.options.title) ? String(m.options.title).toLowerCase() : '';
-              if (t.includes('stake')) window.__stakeMarkers.push(m);
-              // hide FRONT/BACK pins on map to declutter while still using for fit/distances
-              if (t === 'front' || t === 'back'){
-                if (m._map) map.removeLayer(m);
-              }
-            });
-          }
-          if (window.__applyPenToggle && window.__penaltiesOn) {
-            window.__applyPenToggle(window.__penaltiesOn());
-          }
-        }catch(e){ console.warn('collect stakes error', e); }
-      }
+  // Expose map safely without renaming 'map'
+  try {
+    if (!window.__leafletMap && typeof map !== 'undefined') window.__leafletMap = map;
+  } catch(e){}
+
+  // Rules modal logic
+  const modal = document.getElementById('rulesModalMini');
+  const openBtn = document.getElementById('rulesBtnMini');
+  const closeBtn = document.getElementById('rulesCloseMini');
+  if (openBtn && modal) openBtn.addEventListener('click', ()=> modal.style.display='grid');
+  if (closeBtn && modal) closeBtn.addEventListener('click', ()=> modal.style.display='none');
+  if (modal) modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.style.display='none'; });
+
+  // Scorecard setup close
+  const closeSetup = document.getElementById('closeSetup');
+  const scoreModal = document.getElementById('scoreModal') || document.getElementById('scorecardModal');
+  if (closeSetup && scoreModal) closeSetup.addEventListener('click', ()=> scoreModal.style.display='none');
+
+  // Penalties toggle + hook
+  const key = 'penalties_show';
+  const penBtn = document.getElementById('penBtnMini');
+  const penSwitch = document.getElementById('penSwitch');
+  window.__stakeMarkers = window.__stakeMarkers || [];
+  window.__applyPenToggle = function(show){
+    try{
+      const m = window.__leafletMap || window.map;
+      if (!m) return;
+      window.__stakeMarkers.forEach(marker => {
+        if (show) { if (!marker._map) marker.addTo(m); }
+        else { if (marker._map) m.removeLayer(marker); }
+      });
+    }catch(e){ console.warn('pen toggle error', e); }
+  };
+  function setPen(on){
+    if (penSwitch){
+      penSwitch.style.background = on ? '#16a34a' : '#ddd';
+      penSwitch.style.borderColor = on ? '#16a34a' : '#cfcfcf';
+      const knob = penSwitch.querySelector('[data-role="knob"]');
+      if (knob) knob.style.transform = on ? 'translateX(20px)' : 'translateX(0)';
     }
+    localStorage.setItem(key, on ? '1' : '0');
+    if (window.__applyPenToggle) window.__applyPenToggle(on);
   }
-})();
+  const initPen = (localStorage.getItem(key) === '1');
+  setPen(initPen);
+  if (penBtn) penBtn.addEventListener('click', ()=> setPen(!(localStorage.getItem(key) === '1')));
 
-</script>
+  // After each renderHole, collect stake markers by title and hide FRONT/BACK dots to declutter
+  if (!window.__patchedRenderHole && typeof window.renderHole === 'function'){
+    window.__patchedRenderHole = true;
+    const orig = window.renderHole;
+    window.renderHole = function(){
+      orig();
+      try{
+        const m = window.__leafletMap || window.map;
+        window.__stakeMarkers = [];
+        if (window.state && Array.isArray(state.markers)){
+          state.markers.forEach(mm => {
+            const t = (mm && mm.options && mm.options.title) ? String(mm.options.title).toLowerCase() : '';
+            if (t.includes('stake')) window.__stakeMarkers.push(mm);
+            if (t==='front' || t==='back'){ if (mm._map) m.removeLayer(mm); }
+          });
+        }
+        setPen(localStorage.getItem(key) === '1'); // apply current state
+      }catch(e){}
+    };
+  }
 
-<script>
-
-// No-go zones detection (supports pins.NOGO, pins.NO_GO, pins.NO_GO_ZONES)
-// Expects each zone as an array of {lat,lng} points (polygon)
-(function(){
+  // No-go zone detection (supports pins.NOGO/NO_GO/NO_GO_ZONES)
   function pointInPoly(pt, poly){
-    // ray casting
-    let x = pt.lat, y = pt.lng;
-    let inside = false;
+    let x=pt.lat, y=pt.lng, inside=false;
     for (let i=0,j=poly.length-1; i<poly.length; j=i++){
-      let xi = poly[i].lat, yi = poly[i].lng;
-      let xj = poly[j].lat, yj = poly[j].lng;
-      let intersect = ((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
-      if (intersect) inside = !inside;
+      let xi=poly[i].lat, yi=poly[i].lng, xj=poly[j].lat, yj=poly[j].lng;
+      let intersect=((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
+      if (intersect) inside=!inside;
     }
     return inside;
   }
   window.__nogoZones = [];
-  window.__loadNoGoForHole = function(hole){
+  function loadNoGoForHole(h){
     window.__nogoZones = [];
-    try{
-      const pins = (hole && hole.pins) || {};
-      const candidates = [].concat(
-        pins.NOGO || [],
-        pins.NO_GO || [],
-        pins.NO_GO_ZONES || []
-      );
-      // candidates may be array of polygons OR single polygon
-      candidates.forEach(zone => {
-        if (!zone) return;
-        if (Array.isArray(zone) && zone.length && zone[0].lat!==undefined) {
-          window.__nogoZones.push(zone);
-        } else if (Array.isArray(zone)) {
-          // array of arrays
-          zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
-        }
-      });
-      // console.log('No-go zones loaded:', window.__nogoZones.length);
-    }catch(e){}
-  };
-  // Hook renderHole to refresh zones
-  (function(){
-    const orig = window.renderHole;
-    if (typeof orig === 'function'){
-      window.renderHole = function(){
-        orig();
+    const pins = (h && h.pins) || {};
+    const cand = [].concat(pins.NOGO||[], pins.NO_GO||[], pins.NO_GO_ZONES||[]);
+    cand.forEach(zone => {
+      if (Array.isArray(zone) && zone.length && zone[0].lat!==undefined) window.__nogoZones.push(zone);
+      else if (Array.isArray(zone)) zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
+    });
+  }
+  if (!window.__patchedRenderHoleNoGo && typeof window.renderHole === 'function'){
+    window.__patchedRenderHoleNoGo = true;
+    const orig2 = window.renderHole;
+    window.renderHole = function(){
+      orig2();
+      try{
         const h = window.state && window.state.course && window.state.course.holes
                   ? window.state.course.holes[String(window.state.hole)] : null;
-        window.__loadNoGoForHole(h || {});
-      };
-    }
-  })();
-  // Geolocation watcher hook to alert if inside
-  (function(){
-    const origCartUpdate = window.updateCartAndChips;
+        loadNoGoForHole(h||{});
+      }catch(e){}
+    };
+  }
+  if (!window.__patchedUpdateCart && typeof window.updateCartAndChips === 'function'){
+    window.__patchedUpdateCart = true;
+    const orig3 = window.updateCartAndChips;
     window.__wasInNoGo = false;
     window.updateCartAndChips = function(){
-      if (typeof origCartUpdate === 'function') origCartUpdate();
+      orig3();
       try{
         const cm = window.state && window.state.cartMarker;
         if (!cm) return;
         const ll = cm.getLatLng();
         const pt = {lat: ll.lat, lng: ll.lng};
         let inside = false;
-        for (const poly of (window.__nogoZones||[])){
-          if (pointInPoly(pt, poly)) { inside = true; break; }
-        }
+        for (const poly of (window.__nogoZones||[])){ if (pointInPoly(pt, poly)) { inside = true; break; } }
         if (inside && !window.__wasInNoGo){
           window.__wasInNoGo = true;
           try{
@@ -1063,69 +1073,16 @@
             o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 350);
           }catch(e){}
           const t = document.getElementById('toast');
-          if (t){ t.textContent = 'Please stay clear of greens / no-go zones.'; t.style.display='block'; setTimeout(()=> t.style.display='none', 2500); }
+          if (t){ t.textContent='Please stay clear of greens / no-go zones.'; t.style.display='block'; setTimeout(()=> t.style.display='none', 2500); }
         }
         if (!inside) window.__wasInNoGo = false;
       }catch(e){}
     };
-  })();
-})();
-
-</script>
-
-<script>
-
-// Hide FRONT/BACK markers from map after render to reduce clutter; keep for distances
-(function(){
-  const orig = window.renderHole;
-  if (typeof orig === 'function'){
-    window.renderHole = function(){
-      orig();
-      try{
-        const map = window.__leafletMap;
-        if (window.state && Array.isArray(state.markers)){
-          state.markers.forEach(m => {
-            const t = (m && m.options && m.options.title) ? String(m.options.title).toUpperCase() : '';
-            if (t==='FRONT' || t==='BACK'){ if (m._map) map.removeLayer(m); }
-          });
-        }
-      }catch(e){}
-    }
   }
 })();
 
-</script>
-</body></body></body></body>
-<script>
-// Rules modal logic
-(function(){
-  const modal = document.getElementById('rulesModalMini');
-  const openBtn = document.getElementById('rulesBtnMini');
-  const closeBtn = document.getElementById('rulesCloseMini');
-  if (openBtn && modal) openBtn.addEventListener('click', ()=> modal.style.display='grid');
-  if (closeBtn && modal) closeBtn.addEventListener('click', ()=> modal.style.display='none');
-  if (modal) modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.style.display='none'; });
-})();
-
-// Penalties toggle (show/hide stake markers)
-(function(){
-  const key = 'penalties_show';
-  const penBtn = document.getElementById('penBtnMini');
-  const penSwitch = document.getElementById('penSwitch');
-  function setOn(on){
-    if (!penSwitch) return;
-    penSwitch.style.background = on ? '#16a34a' : '#ddd';
-    penSwitch.style.borderColor = on ? '#16a34a' : '#cfcfcf';
-    const knob = penSwitch.querySelector('[data-role="knob"]');
-    if (knob) knob.style.transform = on ? 'translateX(20px)' : 'translateX(0)';
-    localStorage.setItem(key, on ? '1' : '0');
-    if (window.__applyPenToggle) window.__applyPenToggle(on);
-  }
-  const initOn = (localStorage.getItem(key) === '1');
-  setOn(initOn);
-  if (penBtn) penBtn.addEventListener('click', ()=> setOn(!(localStorage.getItem(key) === '1')));
-  window.__penaltiesOn = ()=> localStorage.getItem(key) === '1';
-})();
+// Layup width fix (ensure no wrap)
+try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
 </script>
 
 </body>
