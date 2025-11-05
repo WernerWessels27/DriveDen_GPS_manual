@@ -74,21 +74,6 @@
       border: 1px solid var(--border); background: var(--chip); color: var(--text); font-weight: 800;
     }
 
-#toast {
-  z-index: 9999 !important;
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #dc2626; /* red */
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 8px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-    
     /* Hole bar: Par | HOLE | Stroke */
     .holeBar {
       position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
@@ -257,7 +242,7 @@
   <div id="map"></div>
 
   <!-- Rules & Penalties (top-right) -->
-  <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;">
+  <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
     <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
     <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
       <span>Penalties</span>
@@ -679,7 +664,7 @@ BACK:  dotIcon('transparent', 12),
 
     // Geolocation (watch for live CART updates)
     function updateCartAndChips(){
-      if (!state || !state.course || !state.course.holes) return;
+      if (!window.state || !state.course || !state.course.holes) return;
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
@@ -1207,12 +1192,18 @@ window.__patchBlock = true;
 
   // No-go zone detection (supports pins.NOGO/NO_GO/NO_GO_ZONES)
   function pointInPoly(pt, poly){
-    let x = pt.lng, y = pt.lat, inside = false;
-    for (let i=0, j=poly.length-1; i<poly.length; j=i++){
-      let xi = poly[i].lng, yi = poly[i].lat, xj = poly[j].lng, yj = poly[j].lat;
-      let intersect = ((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
+    // Accept pt as {lng,lat} or [lng,lat]; poly as array of {lng,lat} or [lng,lat]
+    const getXY = (p) => Array.isArray(p) ? [Number(p[0]), Number(p[1])] : [Number(p.lng), Number(p.lat)];
+    const [x, y] = getXY(pt);
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = getXY(poly[i]);
+      const [xj, yj] = getXY(poly[j]);
+      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
       if (intersect) inside = !inside;
     }
+    return inside;
+  }
     return inside;
   }
   window.__nogoZones = [];
@@ -1225,7 +1216,6 @@ window.__patchBlock = true;
       else if (Array.isArray(zone)) zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
     });
   }
-  window.loadNoGoForHole = loadNoGoForHole;
   if (!window.__patchedRenderHoleNoGo && typeof window.renderHole === 'function'){
     window.__patchedRenderHoleNoGo = true;
     const orig2 = window.renderHole;
@@ -1273,86 +1263,31 @@ try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace=
 </script>
 
 
-
-
-
-  
 <script>
-/* Ensure no-go polygons are loaded for the current hole every time it renders */
+
 (function(){
-  if (typeof window.renderHole !== 'function') return;
-  const _renderHole = window.renderHole;
-
-  window.renderHole = function(holeNo){
-    const ret = _renderHole.apply(this, arguments);
-    try {
-      const holes = state?.course?.holes || {};
-      const h = holes[String(holeNo)];
-      const pins = h?.pins || {};
-
-      // Accept any of these keys
+  window.loadNoGoForHole = function(h){
+    try{
+      const pins = (h && h.pins) || {};
       const raw = pins.NO_GO || pins.NOGO || pins.NO_GO_ZONES || [];
-
-      // Keep format as objects {lng,lat} so pointInPoly(pt, poly) works unchanged
-      const zones = raw.map(poly => poly.map(pt => ({ lng: pt.lng, lat: pt.lat })));
-
-      window.__nogoZones = zones;
-      window.__wasInNoGo = false;      // allow first entry to trigger toast
-      // Trigger a check even if the cart hasn't moved yet
-      if (typeof updateCartAndChips === 'function') setTimeout(updateCartAndChips, 0);
-      // Debug (optional): console.log('No-Go rings:', zones.length);
-    } catch(e) { /* no-op */ }
-    return ret;
+      const toObj = (pt)=> Array.isArray(pt) ? {lng:Number(pt[0]), lat:Number(pt[1])} : {lng:Number(pt.lng), lat:Number(pt.lat)};
+      const rings = raw.map(poly => poly.map(toObj));
+      window.__nogoZones = rings;
+      window.__wasInNoGo = false;
+      if (typeof window.updateCartAndChips === 'function') setTimeout(window.updateCartAndChips, 0);
+    }catch(e){}
   };
-})();
-</script>
-
-
-<script>
-/* ===== No-Go wiring: load polygons on hole render and trigger a check ===== */
-(function(){
-  if (typeof window.renderHole !== 'function') return;   // safety
-  const _renderHole = window.renderHole;
-
-  // Make sure our cart update can't crash if course isn't ready
-  if (typeof window.updateCartAndChips === 'function') {
-    const orig = window.updateCartAndChips;
-    window.updateCartAndChips = function(){
-      if (!window.state || !state.course || !state.course.holes) return;
-      return orig.apply(this, arguments);
+  if (typeof window.renderHole === 'function') {
+    const _renderHole = window.renderHole;
+    window.renderHole = function(holeNo){
+      const ret = _renderHole.apply(this, arguments);
+      const holes = (window.state && state.course && state.course.holes) || {};
+      const h = holes[String(holeNo)];
+      if (h) window.loadNoGoForHole(h);
+      return ret;
     };
   }
-
-  window.renderHole = function(holeNo){
-    const ret = _renderHole.apply(this, arguments);
-    try {
-      const hole = (state?.course?.holes || {})[String(holeNo)];
-      const pins = hole?.pins || {};
-
-      // Accept any of these keys from mapper/export
-      const raw = pins.NO_GO || pins.NOGO || pins.NO_GO_ZONES || [];
-
-      // Normalize to objects with {lng,lat} for the existing pointInPoly(pt, ring) that expects {lng,lat}
-      const rings = raw.map(poly => poly.map(pt => (
-        Array.isArray(pt) ? { lng: pt[0], lat: pt[1] }  // if ever arrays, assume [lng,lat]
-                          : { lng: pt.lng, lat: pt.lat } // mapper saves {lat,lng}
-      )));
-
-      window.__nogoZones = rings;
-      window.__wasInNoGo = false; // allow first entry to fire
-
-      // Force a first check even if cart hasn't moved yet
-      if (typeof window.updateCartAndChips === 'function') {
-        setTimeout(window.updateCartAndChips, 0);
-      }
-      // Debug (optional): console.log('No-Go rings loaded:', rings.length);
-    } catch(e) { /* silent */ }
-    return ret;
-  };
 })();
 </script>
-
-  
-  
 </body>
 </html>
