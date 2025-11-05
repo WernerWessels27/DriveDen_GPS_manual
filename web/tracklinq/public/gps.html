@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#14532d">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TrackLinq GPS</title>
@@ -1255,5 +1264,15 @@ window.__patchBlock = true;
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
 </script>
 
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(console.error);
+  });
+}
+</script>
+
+  
 </body>
 </html>
