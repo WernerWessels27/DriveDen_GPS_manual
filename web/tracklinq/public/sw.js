@@ -1,5 +1,5 @@
 // TrackLinq GPS — Service Worker for offline support
-const CACHE_NAME = 'tracklinq-v2';
+const CACHE_NAME = 'tracklinq-v1';
 const APP_SHELL = [
   '/gps.html',
   '/mapper.html',
