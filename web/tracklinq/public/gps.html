@@ -1257,5 +1257,44 @@ window.__patchBlock = true;
 try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace='nowrap'; }catch(e){}
 </script>
 
+
+
+
+
+  
+<script>
+/* Ensure no-go polygons are loaded for the current hole every time it renders */
+(function(){
+  if (typeof window.renderHole !== 'function') return;
+  const _renderHole = window.renderHole;
+
+  window.renderHole = function(holeNo){
+    const ret = _renderHole.apply(this, arguments);
+    try {
+      const holes = state?.course?.holes || {};
+      const h = holes[String(holeNo)];
+      const pins = h?.pins || {};
+
+      // Accept any of these keys
+      const raw = pins.NO_GO || pins.NOGO || pins.NO_GO_ZONES || [];
+
+      // Keep format as objects {lng,lat} so pointInPoly(pt, poly) works unchanged
+      const zones = raw.map(poly => poly.map(pt => ({ lng: pt.lng, lat: pt.lat })));
+
+      window.__nogoZones = zones;
+      window.__wasInNoGo = false;      // allow first entry to trigger toast
+      // Trigger a check even if the cart hasn't moved yet
+      if (typeof updateCartAndChips === 'function') setTimeout(updateCartAndChips, 0);
+      // Debug (optional): console.log('No-Go rings:', zones.length);
+    } catch(e) { /* no-op */ }
+    return ret;
+  };
+})();
+</script>
+
+
+
+  
+  
 </body>
 </html>
