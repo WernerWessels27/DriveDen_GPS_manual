@@ -779,27 +779,18 @@ BACK:  dotIcon('transparent', 12),
       html += `<th>OUT</th>`;
       back9.forEach(n=> html += `<th>${n}</th>`);
       html += `<th>IN</th><th>TOTAL</th><th>NET</th><th>PTS</th></tr>`;
-      const parOut = front9.reduce((s,n)=> s + (Number(holes[n]?.par) || 0), 0);
-      const parIn  = back9.reduce((s,n)=> s + (Number(holes[n]?.par) || 0), 0);
-      const parTot = parOut + parIn;
-
 
       html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
       front9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += `<td>${parOut}</td>`;
-      back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
-      html += '<tr><th style="text-align:left;padding-left:12px;">Stroke</th>';
-      front9.forEach(n=> html += `<td>${holes[n]?.stroke ?? ''}</td>`);
       html += `<td>–</td>`;
-      back9.forEach(n=> html += `<td>${holes[n]?.stroke ?? ''}</td>`);
+      back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
       html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
 
       players.forEach((p, idx)=>{
         html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
         ordered.forEach(n=>{
           const val = saved?.strokes?.[idx]?.[n] ?? '';
-          html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"></td>`;
+          html += `<td><div class="cellWrap"><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"><div class="mini" data-player="${idx}" data-hole="${n}" style="font-size:10px;color:var(--muted);line-height:1;margin-top:2px;"></div></div></td>`;
         });
         html += `<td class="outCell" data-player="${idx}">0</td>`;
         html += `<td class="inCell" data-player="${idx}">0</td>`;
@@ -836,6 +827,21 @@ BACK:  dotIcon('transparent', 12),
         const par = holes[holeNo]?.par ?? null;
         const strokeIdx = holes[holeNo]?.stroke ?? null;
         const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, strokeIdx||18) : 0;
+        // Update compact mini text under each score: ± vs par and Stableford points (if handicaps in use)
+        (function(){
+          const mini = document.querySelector(`.mini[data-player="${playerIdx}"][data-hole="${holeNo}"]`);
+          if (!mini) return;
+          const diffOk = Number.isFinite(par) && Number.isFinite(v);
+          const diff = diffOk ? (v - par) : null;
+          const sgn  = (diff===0) ? 'E' : (diff>0 ? `+${diff}` : `${diff}`);
+          if (useHcaps && diffOk){
+            const pts = stablefordPoints(par, v, recv);
+            mini.textContent = `${sgn} · ${pts}pt${pts===1?'':'s'}`;
+          } else {
+            mini.textContent = diffOk ? sgn : '';
+          }
+        })();
+
         const pts = stablefordPoints(par, v, recv);
 
         agg[playerIdx].gross += v;
