@@ -786,6 +786,14 @@ BACK:  dotIcon('transparent', 12),
       back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
       html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
 
+      // Stroke on scorecard
+      html += '<tr><th style="text-align:left;padding-left:12px;">Stroke</th>';
+      front9.forEach(n => html += `<td>${holes[n]?.stroke ?? ''}</td>`);
+      html += `<td>–</td>`;
+      back9.forEach(n => html += `<td>${holes[n]?.stroke ?? ''}</td>`);
+      html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
+
+
       players.forEach((p, idx)=>{
         html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
         ordered.forEach(n=>{
