@@ -454,20 +454,15 @@
                C 29.2 27.8, 28.8 26.8, 28.0 25.6 Z' fill='white'/>
     `;
 const ICONS = {
-const ICONS = {
   TEE: dotIcon('#16a34a', 14),
   FRONT: L.divIcon({className:'', html:'', iconSize:[1,1], iconAnchor:[0,0], opacity:0}),
   MID: dotIcon('#fbbf24', 12),
   BACK: L.divIcon({className:'', html:'', iconSize:[1,1], iconAnchor:[0,0], opacity:0}),
-      
   TOILET: largeSymbolIcon(TOILET_SVG, 36),
-      TAPS: largeSymbolIcon(TAP_SVG, 36),
-      STAKE_WHITE: dotIcon('#ffffff', 8),
-      STAKE_RED: dotIcon('#ef4444', 8),
-      STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: L.divIcon({className:'', html:'<div style=\"font-size:26px;line-height:1\">🛺</div>', iconSize:[26,26], iconAnchor:[13,13]}),
-      LAYUP: dotIcon('#111111', 12)
-    };
+  TAP: largeSymbolIcon(TAP_SVG, 36),
+  CART: largeSymbolIcon(CART_SVG, 36),
+};
+
 
     // Map (Esri; no visible Leaflet controls)
     const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
