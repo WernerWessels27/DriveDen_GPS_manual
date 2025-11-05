@@ -1,7 +1,6 @@
 {
   "name": "TrackLinq GPS",
   "short_name": "TrackLinq",
-  "version": "1.1",
   "start_url": "/gps.html?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -12,6 +11,7 @@
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    { "name": "Open GPS", "short_name": "GPS", "url": "/gps.html" }
+    { "name": "Open GPS", "short_name": "GPS", "url": "/gps.html" },
+    { "name": "Mapper", "short_name": "Mapper", "url": "/mapper.html" }
   ]
 }
