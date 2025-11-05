@@ -1308,6 +1308,49 @@ try{ var lay=document.getElementById('layupText'); if(lay) lay.style.whiteSpace=
 </script>
 
 
+<script>
+/* ===== No-Go wiring: load polygons on hole render and trigger a check ===== */
+(function(){
+  if (typeof window.renderHole !== 'function') return;   // safety
+  const _renderHole = window.renderHole;
+
+  // Make sure our cart update can't crash if course isn't ready
+  if (typeof window.updateCartAndChips === 'function') {
+    const orig = window.updateCartAndChips;
+    window.updateCartAndChips = function(){
+      if (!window.state || !state.course || !state.course.holes) return;
+      return orig.apply(this, arguments);
+    };
+  }
+
+  window.renderHole = function(holeNo){
+    const ret = _renderHole.apply(this, arguments);
+    try {
+      const hole = (state?.course?.holes || {})[String(holeNo)];
+      const pins = hole?.pins || {};
+
+      // Accept any of these keys from mapper/export
+      const raw = pins.NO_GO || pins.NOGO || pins.NO_GO_ZONES || [];
+
+      // Normalize to objects with {lng,lat} for the existing pointInPoly(pt, ring) that expects {lng,lat}
+      const rings = raw.map(poly => poly.map(pt => (
+        Array.isArray(pt) ? { lng: pt[0], lat: pt[1] }  // if ever arrays, assume [lng,lat]
+                          : { lng: pt.lng, lat: pt.lat } // mapper saves {lat,lng}
+      )));
+
+      window.__nogoZones = rings;
+      window.__wasInNoGo = false; // allow first entry to fire
+
+      // Force a first check even if cart hasn't moved yet
+      if (typeof window.updateCartAndChips === 'function') {
+        setTimeout(window.updateCartAndChips, 0);
+      }
+      // Debug (optional): console.log('No-Go rings loaded:', rings.length);
+    } catch(e) { /* silent */ }
+    return ret;
+  };
+})();
+</script>
 
   
   
