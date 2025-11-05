@@ -780,11 +780,17 @@ BACK:  dotIcon('transparent', 12),
       back9.forEach(n=> html += `<th>${n}</th>`);
       html += `<th>IN</th><th>TOTAL</th><th>NET</th><th>PTS</th></tr>`;
 
-      html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
-      front9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += `<td>–</td>`;
-      back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
+const parOut = front9.reduce((s, n) => s + (Number(holes[n]?.par) || 0), 0);
+const parIn  = back9.reduce((s, n) => s + (Number(holes[n]?.par) || 0), 0);
+const parTot = parOut + parIn;
+
+//Par indicator on scorecard with Par Total OUT IN TOTAL
+html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
+front9.forEach(n => html += `<td>${holes[n]?.par ?? ''}</td>`);
+html += `<td>${parOut}</td>`;
+back9.forEach(n => html += `<td>${holes[n]?.par ?? ''}</td>`);
+html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
+
 
       // Stroke on scorecard
       html += '<tr><th style="text-align:left;padding-left:12px;">Stroke</th>';
