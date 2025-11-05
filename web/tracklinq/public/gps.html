@@ -74,6 +74,21 @@
       border: 1px solid var(--border); background: var(--chip); color: var(--text); font-weight: 800;
     }
 
+#toast {
+  z-index: 9999 !important;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc2626; /* red */
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+    
     /* Hole bar: Par | HOLE | Stroke */
     .holeBar {
       position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
