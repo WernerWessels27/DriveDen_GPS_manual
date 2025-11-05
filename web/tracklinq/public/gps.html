@@ -455,11 +455,9 @@
     `;
 const ICONS = {
       TEE: dotIcon('#16a34a', 14),
-
-FRONT: dotIcon('transparent', 12), 
-BACK:  dotIcon('transparent', 12), 
-
+      FRONT: dotIcon('#ffffff', 12),
       MID: dotIcon('#fbbf24', 12),
+      BACK: dotIcon('#ef4444', 12),
       TOILET: largeSymbolIcon(TOILET_SVG, 36),
       TAPS: largeSymbolIcon(TAP_SVG, 36),
       STAKE_WHITE: dotIcon('#ffffff', 8),
@@ -774,28 +772,23 @@ BACK:  dotIcon('transparent', 12),
       const back9  = ordered.filter(n => n > 9);
       const tbl = $('#scoreTable');
 
-      let html = '<tr><th style="text-align:left;padding-left:12px;">Player</th>';
+      let html = '<tr><th style="text-align:left;padding-left:12px;">Hole</th>';
       front9.forEach(n=> html += `<th>${n}</th>`);
       html += `<th>OUT</th>`;
       back9.forEach(n=> html += `<th>${n}</th>`);
       html += `<th>IN</th><th>TOTAL</th><th>NET</th><th>PTS</th></tr>`;
-      const parOut = front9.reduce((s,n)=> s + (Number(holes[n]?.par) || 0), 0);
-      const parIn  = back9.reduce((s,n)=> s + (Number(holes[n]?.par) || 0), 0);
-      const parTot = parOut + parIn;
-
 
       html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
       front9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += `<td>${parOut}</td>`;
+      html += `<td>–</td>`;
       back9.forEach(n=> html += `<td>${holes[n]?.par ?? ''}</td>`);
-      html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
-
+      html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
 
       players.forEach((p, idx)=>{
         html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
         ordered.forEach(n=>{
           const val = saved?.strokes?.[idx]?.[n] ?? '';
-          html += `<td><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"></td>`;
+          html += `<td><div class="cellWrap"><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"><div class="mini" data-player="${idx}" data-hole="${n}" style="font-size:10px;color:var(--muted);line-height:1;margin-top:2px;"></div></div></td>`;
         });
         html += `<td class="outCell" data-player="${idx}">0</td>`;
         html += `<td class="inCell" data-player="${idx}">0</td>`;
@@ -832,6 +825,21 @@ BACK:  dotIcon('transparent', 12),
         const par = holes[holeNo]?.par ?? null;
         const strokeIdx = holes[holeNo]?.stroke ?? null;
         const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, strokeIdx||18) : 0;
+        // Update mini info beneath each input (± vs Par and Stableford points if handicaps used)
+        (function(){
+          const mini = document.querySelector(`.mini[data-player="${playerIdx}"][data-hole="${holeNo}"]`);
+          if (!mini) return;
+          const diffOk = Number.isFinite(par) && Number.isFinite(v);
+          const diff = diffOk ? (v - par) : null;
+          const sgn  = (diff===0) ? 'E' : (diff>0 ? `+${diff}` : `${diff}`);
+          if (useHcaps && diffOk){
+            const pts = stablefordPoints(par, v, recv);
+            mini.textContent = `${sgn} · ${pts}pt${pts===1?'':'s'}`;
+          } else {
+            mini.textContent = diffOk ? sgn : '';
+          }
+        })();
+    
         const pts = stablefordPoints(par, v, recv);
 
         agg[playerIdx].gross += v;
