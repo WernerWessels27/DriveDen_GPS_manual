@@ -1,192 +1,80 @@
-/* TrackLinq Service Worker
-   v2.3 — App shell + course JSON precache, OSM/Esri tile cache, offline login
-*/
-
-const VERSION = 'v2.3';
-const STATIC_CACHE = `static-${VERSION}`;
-const RUNTIME_CACHE = `runtime-${VERSION}`;
-const TILE_CACHE = `tiles-${VERSION}`;
-
-const COURSE_INDEX = '/courses/index.json';
-
-// ---- Core app shell we want available offline (add anything you link to directly)
-const CORE = [
-  '/',                    // root
-  '/index.html',          // main login
-  '/login.html',          // legacy/simple login (if you use it)
-  '/gps.html',            // main app
-  '/mapper.html',         // mapper
+// TrackLinq GPS — Service Worker for offline support
+const CACHE_NAME = 'tracklinq-v1';
+const APP_SHELL = [
+  '/gps.html',
+  '/mapper.html',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  COURSE_INDEX,
-
-  // Leaflet (CDN)
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  '/icons/icon-512.png'
 ];
 
-// ---- Install: cache the shell and try to precache known course JSONs
 self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    await cacheAddAll(STATIC_CACHE, CORE);
-    await preCacheCoursesFromIndex(STATIC_CACHE);
-    await self.skipWaiting();
-  })());
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(APP_SHELL);
+    })()
+  );
+  self.skipWaiting();
 });
 
-// ---- Activate: clean old caches
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => {
-      if (![STATIC_CACHE, RUNTIME_CACHE, TILE_CACHE].includes(k)) return caches.delete(k);
-    }));
-    await self.clients.claim();
-  })());
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(names.map(n => n !== CACHE_NAME && caches.delete(n)));
+    })()
+  );
+  self.clients.claim();
 });
 
-// ---- Fetch handling
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // 1) Map tiles: OSM + Esri (cache-first + background refresh)
-  if (
-    url.hostname.endsWith('tile.openstreetmap.org') ||
-    url.hostname === 'server.arcgisonline.com'
-  ) {
-    event.respondWith(cacheTiles(req));
+  if (req.method !== 'GET') return;
+
+  // For navigations (HTML pages): network first
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const net = await fetch(req);
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(req, net.clone());
+        return net;
+      } catch {
+        const cache = await caches.open(CACHE_NAME);
+        return (await cache.match(req)) || (await cache.match('/gps.html'));
+      }
+    })());
     return;
   }
 
-  // 2) Leaflet CDN (cache-first)
-  if (url.hostname === 'unpkg.com' && url.pathname.includes('/leaflet@')) {
-    event.respondWith(cacheFirstSWR(req, STATIC_CACHE, null));
+  // For JSON/images: stale-while-revalidate
+  if (url.pathname.endsWith('.json') || req.destination === 'image') {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(req);
+      const net = fetch(req).then(r => {
+        cache.put(req, r.clone());
+        return r;
+      }).catch(() => null);
+      return cached || net || fetch(req);
+    })());
     return;
   }
 
-  const isOwnOrigin = url.origin === self.location.origin;
-
-  // 3) Static/site pages & assets (cache-first)
-  const isStaticAsset = isOwnOrigin && (
-    req.destination === 'document' ||
-    req.destination === 'script' ||
-    req.destination === 'style' ||
-    req.destination === 'image' ||
-    req.destination === 'font'
-  );
-
-  // 4) Course JSON (cache-first)
-  const isCourseJson = isOwnOrigin && (
-    url.pathname === COURSE_INDEX ||
-    (url.pathname.startsWith('/courses/') && url.pathname.endsWith('.json'))
-  );
-
-  if (isStaticAsset || isCourseJson) {
-    event.respondWith(cacheFirstSWR(
-      req,
-      STATIC_CACHE,
-      // For navigations, fall back to index.html (so you can still enter when offline)
-      (isStaticAsset && req.mode === 'navigate') ? '/index.html' : null
-    ));
-    return;
-  }
-
-  // 5) Everything else (network-first with offline fallback to /gps.html)
-  event.respondWith(networkFirst(req, RUNTIME_CACHE));
+  // Default: cache first, then network
+  event.respondWith((async () => {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    const net = await fetch(req);
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(req, net.clone());
+    return net;
+  })());
 });
 
-// ---------- Helpers
-
-async function cacheAddAll(cacheName, urls) {
-  const cache = await caches.open(cacheName);
-  await cache.addAll(urls);
-}
-
-async function preCacheCoursesFromIndex(cacheName) {
-  try {
-    // Try cache first
-    let res = await caches.match(COURSE_INDEX);
-    if (!res) {
-      res = await fetch(COURSE_INDEX, { cache: 'no-cache' });
-      const sc = await caches.open(cacheName);
-      await sc.put(COURSE_INDEX, res.clone());
-    }
-    const idx = await res.json();
-    const files = (idx.courses || []).map(c => `/courses/${c.id}.json`);
-    if (files.length) {
-      const sc = await caches.open(cacheName);
-      await Promise.all(files.map(async (u) => {
-        try {
-          const r = await fetch(u, { cache: 'no-cache' });
-          await sc.put(u, r.clone());
-        } catch (_) {}
-      }));
-    }
-  } catch (_) {}
-}
-
-async function cacheTiles(req) {
-  const cache = await caches.open(TILE_CACHE);
-  const cached = await cache.match(req);
-  if (cached) {
-    // Try to refresh in background
-    try {
-      const fresh = await fetch(req);
-      await cache.put(req, fresh.clone());
-    } catch (_) {}
-    return cached;
-  }
-  try {
-    const fresh = await fetch(req);
-    await cache.put(req, fresh.clone());
-    return fresh;
-  } catch (_) {
-    return new Response('', { status: 503 });
-  }
-}
-
-async function cacheFirstSWR(request, cacheName, navigationFallbackPath = null) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-
-  if (cached) {
-    // background refresh
-    try {
-      const fresh = await fetch(request, { cache: 'no-cache' });
-      await cache.put(request, fresh.clone());
-    } catch (_) {}
-    return cached;
-  }
-
-  try {
-    const res = await fetch(request);
-    await cache.put(request, res.clone());
-    return res;
-  } catch (_) {
-    if (navigationFallbackPath && request.mode === 'navigate') {
-      const fb = await cache.match(navigationFallbackPath);
-      if (fb) return fb;
-    }
-    return new Response('Offline', { status: 503 });
-  }
-}
-
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  try {
-    const res = await fetch(request);
-    cache.put(request, res.clone());
-    return res;
-  } catch (_) {
-    const cached = await cache.match(request);
-    if (cached) return cached;
-
-    if (request.mode === 'navigate') {
-      const shell = await (await caches.open(STATIC_CACHE)).match('/index.html');
-      if (shell) return shell;
-    }
-    return new Response('Offline', { status: 503 });
-  }
-}
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
