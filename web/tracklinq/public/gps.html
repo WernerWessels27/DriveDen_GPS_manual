@@ -454,11 +454,13 @@
                C 29.2 27.8, 28.8 26.8, 28.0 25.6 Z' fill='white'/>
     `;
 const ICONS = {
-      TEE: dotIcon('#16a34a', 14),
-      FRONT: dotIcon('#ffffff', 12),
-      MID: dotIcon('#fbbf24', 12),
-      BACK: dotIcon('#ef4444', 12),
-      TOILET: largeSymbolIcon(TOILET_SVG, 36),
+const ICONS = {
+  TEE: dotIcon('#16a34a', 14),
+  FRONT: L.divIcon({className:'', html:'', iconSize:[1,1], iconAnchor:[0,0], opacity:0}),
+  MID: dotIcon('#fbbf24', 12),
+  BACK: L.divIcon({className:'', html:'', iconSize:[1,1], iconAnchor:[0,0], opacity:0}),
+      
+  TOILET: largeSymbolIcon(TOILET_SVG, 36),
       TAPS: largeSymbolIcon(TAP_SVG, 36),
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
