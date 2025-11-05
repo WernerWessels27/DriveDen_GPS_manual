@@ -242,7 +242,7 @@
   <div id="map"></div>
 
   <!-- Rules & Penalties (top-right) -->
-  <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
+  <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1300;display:flex;flex-direction:column;gap:8px;">
     <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
     <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
       <span>Penalties</span>
@@ -664,6 +664,7 @@ BACK:  dotIcon('transparent', 12),
 
     // Geolocation (watch for live CART updates)
     function updateCartAndChips(){
+      if (!state || !state.course || !state.course.holes) return;
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
@@ -1191,11 +1192,11 @@ window.__patchBlock = true;
 
   // No-go zone detection (supports pins.NOGO/NO_GO/NO_GO_ZONES)
   function pointInPoly(pt, poly){
-    let x=pt.lat, y=pt.lng, inside=false;
-    for (let i=0,j=poly.length-1; i<poly.length; j=i++){
-      let xi=poly[i].lat, yi=poly[i].lng, xj=poly[j].lat, yj=poly[j].lng;
-      let intersect=((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
-      if (intersect) inside=!inside;
+    let x = pt.lng, y = pt.lat, inside = false;
+    for (let i=0, j=poly.length-1; i<poly.length; j=i++){
+      let xi = poly[i].lng, yi = poly[i].lat, xj = poly[j].lng, yj = poly[j].lat;
+      let intersect = ((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
+      if (intersect) inside = !inside;
     }
     return inside;
   }
@@ -1209,6 +1210,7 @@ window.__patchBlock = true;
       else if (Array.isArray(zone)) zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
     });
   }
+  window.loadNoGoForHole = loadNoGoForHole;
   if (!window.__patchedRenderHoleNoGo && typeof window.renderHole === 'function'){
     window.__patchedRenderHoleNoGo = true;
     const orig2 = window.renderHole;
