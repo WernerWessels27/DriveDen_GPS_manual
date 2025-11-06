@@ -598,6 +598,9 @@ BACK:  dotIcon('transparent', 12),
     function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
 
     function doHoleView(){
+      state.viewMode = null;     // disable CART auto-framing
+state._lastCartFit = null; // reset movement tracker
+
       const p = state.course.holes[String(state.hole)]?.pins || {};
       if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     }
