@@ -245,6 +245,48 @@
   background: var(--panel) !important;
 }
 
+.rules-wrap{padding:12px}
+.rules-canvas{
+  position:relative; max-width:100%;
+  border-radius:14px; overflow:hidden; background:#eaf3ef;
+}
+.rules-canvas img{width:100%; display:block}
+
+/* Hotspots */
+.hotspot{
+  position:absolute;
+  left:calc(var(--x) * 1%); top:calc(var(--y) * 1%);
+  transform:translate(-50%,-50%);
+  width:28px; height:28px; border-radius:50%; border:0;
+  background:#111827; color:#fff; font-weight:800; line-height:28px;
+  box-shadow:0 6px 16px rgba(0,0,0,.25); cursor:pointer;
+}
+.hotspot:hover{transform:translate(-50%,-50%) scale(1.06)}
+
+/* Popup + overlay */
+.rules-dim{position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(2px); display:none; z-index:9998}
+.rules-dim.show{display:block}
+.rules-pop{
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  min-width:300px; max-width:92vw; background:#fff; color:#111827;
+  border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+  display:none; z-index:9999;
+}
+.rules-pop.show{display:block}
+.rules-pop .rp-head{padding:12px 14px; border-bottom:1px solid #eee}
+.rules-pop .rp-head h3{margin:0; font-size:15px}
+.rules-pop .rp-body{padding:12px 14px; font-size:13px; line-height:1.35}
+.rules-pop .rp-body p{margin:0 0 8px}
+.rules-pop .rp-foot{padding:10px 12px; border-top:1px solid #f1f1f1; display:flex; justify-content:flex-end}
+.rp-btn{background:#14532d; color:#fff; border:0; border-radius:10px; padding:8px 12px; font-weight:700; cursor:pointer}
+
+/* Dark mode (if your body gets .dark) */
+body.dark .rules-pop{background:#111827; color:#e5e7eb; border:1px solid #1f2937}
+body.dark .rp-btn{background:#16a34a}
+
+
+
+    
 </style>
 </head>
 <body data-theme="light">
