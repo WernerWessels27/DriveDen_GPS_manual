@@ -723,6 +723,7 @@ function ensureCartBackInView(){
         const { latitude, longitude } = pos.coords;
         if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
+        ensureCartBackInView();
         updateCartAndChips();
       }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
     }
