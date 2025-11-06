@@ -602,6 +602,9 @@ BACK:  dotIcon('transparent', 12),
       if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     }
     function doCartView(){
+      state.viewMode = 'cart';
+      state._lastCartFit = null;
+
       const p = state.course.holes[String(state.hole)]?.pins || {};
       const cart = fromCart();
       if (cart && p.BACK){ fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
