@@ -613,48 +613,6 @@ BACK:  dotIcon('transparent', 12),
       doCartView();
     }
 
-// === CART auto-framing (20% inset from all borders) ===
-function getBackLL(){
-  const hole = state?.course?.holes?.[String(state.hole)];
-  const b = hole?.pins?.BACK;
-  return b ? L.latLng(b.lat, b.lng) : null;   // FRONT/BACK may be invisible; we only use coords
-}
-
-function ensureCartBackInView(){
-  try{
-    if (state.viewMode !== 'cart') return;                 // only act in CART mode
-    if (!state?.cartMarker) return;
-    const map = (typeof window.map !== 'undefined' ? window.map : state.map);
-    if (!map) return;
-
-    const back = getBackLL();
-    if (!back) return;
-
-    const cart = state.cartMarker.getLatLng();
-
-    // If both already inside a 20% inner frame and cart hasn't moved much, skip refit
-    const inner = map.getBounds().pad(-0.20);              // 20% inset
-    const last = state._lastCartFit ? L.latLng(state._lastCartFit) : null;
-    const movedEnough = !last || cart.distanceTo(last) > 6; // 6m movement threshold
-
-    if (!inner.contains(cart) || !inner.contains(back) || movedEnough){
-      state._lastCartFit = cart;
-
-      // Fit both points with pixel padding equal to 20% of viewport (keeps both ~20% from edges)
-      const sz = map.getSize();
-      const pad = [Math.round(sz.x*0.20), Math.round(sz.y*0.20)];
-      const bounds = L.latLngBounds([cart, back]);
-      map.fitBounds(bounds, {
-        paddingTopLeft: pad,
-        paddingBottomRight: pad,
-        maxZoom: 19,
-        animate: false
-      });
-    }
-  }catch(e){ /* never break UI */ }
-}
-
-    
     function renderHole(){
       clearMarkers();
       const h = state.course.holes[String(state.hole)];
