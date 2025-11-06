@@ -613,42 +613,6 @@ BACK:  dotIcon('transparent', 12),
       doCartView();
     }
 
-// === CART auto-framing (keeps CART + BACK visible while moving) ===
-function getBackLL(){
-  const hole = state?.course?.holes?.[String(state.hole)];
-  const b = hole?.pins?.BACK;
-  return b ? L.latLng(b.lat, b.lng) : null;   // FRONT/BACK can stay invisible; we only use coords
-}
-
-function ensureCartBackInView(){
-  try{
-    if (state.viewMode !== 'cart') return;      // only act in CART mode
-    if (!state?.map || !state?.cartMarker) return;
-
-    const back = getBackLL();
-    if (!back) return;
-
-    const map = state.map || window.map;        // your map is usually assigned to state.map
-    const cart = state.cartMarker.getLatLng();
-
-    // Inner “safe” bounds (12% inset from edges)
-    const inner = map.getBounds().pad(-0.12);
-
-    // Refit if either point is outside the safe area or cart moved > 8m since last fit
-    const movedEnough = !state._lastCartFit ||
-                        map.distance(cart, state._lastCartFit) > 8;
-
-    if (!inner.contains(cart) || !inner.contains(back) || movedEnough){
-      state._lastCartFit = cart;
-      const bounds = L.latLngBounds([cart, back]).pad(0.25); // comfy padding; Leaflet picks zoom
-      map.fitBounds(bounds, { maxZoom: 19, animate: false });
-    }
-  }catch(e){ /* never break UI */ }
-}
-
-
-
-    
     function renderHole(){
       clearMarkers();
       const h = state.course.holes[String(state.hole)];
@@ -712,7 +676,6 @@ function ensureCartBackInView(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
-      ensureCartBackInView();
     }
     if (navigator.geolocation){
       navigator.geolocation.watchPosition((pos)=>{
