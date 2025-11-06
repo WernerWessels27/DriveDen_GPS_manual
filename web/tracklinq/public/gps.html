@@ -712,6 +712,7 @@ function ensureCartBackInView(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
+      ensureCartBackInView();
     }
     if (navigator.geolocation){
       navigator.geolocation.watchPosition((pos)=>{
