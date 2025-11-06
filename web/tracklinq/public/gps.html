@@ -480,8 +480,6 @@ BACK:  dotIcon('transparent', 12),
 
     // Map (Esri; no visible Leaflet controls)
     const map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-25.746, 28.229], 17);
-    if (!state.map) state.map = map;
-    map.on('dragstart', ()=>{ if (state.viewMode==='cart') state.viewMode = null; });
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19 }
@@ -595,55 +593,16 @@ BACK:  dotIcon('transparent', 12),
     }
 
     // Markers & fitting
-    // === CART auto-framing helpers (Cart + BACK) ===
-    function getBackLL(){
-      const p = state.course?.holes?.[String(state.hole)]?.pins || {};
-      return p.BACK ? L.latLng(p.BACK.lat, p.BACK.lng) : null;
-    }
-    function fitCartAndBack(opts={}){
-      if (!state?.map && typeof map !== 'undefined') state.map = map;
-      if (!state?.cartMarker) return;
-      const back = getBackLL();
-      if (!back) return;
-      const cart = state.cartMarker.getLatLng();
-      const bounds = L.latLngBounds([cart, back]).pad(0.25);
-      (state.map || map).fitBounds(bounds, { maxZoom: 19, animate: false, ...opts });
-    }
-    function ensureCartBackInView(){
-      if (state.viewMode !== 'cart' || !state?.cartMarker) return;
-      const back = getBackLL();
-      if (!back) return;
-      const cart = state.cartMarker.getLatLng();
-      const inner = (state.map || map).getBounds().pad(-0.12);
-      const movedEnough = !state._lastCartFit || haversine(
-        {lat: cart.lat, lng: cart.lng},
-        {lat: state._lastCartFit.lat, lng: state._lastCartFit.lng}
-      ) > 8;
-      if (!inner.contains(cart) || !inner.contains(back) || movedEnough){
-        state._lastCartFit = { lat: cart.lat, lng: cart.lng };
-        fitCartAndBack({ animate:false });
-      }
-    }
-
     function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
     function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
 
     function doHoleView(){
-      state.viewMode = null; // stop cart auto-framing
       const p = state.course.holes[String(state.hole)]?.pins || {};
-      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
-    };
       if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     }
     function doCartView(){
-      state.viewMode = 'cart';
-      state._lastCartFit = null;
       const p = state.course.holes[String(state.hole)]?.pins || {};
-      const cart = fromCart();
-      if (cart && p.BACK){ fitCartAndBack({ animate:false }); }
-      else if (p.TEE && p.BACK){ fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); } // fallback
-    };
       const cart = fromCart();
       if (cart && p.BACK){ fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
       else if (p.TEE && p.BACK){ fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); } // fallback
@@ -717,9 +676,6 @@ BACK:  dotIcon('transparent', 12),
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
-    
-      // Keep cart and BACK in frame if CART mode is active
-      try{ ensureCartBackInView(); }catch(e){}
     }
     if (navigator.geolocation){
       navigator.geolocation.watchPosition((pos)=>{
