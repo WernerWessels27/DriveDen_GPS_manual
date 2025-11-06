@@ -1340,6 +1340,101 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<script>
+// Rule texts (edit to match your local rules if needed)
+const RULES = {
+  water: {
+    title: "Water (Penalty Area)",
+    body: [
+      "• Play as it lies, or take 1-stroke relief:",
+      "– Stroke-and-distance (replay previous shot).",
+      "– Back-on-the-line: keep the entry point between you and the flag."
+    ]
+  },
+  red: {
+    title: "Red Stakes (Lateral Penalty)",
+    body: [
+      "• 1-stroke relief options:",
+      "– Stroke-and-distance.",
+      "– Back-on-the-line.",
+      "– Lateral: within 2 club-lengths of entry point, no nearer the hole."
+    ]
+  },
+  yellow: {
+    title: "Yellow Stakes (Penalty Area)",
+    body: [
+      "• 1-stroke relief options:",
+      "– Stroke-and-distance.",
+      "– Back-on-the-line only (no lateral unless local rule)."
+    ]
+  },
+  white: {
+    title: "White Stakes (Out of Bounds)",
+    body: [
+      "• Stroke-and-distance only (replay previous shot, +1).",
+      "• If local rule E-5 applies, a 2-stroke alternative may be available."
+    ]
+  },
+  bunker: {
+    title: "Bunker",
+    body: [
+      "• Play as it lies (don’t improve conditions).",
+      "• Unplayable: 1-stroke relief inside bunker, or 2-stroke back-on-the-line outside (if allowed)."
+    ]
+  },
+  gur: {
+    title: "G.U.R. (Abnormal Course Condition)",
+    body: [
+      "• Free relief: nearest point of complete relief within 1 club-length, not nearer the hole.",
+      "• Relief covers stance & swing; line-of-sight only if a local rule states."
+    ]
+  },
+  cartpath: {
+    title: "Cart Path (Immovable Obstruction)",
+    body: [
+      "• Free relief: nearest point of complete relief within 1 club-length.",
+      "• Or play it as it lies."
+    ]
+  },
+  rocks: {
+    title: "Rocks / Roots",
+    body: [
+      "• If Committee allows, take free relief (safety).",
+      "• Otherwise: play as it lies or take unplayable (1 stroke)."
+    ]
+  }
+};
+
+(function initRulesGuide(){
+  const wrap = document.getElementById('rules-guide');
+  if (!wrap) return;
+
+  const dim   = document.getElementById('rules-dim');
+  const pop   = document.getElementById('rules-pop');
+  const title = document.getElementById('rules-pop-title');
+  const body  = document.getElementById('rules-pop-body');
+  const close = document.getElementById('rules-pop-close');
+
+  function showRule(key){
+    const r = RULES[key]; if (!r) return;
+    title.textContent = r.title;
+    body.innerHTML = r.body.map(line=>{
+      if (line.startsWith("•")) return `<p>• ${line.slice(1).trim()}</p>`;
+      if (line.startsWith("–")) return `<p style="margin-left:14px">– ${line.slice(1).trim()}</p>`;
+      return `<p>${line}</p>`;
+    }).join("");
+    pop.classList.add('show'); dim.classList.add('show');
+  }
+
+  wrap.querySelectorAll('.hotspot').forEach(btn=>{
+    btn.addEventListener('click', ()=> showRule(btn.dataset.key));
+  });
+
+  [dim, close].forEach(el => el.addEventListener('click', ()=>{
+    pop.classList.remove('show'); dim.classList.remove('show');
+  }));
+})();
+</script>
 
   
 </body>
