@@ -269,12 +269,38 @@
         <button class="btnMini" id="rulesCloseMini" style="border:1px solid #ddd;background:#f5f5f5;color:#111;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;">Close</button>
       </h2>
       <div id="rulesBodyMini">
-        <p>This panel supports <strong>rich HTML</strong> (images, links, embeds).</p>
-        <ul>
-          <li><a href="https://www.randa.org/rog/the-rules-of-golf" target="_blank" rel="noopener">R&amp;A — Rules of Golf</a></li>
-          <li><a href="https://www.usga.org/content/usga/home-page/rules-hub.html" target="_blank" rel="noopener">USGA — Rules Hub</a></li>
-          <li><a href="https://www.pgatour.com/fan-relations/rules" target="_blank" rel="noopener">PGA TOUR — Rules &amp; Resources</a></li>
-        </ul>
+        <!-- RULES: Interactive image + hotspots -->
+<section id="rules-guide" class="rules-wrap">
+  <div class="rules-canvas">
+    <img src="/images/rules-hole.png" alt="Model golf hole">
+
+    <!-- Stakes (center of each dotted row) -->
+    <button class="hotspot" data-key="white"  style="--x:88.3; --y:82.5;">i</button>
+    <button class="hotspot" data-key="yellow" style="--x:88.0; --y:24.3;">i</button>
+    <button class="hotspot" data-key="red"    style="--x:14.0; --y:83.0;">i</button>
+
+    <!-- Hazards -->
+    <button class="hotspot" data-key="water"  style="--x:55.2; --y:63.1;">i</button>
+    <button class="hotspot" data-key="bunker" style="--x:72.5; --y:40.7;">i</button> <!-- greenside -->
+    <button class="hotspot" data-key="bunker" style="--x:28.4; --y:52.7;">i</button> <!-- fairway -->
+
+    <!-- Special areas -->
+    <button class="hotspot" data-key="gur"     style="--x:68.9; --y:72.8;">i</button>
+    <button class="hotspot" data-key="rocks"   style="--x:79.1; --y:62.6;">i</button>
+
+    <!-- Cart path (fork) -->
+    <button class="hotspot" data-key="cartpath" style="--x:74.7; --y:72.0;">i</button>
+  </div>
+</section>
+
+<!-- Reusable popup + overlay (place once, after the section) -->
+<div class="rules-dim" id="rules-dim"></div>
+<div class="rules-pop" id="rules-pop">
+  <div class="rp-head"><h3 id="rules-pop-title">Rule</h3></div>
+  <div class="rp-body" id="rules-pop-body"></div>
+  <div class="rp-foot"><button class="rp-btn" id="rules-pop-close">Close</button></div>
+</div>
+
       </div>
     </div>
   </div>
