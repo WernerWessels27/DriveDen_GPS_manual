@@ -613,6 +613,44 @@ BACK:  dotIcon('transparent', 12),
       doCartView();
     }
 
+// === CART auto-follow (20% inset) ===
+function ensureCartBackInView(){
+  try {
+    if (state.viewMode !== 'cart') return;
+
+    const map = window.__leafletMap;
+    if (!map || !state.cartMarker) return;
+
+    // Get BACK pin
+    const hole = state.course?.holes?.[String(state.hole)];
+    const back = hole?.pins?.BACK;
+    if (!back) return;
+
+    const cart = state.cartMarker.getLatLng();
+    const backLL = L.latLng(back.lat, back.lng);
+
+    // Inner 20% "safe zone"
+    const inner = map.getBounds().pad(-0.20);
+
+    // If cart or back outside safe zone → refit
+    if (!inner.contains(cart) || !inner.contains(backLL)) {
+      const size = map.getSize();
+      const pad = [Math.round(size.x * 0.20), Math.round(size.y * 0.20)];
+      const bounds = L.latLngBounds([cart, backLL]);
+
+      map.fitBounds(bounds, {
+        paddingTopLeft: pad,
+        paddingBottomRight: pad,
+        maxZoom: 19,
+        animate: false
+      });
+    }
+  } catch(e) {
+    // never break UI
+  }
+}
+
+    
     function renderHole(){
       clearMarkers();
       const h = state.course.holes[String(state.hole)];
