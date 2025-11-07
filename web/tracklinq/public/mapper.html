@@ -195,7 +195,7 @@
 
     const state = {
       course: {
-        course: { id:'', name:'', pin:'' },
+        course: { id:'', name:'', pin:'' }, pois: { TOILET: [], TAPS: [] }, 
         holes: {} // "1": { par, stroke, pins:{} }
       },
       holeCount: 18,
@@ -302,14 +302,17 @@
       } else if (tool==='BACK'){
         pins.BACK = base;
         m = addMarker(ICONS.BACK, base, 'BACK', true);
-      } else if (tool==='TOILET'){
-        pins.TOILET = base;
-        m = addMarker(ICONS.TOILET, base, 'Toilet', true);
-      } else if (tool==='TAPS'){
-        pins.TAPS = pins.TAPS || [];
-        pins.TAPS.push(base);
-        m = addMarker(ICONS.TAPS, base, 'Tap', false, 'TAPS', pins.TAPS.length-1);
-      } else if (tool==='STAKE_WHITE' || tool==='STAKE_RED' || tool==='STAKE_YELLOW'){
+      }
+    else if (tool==='TOILET') {
+      state.course.pois = state.course.pois || { TOILET: [], TAPS: [] };
+      state.course.pois.TOILET.push(base);
+      m = addMarker(ICONS.TOILET, base, 'Toilet', false, 'POI_TOILET', state.course.pois.TOILET.length-1);
+    }
+    else if (tool==='TAPS') {
+      state.course.pois = state.course.pois || { TOILET: [], TAPS: [] };
+      state.course.pois.TAPS.push(base);
+      m = addMarker(ICONS.TAPS, base, 'Tap', false, 'POI_TAPS', state.course.pois.TAPS.length-1);
+    } else if (tool==='STAKE_WHITE' || tool==='STAKE_RED' || tool==='STAKE_YELLOW'){
         const key = tool;
         pins[key] = pins[key] || [];
         pins[key].push(base);
@@ -453,9 +456,8 @@
       if (p.TEE)   addMarker(ICONS.TEE, p.TEE, 'TEE', true);
       if (p.FRONT) addMarker(ICONS.FRONT, p.FRONT, 'FRONT', true);
       if (p.MID)   addMarker(ICONS.MID, p.MID, 'MID', true);
-      if (p.BACK)  addMarker(ICONS.BACK, p.BACK, 'BACK', true);
-      if (p.TOILET) addMarker(ICONS.TOILET, p.TOILET, 'Toilet', true);
-      (p.TAPS || []).forEach((obj, i)=> addMarker(ICONS.TAPS, obj, 'Tap', false, 'TAPS', i));
+      if (p.BACK)  addMarker(ICONS.BACK, p.BACK, 'BACK', true);    // hole TOILET suppressed; course-wide now
+(p.TAPS || []).forEach((obj, i)=> addMarker(ICONS.TAPS, obj, 'Tap', false, 'TAPS', i));
       (p.STAKE_WHITE || []).forEach((obj, i)=> addMarker(ICONS.STAKE_WHITE, obj, 'Stake White', false, 'STAKE_WHITE', i));
       (p.STAKE_RED || []).forEach((obj, i)=> addMarker(ICONS.STAKE_RED, obj, 'Stake Red', false, 'STAKE_RED', i));
       (p.STAKE_YELLOW || []).forEach((obj, i)=> addMarker(ICONS.STAKE_YELLOW, obj, 'Stake Yellow', false, 'STAKE_YELLOW', i));
