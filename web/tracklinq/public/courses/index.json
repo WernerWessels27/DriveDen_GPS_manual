@@ -9,6 +9,14 @@
     }
 ,
     {
+      "id": "wingate-country-club",
+      "name": "Wingate Country Club",
+      "short_code": "WCC",
+      "pin": "WCC1234567",
+      "active": true
+    }
+    ,
+    {
       "id": "Home",
       "name": "Home",
       "short_code": "HOME",
