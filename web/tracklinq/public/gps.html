@@ -97,16 +97,19 @@
     /* Distances (top-left) stacked vertical, MID larger; unit toggle here */
     .distStack {
       position: absolute; top: 112px; left: 12px; z-index: 1050;
-      display: grid; gap: 8px; min-width: 170px;
+      display: grid; gap: 10px; min-width: 210px;
     }
     .chipV {
       display: grid; grid-template-columns: 14px 1fr auto; align-items: center;
-      gap: 8px; padding: 10px 12px; border-radius: 14px;
+      gap: 10px; padding: 14px 14px; border-radius: 16px;
       background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); box-shadow: var(--shadow);
     }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-    .midTxt { font-size: 18px; font-weight: 900; }  /* MID larger */
-    .smallTxt { font-size: 12px; font-weight: 700; }
+    .midTxt { font-size: 24px; font-weight: 900; }  /* MID larger */
+    .smallTxt { font-size: 16px; font-weight: 800; }
+    /* MID elevation */
+    .midElev { font-size: 13px; font-weight: 900; color: var(--muted); margin-left: 10px; }
+
     .unitToggle {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 8px 10px; border-radius: 999px; background: var(--panel);
@@ -122,7 +125,19 @@
       width: 52px; height: 52px; display: grid; place-items: center;
       border-radius: 14px; background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); cursor: pointer;
       font-size: 24px; user-select: none; box-shadow: var(--shadow);
+    
+    /* Bottom-right zoom buttons */
+    .zoomStack{
+      position:absolute; right:12px; bottom:12px; z-index:1050;
+      display:grid; gap:8px;
     }
+    .zoomBtn{
+      width:52px; height:52px; display:grid; place-items:center;
+      border-radius:14px; background:var(--panel); border:1px solid var(--chip-border);
+      color:var(--text); cursor:pointer; font-size:26px; font-weight:900;
+      user-select:none; box-shadow:var(--shadow);
+    }
+}
 
     /* Bottom-center bubbles: Scorecard & History */
     .bottomBubbles {
@@ -379,7 +394,7 @@ body.dark .rp-btn{background:#16a34a}
     <div class="chipV">
       <span class="dot" style="background:#fbbf24"></span>
       <span class="midTxt">MID</span>
-      <span id="dMid" class="midTxt">–</span>
+      <span id="dMid" class="midTxt">–</span><span id="dMidElev" class="midElev"></span>
     </div>
     <div class="chipV">
       <span class="dot" style="background:#ef4444"></span>
@@ -394,6 +409,12 @@ body.dark .rp-btn{background:#16a34a}
   <div class="viewIcons">
     <button title="Hole View (TEE↔BACK)" class="viewBtn" id="holeViewBtn">⛳</button>
     <button title="Cart View (CART↔BACK)" class="viewBtn" id="cartViewBtn">🛺</button>
+  </div>
+
+  <!-- Bottom-right zoom -->
+  <div class="zoomStack">
+    <button title="Zoom In" class="zoomBtn" id="zoomInBtn">+</button>
+    <button title="Zoom Out" class="zoomBtn" id="zoomOutBtn">−</button>
   </div>
 
   <!-- Floating clear layup -->
@@ -553,6 +574,10 @@ BACK:  dotIcon('transparent', 12),
       { maxZoom: 19 }
     ).addTo(map);
 
+    // Custom zoom buttons
+    $('#zoomInBtn')?.addEventListener('click', ()=>map.zoomIn());
+    $('#zoomOutBtn')?.addEventListener('click', ()=>map.zoomOut());
+
     // Data (cache-first)
     async function getIndex(){
       let res=await caches.match('/courses/index.json');
@@ -625,7 +650,11 @@ BACK:  dotIcon('transparent', 12),
       meta:null, course:null, hole:1, markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
-      initialFramed:false
+      initialFramed:false,
+      followCart:false,
+      cartAlt:null,
+      lastAutoAdvanceTs:0,
+      lastAutoAdvanceHole:0
     };
 
     // Distance helpers
@@ -637,6 +666,8 @@ BACK:  dotIcon('transparent', 12),
       return 2*R*Math.atan2(Math.sqrt(aa),Math.sqrt(1-aa));
     }
     const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
+    function pinAlt(pin){ if(!pin) return null; return (pin.alt ?? pin.ele ?? pin.elev ?? pin.elevation ?? pin.height ?? null); }
+    function fmtElev(deltaM){ if(deltaM===null||!Number.isFinite(deltaM)) return ''; const sign = deltaM>0? '▲' : (deltaM<0? '▼' : '•'); return `${sign}${Math.round(Math.abs(deltaM))}m`; }
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
     function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
     function labelAt(ll, text){
@@ -656,6 +687,18 @@ BACK:  dotIcon('transparent', 12),
       if(pins.FRONT) f.textContent=fmt(haversine(from, pins.FRONT));
       if(pins.MID)   m.textContent=fmt(haversine(from, pins.MID));
       if(pins.BACK)  b.textContent=fmt(haversine(from, pins.BACK));
+
+      // MID elevation (if available)
+      const elevEl = $('#dMidElev');
+      if(elevEl){
+        elevEl.textContent='';
+        const midAlt = pinAlt(pins.MID);
+        const cartAlt = state.cartAlt;
+        if(Number.isFinite(midAlt) && Number.isFinite(cartAlt)){
+          elevEl.textContent = fmtElev(midAlt - cartAlt);
+        }
+      }
+
       $('#unitChip').textContent = state.unit;
       updateLayupUI(); // keep layup distances/labels in sync
     }
@@ -663,7 +706,17 @@ BACK:  dotIcon('transparent', 12),
     // Markers & fitting
     function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
-    function fitBetween(a,b){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{padding:[60,60]}); }
+    function fitBetween(a,b, opts={}){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{ padding: opts.padding || [60,60], paddingTopLeft: opts.paddingTopLeft, paddingBottomRight: opts.paddingBottomRight, maxZoom: opts.maxZoom ?? 19, animate: opts.animate ?? true }); }
+    function fitBetweenPercent(a,b, pctX=0.15, pctY=0.18){
+      const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
+      const sz = map.getSize();
+      const pad = [Math.round(sz.x*pctX), Math.round(sz.y*pctY)];
+      map.fitBounds(bounds,{ paddingTopLeft: pad, paddingBottomRight: pad, maxZoom: 19, animate:true });
+    }
+    function maxHoleNum(){
+      const ks = Object.keys(state.course?.holes||{}).map(k=>+k).filter(Number.isFinite);
+      return ks.length? Math.max(...ks) : state.hole;
+    }
 
     function doHoleView(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
@@ -672,8 +725,8 @@ BACK:  dotIcon('transparent', 12),
     function doCartView(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       const cart = fromCart();
-      if (cart && p.BACK){ fitBetween([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng]); }
-      else if (p.TEE && p.BACK){ fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]); } // fallback
+      if (cart && p.BACK){ fitBetweenPercent([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng], 0.15, 0.18); }
+      else if (p.TEE && p.BACK){ fitBetweenPercent([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng], 0.15, 0.18); } // fallback
     }
     function ensureInitialFraming(){
       if (state.initialFramed) return;
@@ -717,8 +770,8 @@ BACK:  dotIcon('transparent', 12),
         }
       });
     }
-    $('#holeViewBtn').addEventListener('click', doHoleView);
-    $('#cartViewBtn').addEventListener('click', doCartView);
+    $('#holeViewBtn').addEventListener('click', ()=>{ state.followCart=false; doHoleView(); });
+    $('#cartViewBtn').addEventListener('click', ()=>{ state.followCart=true; doCartView(); });
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
@@ -816,10 +869,16 @@ BACK:  dotIcon('transparent', 12),
         const nameVal = saved ? (saved.players[i]?.name || `P${i+1}`) : `P${i+1}`;
         const hVal = saved ? (saved.players[i]?.hcap ?? 0) : (i===0?12: (i===1?18:(i===2?24:10)));
         wrap.innerHTML = `
-          <div style="display:grid; gap:6px; padding:8px; border:1px solid var(--border); border-radius:12px; background: var(--chip);">
+          <div style="display:grid; gap:8px; padding:10px; border:1px solid var(--border); border-radius:12px; background: var(--chip);">
             <div style="font-weight:800; text-align:center;">Player ${i+1}</div>
-            <input class="nameInp" placeholder="Name" value="${nameVal}">
-            <input class="hcapInp" type="number" step="1" min="0" max="54" placeholder="Handicap" value="${hVal}">
+            <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
+              <span style="min-width:52px; text-align:right; font-weight:800; color:var(--muted);">Name</span>
+              <input class="nameInp" placeholder="Name" value="${nameVal}">
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
+              <span style="min-width:52px; text-align:right; font-weight:800; color:var(--muted);">Hcap</span>
+              <input class="hcapInp" type="number" step="1" min="0" max="54" placeholder="Handicap" value="${hVal}">
+            </div>
           </div>
         `;
         grid.appendChild(wrap);
