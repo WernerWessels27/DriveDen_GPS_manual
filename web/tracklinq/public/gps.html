@@ -577,6 +577,69 @@ BACK:  dotIcon('transparent', 12),
       { maxZoom: 19 }
     ).addTo(map);
 
+
+// --- Always-on map rotation: keep TEE (left) -> BACK (right) horizontally aligned ---
+let __mapRotationDeg = 0;
+const __mapPane = map.getPane('mapPane');
+if (__mapPane) {
+  __mapPane.style.transformOrigin = '50% 50%';
+}
+
+// Patch Leaflet's transform setter so rotation is applied on every pan/zoom transform.
+(function(){
+  const __origSetTransform = L.DomUtil.setTransform;
+  L.DomUtil.setTransform = function(el, offset, scale){
+    __origSetTransform(el, offset, scale);
+    if (!__mapPane || el !== __mapPane) return;
+
+    const base = el.style.transform || '';
+    const cleaned = base.replace(/\s*rotateZ\([^)]*\)/, '');
+    el.style.transform = (cleaned + ` rotateZ(${__mapRotationDeg}deg)`).trim();
+  };
+})();
+
+function __bearingDeg(a, b){
+  // Forward azimuth / bearing from a->b (degrees 0..360)
+  const toRad = (d)=>d*Math.PI/180;
+  const toDeg = (r)=>r*180/Math.PI;
+  const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);
+  const brng = (toDeg(Math.atan2(y, x)) + 360) % 360;
+  return brng;
+}
+
+function __setMapRotation(deg){
+  __mapRotationDeg = ((deg % 360) + 360) % 360;
+
+  // Force-apply immediately (for cases where Leaflet hasn't updated transform yet)
+  if (__mapPane){
+    const base = __mapPane.style.transform || '';
+    const cleaned = base.replace(/\s*rotateZ\([^)]*\)/, '');
+    __mapPane.style.transform = (cleaned + ` rotateZ(${__mapRotationDeg}deg)`).trim();
+  }
+
+  // Keep layup distance bubble text upright (it is an inner div, safe to rotate)
+  document.querySelectorAll('.layupLabel').forEach(el=>{
+    el.style.transform = `rotateZ(${-__mapRotationDeg}deg)`;
+    el.style.transformOrigin = '50% 50%';
+  });
+}
+
+function __updateRotationForHole(){
+  const h = state.course?.holes?.[String(state.hole)];
+  const p = h?.pins || {};
+  if (p.TEE && p.BACK){
+    const brg = __bearingDeg(p.TEE, p.BACK);
+    // If bearing is 0° (north), rotate +90° so the hole points to the right (east).
+    __setMapRotation(90 - brg);
+  } else {
+    __setMapRotation(0);
+  }
+}
+
+
     // Custom zoom buttons
     $('#zoomInBtn')?.addEventListener('click', ()=>map.zoomIn());
     $('#zoomOutBtn')?.addEventListener('click', ()=>map.zoomOut());
@@ -746,6 +809,7 @@ BACK:  dotIcon('transparent', 12),
       if(!h) return;
 
       const p = h.pins || {};
+      __updateRotationForHole();
       if (p.TEE)   addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
       if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
       if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
