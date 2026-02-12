@@ -775,12 +775,13 @@ function updateBearingForHole(){
       const p = hole?.pins || {};
       const pts = [];
 
-      // Fixed zoom for the entire flyover (max zoom, capped to something sane)
+      // Fixed zoom for the entire flyover (max zoom, within sensible bounds)
       const zMax = (typeof map?.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : 20;
-      const flyZoom = Math.min(Math.max(18, zMax), 21); // keep within sensible bounds
+      const flyZoom = Math.min(Math.max(18, zMax), 21);
+      const flyDur  = 1.15;
 
       // Start at TEE
-      if (p.TEE) pts.push({lat:p.TEE.lat, lng:p.TEE.lng});
+      if (p.TEE) pts.push({lat:p.TEE.lat, lng:p.TEE.lng, zoom: Math.max(map.getZoom(), 18), duration: 1.2});
 
       // Use mapper-provided anchor points if present
       const raw = hole?.flyover;
@@ -790,29 +791,6 @@ function updateBearingForHole(){
           if (Array.isArray(it) && it.length>=2){
             pts.push({lat:Number(it[0]), lng:Number(it[1])});
           } else if (typeof it === 'object' && ('lat' in it) && ('lng' in it)){
-            pts.push({lat:Number(it.lat), lng:Number(it.lng)});
-          }
-        });
-      } else {
-        // Backwards-compatible: generate 3 anchors along TEE→BACK
-        if (p.TEE && p.BACK){
-          const a = L.latLng(p.TEE.lat, p.TEE.lng);
-          const b = L.latLng(p.BACK.lat, p.BACK.lng);
-          [0.25, 0.55, 0.80].forEach(fr=>{
-            pts.push({lat: a.lat + (b.lat-a.lat)*fr, lng: a.lng + (b.lng-a.lng)*fr});
-          });
-        }
-      }
-
-      // End at GREEN (prefer MID, else BACK, else FRONT)
-      const end = p.MID || p.BACK || p.FRONT;
-      if (end) pts.push({lat:end.lat, lng:end.lng});
-
-      // Apply SAME zoom/duration to every point to avoid "bouncy" zooming
-      return pts
-        .filter(pt=>Number.isFinite(pt.lat) && Number.isFinite(pt.lng))
-        .map((pt)=>({ lat: pt.lat, lng: pt.lng, zoom: flyZoom, duration: 1.15 }));
-    } else if (typeof it === 'object' && ('lat' in it) && ('lng' in it)){
             pts.push({lat:Number(it.lat), lng:Number(it.lng), zoom: it.zoom!=null? Number(it.zoom): undefined, duration: it.duration!=null? Number(it.duration): undefined});
           }
         });
@@ -830,15 +808,11 @@ function updateBearingForHole(){
       // End at GREEN (prefer MID, else BACK, else FRONT)
       const end = p.MID || p.BACK || p.FRONT;
       if (end) pts.push({lat:end.lat, lng:end.lng, zoom: 19, duration: 1.4});
-
-      const baseZoom = Math.max(map.getZoom(), 18);
-      return pts.map((pt,i)=>({
-        lat: pt.lat,
-        lng: pt.lng,
-        zoom: pt.zoom ?? baseZoom,
-        duration: pt.duration ?? 1.1
-      })).filter(pt=>Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
-    }
+      // Apply SAME zoom/duration to every point to avoid 'bouncy' zooming
+      return pts
+        .filter(pt=>Number.isFinite(pt.lat) && Number.isFinite(pt.lng))
+        .map(pt=>({ lat: pt.lat, lng: pt.lng, zoom: flyZoom, duration: flyDur }));
+}
 
     function flyToAsync(lat, lng, zoom, duration, abortObj){
       return new Promise((resolve)=>{
@@ -883,10 +857,7 @@ function updateBearingForHole(){
       try{
         const hole = state.course?.holes?.[String(state.hole)];
         const p = hole?.pins || {};
-        const pts0 = getFlyoverPoints();
-        if (pts0 && pts0.length){
-          map.setView([pts0[0].lat, pts0[0].lng], pts0[0].zoom, { animate: false });
-        } else if (p.TEE){
+        if (p.TEE){
           const zMax = (typeof map?.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : 20;
           const flyZoom = Math.min(Math.max(18, zMax), 21);
           map.setView([p.TEE.lat, p.TEE.lng], flyZoom, { animate: false });
