@@ -2,33 +2,33 @@
 <html lang="en">
 <head>
 
-<link rel="manifest" href="/manifest.webmanifest?v=5">
+<link rel="manifest" href="manifest.webmanifest?v=5">
 <meta name="theme-color" content="#000000">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 
   
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TrackLinq GPS</title>
 
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Leaflet -->
   <link
     rel="stylesheet"
-    href="/vendor/leaflet/leaflet.css"
+    href="vendor/leaflet/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
   <script
-    src="/vendor/leaflet/leaflet.js"
+    src="vendor/leaflet/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/vendor/leaflet-rotate/leaflet-rotate.js"></script>
+  <script src="vendor/leaflet-rotate/leaflet-rotate.js"></script>
 
 
   <style>
@@ -919,7 +919,8 @@ function ensureInitialFraming(){
     }
 
     $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; doCartView(); });
-    $('#flyoverBtn').addEventListener('click', ()=>{ startFlyover(); });
+    const __flyBtn = $('#flyoverBtn');
+    if (__flyBtn) __flyBtn.addEventListener('click', ()=>{ startFlyover(); });
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
