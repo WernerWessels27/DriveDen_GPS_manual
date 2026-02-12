@@ -413,6 +413,7 @@ body.dark .rp-btn{background:#16a34a}
   <!-- Bottom-left stacked view icons -->
   <div class="viewIcons">
     <button title="Hole View (TEE↔BACK)" class="viewBtn" id="holeViewBtn">⛳</button>
+    <button title="Flyover (TEE→GREEN)" class="viewBtn" id="flyoverBtn">🚁</button>
     <button title="Cart View (CART↔BACK)" class="viewBtn" id="cartViewBtn">🛺</button>
   </div>
 
@@ -755,6 +756,123 @@ function updateBearingForHole(){
   map.setBearing(-angDeg);
 }
 
+
+    // --- Flyover (TEE → anchors → GREEN) ---
+    let flyoverActive = false;
+    let flyoverAbort = null;
+
+    function cancelFlyover(){
+      if (flyoverAbort) flyoverAbort.aborted = true;
+      flyoverActive = false;
+      flyoverAbort = null;
+    }
+
+    // hole.flyover can be:
+    //  - array of {lat,lng, zoom?, duration?}
+    //  - array of [lat,lng]
+    function getFlyoverPoints(){
+      const hole = state.course?.holes?.[String(state.hole)];
+      const p = hole?.pins || {};
+      const pts = [];
+
+      // Start at TEE
+      if (p.TEE) pts.push({lat:p.TEE.lat, lng:p.TEE.lng, zoom: Math.max(map.getZoom(), 18), duration: 1.2});
+
+      // Use mapper-provided anchor points if present
+      const raw = hole?.flyover;
+      if (Array.isArray(raw)){
+        raw.forEach((it)=>{
+          if (!it) return;
+          if (Array.isArray(it) && it.length>=2){
+            pts.push({lat:Number(it[0]), lng:Number(it[1])});
+          } else if (typeof it === 'object' && ('lat' in it) && ('lng' in it)){
+            pts.push({lat:Number(it.lat), lng:Number(it.lng), zoom: it.zoom!=null? Number(it.zoom): undefined, duration: it.duration!=null? Number(it.duration): undefined});
+          }
+        });
+      } else {
+        // Backwards-compatible: generate 3 anchors along TEE→BACK
+        if (p.TEE && p.BACK){
+          const a = L.latLng(p.TEE.lat, p.TEE.lng);
+          const b = L.latLng(p.BACK.lat, p.BACK.lng);
+          [0.25, 0.55, 0.80].forEach(fr=>{
+            pts.push({lat: a.lat + (b.lat-a.lat)*fr, lng: a.lng + (b.lng-a.lng)*fr});
+          });
+        }
+      }
+
+      // End at GREEN (prefer MID, else BACK, else FRONT)
+      const end = p.MID || p.BACK || p.FRONT;
+      if (end) pts.push({lat:end.lat, lng:end.lng, zoom: 19, duration: 1.4});
+
+      const baseZoom = Math.max(map.getZoom(), 18);
+      return pts.map((pt,i)=>({
+        lat: pt.lat,
+        lng: pt.lng,
+        zoom: pt.zoom ?? baseZoom,
+        duration: pt.duration ?? 1.1
+      })).filter(pt=>Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
+    }
+
+    function flyToAsync(lat, lng, zoom, duration, abortObj){
+      return new Promise((resolve)=>{
+        if (abortObj?.aborted) return resolve(false);
+        const onEnd = ()=>{
+          map.off('moveend', onEnd);
+          resolve(true);
+        };
+        map.on('moveend', onEnd);
+        try{
+          map.flyTo([lat, lng], zoom, { duration: duration, easeLinearity: 0.22 });
+        }catch(e){
+          map.off('moveend', onEnd);
+          try{ map.setView([lat,lng], zoom); }catch(_){}
+          resolve(true);
+        }
+        setTimeout(()=>{ map.off('moveend', onEnd); resolve(true); }, Math.max(400, (duration*1000)+600));
+      });
+    }
+
+    async function startFlyover(){
+      if (!state.course || !map) return;
+
+      cancelFlyover();
+      flyoverActive = true;
+      flyoverAbort = {aborted:false};
+
+      // Freeze follow mode during flyover
+      const prevFollow = state.followCart;
+      state.followCart = false;
+
+      // Lock bearing for the hole
+      updateBearingForHole();
+
+      // Reduce accidental interaction while flying
+      const prevDragging = map.dragging?.enabled?.() ?? true;
+      const prevScroll = map.scrollWheelZoom?.enabled?.() ?? true;
+      try{ map.dragging?.disable(); }catch(_){}
+      try{ map.scrollWheelZoom?.disable(); }catch(_){}
+
+      const pts = getFlyoverPoints();
+      for (const pt of pts){
+        if (flyoverAbort.aborted) break;
+        updateBearingForHole();
+        await flyToAsync(pt.lat, pt.lng, pt.zoom, pt.duration, flyoverAbort);
+      }
+
+      // Restore interaction
+      try{ if (prevDragging) map.dragging?.enable(); }catch(_){}
+      try{ if (prevScroll) map.scrollWheelZoom?.enable(); }catch(_){}
+
+      flyoverActive = false;
+
+      // Return to default HOLE framing (as requested)
+      state.followCart = false;
+      doHoleView();
+
+      // Keep HOLE view (do not restore prevFollow automatically)
+      if (prevFollow) { /* user can tap CART if they want */ }
+    }
+
 function ensureInitialFraming(){
       if (state.initialFramed) return;
       state.initialFramed = true;
@@ -798,15 +916,18 @@ function ensureInitialFraming(){
         }
       });
     }
-    $('#holeViewBtn').addEventListener('click', ()=>{ state.followCart=false; doHoleView(); });
-    $('#cartViewBtn').addEventListener('click', ()=>{ state.followCart=true; doCartView(); });
+    $('#holeViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=false; doHoleView(); });
+    const __flyBtn = $('#flyoverBtn'); if(__flyBtn) __flyBtn.addEventListener('click', ()=>{ startFlyover(); });
+    $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; doCartView(); });
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
+      cancelFlyover();
       const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole();
     });
     $('#nextHole').addEventListener('click', ()=>{
       const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
+      cancelFlyover();
       state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole();
     });
 
