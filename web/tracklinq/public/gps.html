@@ -735,7 +735,7 @@ BACK:  dotIcon('transparent', 12),
       const p = state.course.holes[String(state.hole)]?.pins || {};
       if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
     }
-    function doCartView(){
+    function doCartView(silent){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       const cart = fromCart();
       if (cart && p.BACK){ fitBetweenPercent([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng], 0.15, 0.18); }
@@ -895,7 +895,7 @@ function updateBearingForHole(){
 function ensureInitialFraming(){
       if (state.initialFramed) return;
       state.initialFramed = true;
-      doCartView();
+      doCartView(false);
     }
 
     function renderHole(){
@@ -937,7 +937,7 @@ function ensureInitialFraming(){
     }
     $('#holeViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=false; doHoleView(); });
     const __flyBtn = $('#flyoverBtn'); if(__flyBtn) __flyBtn.addEventListener('click', ()=>{ startFlyover(); });
-    $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; doCartView(); });
+    $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; doCartView(false); });
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
@@ -967,12 +967,82 @@ function ensureInitialFraming(){
       updateLayupUI();
     }
     if (navigator.geolocation){
-      navigator.geolocation.watchPosition((pos)=>{
+      
+function maybeAutoAdvanceByGps(){
+  try{
+    if (!state.course || !state.course.holes) return;
+    const curr = state.course.holes[String(state.hole)];
+    const nextHoleNum = state.hole + 1;
+    const next = state.course.holes[String(nextHoleNum)];
+    if (!curr || !next) return;
+
+    const cart = state.cartLatLng;
+    if (!cart) return;
+
+    const currBack = curr.pins?.BACK;
+    const nextTee  = next.pins?.TEE;
+    if (!currBack || !nextTee) return;
+
+    const dNextTee = distMeters(cart, nextTee);
+    const dCurrBack = distMeters(cart, currBack);
+
+    const now = Date.now();
+    const COOLDOWN_MS = 45000;
+    const TEE_RADIUS_M = 40;
+    const BACK_EXIT_M  = 18;
+
+    if (dNextTee <= TEE_RADIUS_M && dCurrBack >= BACK_EXIT_M && dNextTee < dCurrBack){
+      if ((now - (state.lastGpsAdvanceTs||0)) < COOLDOWN_MS) return;
+      if (state.lastGpsAdvanceFrom === state.hole) return;
+
+      state.lastGpsAdvanceTs = now;
+      state.lastGpsAdvanceFrom = state.hole;
+
+      state.hole = nextHoleNum;
+      state.initialFramed = false;
+      renderHole();
+    }
+  }catch(_){}
+}
+
+function followCartViewIfNeeded(){
+  try{
+    if (!state.followCart) return;
+    if (!map || !state.course) return;
+    const hole = state.course.holes[String(state.hole)];
+    if (!hole) return;
+
+    const cart = state.cartLatLng;
+    const back = hole.pins?.BACK;
+    if (!cart || !back) return;
+
+    const now = Date.now();
+    const MIN_INTERVAL = 700;
+    if ((now - (state.lastFollowTs||0)) < MIN_INTERVAL) return;
+
+    if (state.lastFollowLat != null && state.lastFollowLng != null){
+      const moved = distMeters({lat:state.lastFollowLat, lng:state.lastFollowLng}, cart);
+      if (moved < 3.0) return;
+    }
+
+    state.lastFollowTs = now;
+    state.lastFollowLat = cart.lat;
+    state.lastFollowLng = cart.lng;
+
+    doCartView(true);
+  }catch(_){}
+}
+
+navigator.geolocation.watchPosition((pos)=>{
         const { latitude, longitude } = pos.coords;
         if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
         updateCartAndChips();
-      }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
+      
+      // GPS-based auto-advance + cart follow
+      maybeAutoAdvanceByGps();
+      followCartViewIfNeeded();
+}, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
     }
 
     // LAYUP with lines and labels
@@ -1630,6 +1700,11 @@ const RULES = {
       "• Otherwise: play as it lies or take unplayable (1 stroke)."
     ]
   }
+  lastFollowTs: 0,
+  lastFollowLat: null,
+  lastFollowLng: null,
+  lastGpsAdvanceTs: 0,
+  lastGpsAdvanceFrom: null,
 };
 
 (function initRulesGuide(){
