@@ -27,135 +27,7 @@
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
-  >
-    // ---------------- Ads (club-specific, server-hosted + SW cached) ----------------
-    // Club uploads ads once via ad-manager.html; all tablets logged in with the club PIN see the same ads.
-    // GPS shows them as a full-screen overlay after 5 minutes of no interaction, rotating every 10s.
-    const ADS_IDLE_MS = 5 * 60 * 1000;
-    const ADS_SLIDE_MS = 10 * 1000;
-
-    let __adsLastTouch = Date.now();
-    let __adsEnabled = false;
-    let __adsUrls = [];
-    let __adsIdx = 0;
-    let __adsTimer = null;
-    let __adsIdleCheck = null;
-    let __adsRefreshTimer = null;
-
-    function adsMarkInteraction(){
-      __adsLastTouch = Date.now();
-      hideAdsOverlay();
-    }
-
-    function adsBindInteractionListeners(){
-      const opts = { passive:true };
-      ['touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
-        window.addEventListener(ev, adsMarkInteraction, opts);
-      });
-      const ov = document.getElementById('adsOverlay');
-      if (ov) ov.addEventListener('click', adsMarkInteraction, opts);
-    }
-
-    async function adsFetchList(courseId){
-      const url = `/ads/${encodeURIComponent(courseId)}/ads.json?ts=${Date.now()}`;
-      try{
-        const res = await fetch(url, { cache:'no-store' });
-        if(!res.ok) return [];
-        const j = await res.json();
-        const arr = Array.isArray(j.ads) ? j.ads : [];
-        return arr.filter(Boolean);
-      }catch(_){
-        return [];
-      }
-    }
-
-    function showAdsOverlay(){
-      if (!__adsEnabled) return;
-      if (!__adsUrls || !__adsUrls.length) return;
-
-      const ov = document.getElementById('adsOverlay');
-      const img = document.getElementById('adsImg');
-      if (!ov || !img) return;
-
-      ov.style.display = 'flex';
-      __adsIdx = __adsIdx % __adsUrls.length;
-      img.src = __adsUrls[__adsIdx];
-
-      if (__adsTimer) clearInterval(__adsTimer);
-      __adsTimer = setInterval(()=>{
-        if (ov.style.display === 'none') return;
-        __adsIdx = (__adsIdx + 1) % __adsUrls.length;
-        img.src = __adsUrls[__adsIdx];
-      }, ADS_SLIDE_MS);
-    }
-
-    function hideAdsOverlay(){
-      const ov = document.getElementById('adsOverlay');
-      if (ov) ov.style.display = 'none';
-      if (__adsTimer){ clearInterval(__adsTimer); __adsTimer = null; }
-    }
-
-    function startAdsIdleLoop(){
-      if (__adsIdleCheck) clearInterval(__adsIdleCheck);
-      __adsIdleCheck = setInterval(()=>{
-        if (!__adsEnabled) return;
-        if (!__adsUrls || !__adsUrls.length) return;
-        const idle = Date.now() - __adsLastTouch;
-        if (idle >= ADS_IDLE_MS){
-          showAdsOverlay();
-        }
-      }, 2000);
-    }
-
-    async function initAds(courseId){
-      // Only show ads in club mode (PIN-validated)
-      const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-      if (mode !== 'club'){
-        __adsEnabled = false;
-        return;
-      }
-
-      adsBindInteractionListeners();
-      __adsLastTouch = Date.now();
-
-      // initial load
-      __adsUrls = await adsFetchList(courseId);
-      __adsEnabled = __adsUrls.length > 0;
-
-      // preload first image to avoid flash
-      if (__adsEnabled){
-        try{ const pre = new Image(); pre.src = __adsUrls[0]; }catch(_){}
-      }
-
-      startAdsIdleLoop();
-
-      // refresh list periodically (keeps sponsor updates fresh)
-      if (__adsRefreshTimer) clearInterval(__adsRefreshTimer);
-      __adsRefreshTimer = setInterval(async ()=>{
-        const m = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-        if (m !== 'club') return;
-        const latest = await adsFetchList(courseId);
-        __adsUrls = latest;
-        __adsEnabled = __adsUrls.length > 0;
-        if (!__adsEnabled) hideAdsOverlay();
-      }, 120000);
-    }
-
-    // Quick access for clubs: press 'A' to open ads manager (club mode only)
-    window.addEventListener('keydown', (e)=>{
-      if ((e.key||'').toLowerCase() === 'a'){
-        try{
-          const courseId = state?.course?.course?.id || state?.meta?.id;
-          if (!courseId) return;
-          const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-          if (mode !== 'club') return;
-          const pin = (localStorage.getItem(`pin_${courseId}`)||'').trim();
-          location.href = `ad-manager.html?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`;
-        }catch(_){}
-      }
-    });
-
-</script>
+  ></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate.js"></script>
 
 
@@ -442,28 +314,30 @@ body.dark .rp-btn{background:#16a34a}
     .cartSvgIcon svg{width:28px;height:28px;}
     .cartSvgIcon svg *{fill:currentColor;stroke:currentColor;}
 
-
-    /* Ads overlay */
-    .adsOverlay{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.92);
-      z-index:9999;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-      touch-action:manipulation;
-    }
-    .adsImg{
-      max-width:100%;
-      max-height:100%;
-      object-fit:contain;
-      border-radius:18px;
-      box-shadow:0 10px 40px rgba(0,0,0,0.55);
-    }
-
 </style>
+
+<style id="adsStyle">
+  /* Ads overlay (minimal, isolated) */
+  .adsOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.92);
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+    touch-action:manipulation;
+  }
+  .adsImg{
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+    border-radius:18px;
+    box-shadow:0 10px 40px rgba(0,0,0,0.55);
+  }
+</style>
+
 </head>
 <body data-theme="light">
   <div id="map"></div>
@@ -1092,8 +966,6 @@ function ensureInitialFraming(){
     $('#prevHole').addEventListener('click', ()=>{
       cancelFlyover();
       const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole();
-      // Ads overlay (club mode only)
-      initAds(courseId);
     });
     $('#nextHole').addEventListener('click', ()=>{
       const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
@@ -1895,6 +1767,131 @@ const RULES = {
   <div id="adsOverlay" class="adsOverlay" style="display:none;">
     <img id="adsImg" class="adsImg" alt="Advertisement">
   </div>
+
+
+<script id="adsScript">
+(function(){
+  // ---------------- Ads (club-specific, server-hosted + SW cached) ----------------
+  // Club uploads ads once via ad-manager.html; all tablets logged in with the club PIN see the same ads.
+  // GPS shows them as a full-screen overlay after 5 minutes of no interaction, rotating every 10s.
+
+  const ADS_IDLE_MS = 5 * 60 * 1000;
+  const ADS_SLIDE_MS = 10 * 1000;
+
+  let lastTouch = Date.now();
+  let enabled = false;
+  let urls = [];
+  let idx = 0;
+  let slideTimer = null;
+  let idleTimer = null;
+  let refreshTimer = null;
+
+  function markInteraction(){
+    lastTouch = Date.now();
+    hide();
+  }
+
+  function bindInteraction(){
+    const opts = { passive:true };
+    ['touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
+      window.addEventListener(ev, markInteraction, opts);
+    });
+    const ov = document.getElementById('adsOverlay');
+    if (ov) ov.addEventListener('click', markInteraction, opts);
+  }
+
+  async function fetchList(courseId){
+    const url = `/ads/${encodeURIComponent(courseId)}/ads.json?ts=${Date.now()}`;
+    try{
+      const res = await fetch(url, { cache:'no-store' });
+      if(!res.ok) return [];
+      const j = await res.json();
+      const arr = Array.isArray(j.ads) ? j.ads : [];
+      return arr.filter(Boolean);
+    }catch(_){
+      return [];
+    }
+  }
+
+  function show(){
+    if (!enabled || !urls.length) return;
+    const ov = document.getElementById('adsOverlay');
+    const img = document.getElementById('adsImg');
+    if (!ov || !img) return;
+
+    ov.style.display = 'flex';
+    idx = idx % urls.length;
+    img.src = urls[idx];
+
+    if (slideTimer) clearInterval(slideTimer);
+    slideTimer = setInterval(()=>{
+      if (ov.style.display === 'none') return;
+      idx = (idx + 1) % urls.length;
+      img.src = urls[idx];
+    }, ADS_SLIDE_MS);
+  }
+
+  function hide(){
+    const ov = document.getElementById('adsOverlay');
+    if (ov) ov.style.display = 'none';
+    if (slideTimer){ clearInterval(slideTimer); slideTimer = null; }
+  }
+
+  function startIdleLoop(){
+    if (idleTimer) clearInterval(idleTimer);
+    idleTimer = setInterval(()=>{
+      if (!enabled || !urls.length) return;
+      if (Date.now() - lastTouch >= ADS_IDLE_MS) show();
+    }, 2000);
+  }
+
+  async function init(courseId){
+    try{
+      const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
+      if (mode !== 'club'){ enabled = false; return; }
+
+      bindInteraction();
+      lastTouch = Date.now();
+
+      urls = await fetchList(courseId);
+      enabled = urls.length > 0;
+
+      if (enabled){
+        try{ const pre = new Image(); pre.src = urls[0]; }catch(_){}
+      }
+
+      startIdleLoop();
+
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(async ()=>{
+        const m = (localStorage.getItem(`mode_${courseId}`)||'').trim();
+        if (m !== 'club') return;
+        const latest = await fetchList(courseId);
+        urls = latest;
+        enabled = urls.length > 0;
+        if (!enabled) hide();
+      }, 120000);
+
+    }catch(_){}
+  }
+
+  // Expose a safe hook so gps.html can call it without modifying existing UI.
+  window.__initAds = init;
+
+  // Shortcut: 'A' opens ad manager in club mode (no UI changes)
+  window.addEventListener('keydown', (e)=>{
+    if ((e.key||'').toLowerCase() !== 'a') return;
+    try{
+      const courseId = window.state?.course?.course?.id || window.state?.meta?.id;
+      if (!courseId) return;
+      const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
+      if (mode !== 'club') return;
+      const pin = (localStorage.getItem(`pin_${courseId}`)||'').trim();
+      location.href = `ad-manager.html?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`;
+    }catch(_){}
+  });
+})();
+</script>
 
 </body>
 </html>
