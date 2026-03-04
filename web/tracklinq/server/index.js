@@ -1,3 +1,5 @@
+import fs from "fs";
+import multer from "multer";
 // /web/tracklinq/server/index.js
 import express from "express";
 import path from "path";
@@ -159,6 +161,122 @@ app.all("/admin/seed", async (req, res) => {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
+
+
+// ========== ADS SYSTEM (Club-managed overlays) ==========
+// Ads are stored per club (folder name = club short_code).
+// Public tablets fetch:    GET /ads/<short_code>/ads.json
+// Club portal uses PIN:    GET/POST/DELETE /api/ads/*?course=<short_code>&pin=<PIN>
+
+const adsDir = process.env.ADS_DIR || path.join(publicDir, "ads");
+if (!fs.existsSync(adsDir)) fs.mkdirSync(adsDir, { recursive: true });
+
+const adsUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+
+function safeId(id) {
+  return String(id || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+}
+
+function ensureClubDir(shortCode) {
+  const dir = path.join(adsDir, shortCode);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function listAds(shortCode) {
+  const dir = ensureClubDir(shortCode);
+  return fs
+    .readdirSync(dir)
+    .filter((f) => /\.(png|jpg|jpeg|webp|gif)$/i.test(f))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+async function resolveClubByPin(pin) {
+  const { rows } = await query(
+    "SELECT id, name, short_code FROM clubs WHERE pin_code = $1 AND is_active = TRUE LIMIT 1",
+    [pin]
+  );
+  return rows[0] || null;
+}
+
+async function requireClubPin(req, res, next) {
+  const course = safeId(req.query.course); // expected to match club short_code
+  const pin = String(req.query.pin || "").trim();
+
+  if (!course) return res.status(400).send("Missing course");
+  if (!pin) return res.status(400).send("Missing pin");
+
+  try {
+    const club = await resolveClubByPin(pin);
+    if (!club) return res.status(401).send("Invalid PIN");
+
+    const shortCode = safeId(club.short_code);
+    if (!shortCode || shortCode !== course) {
+      return res.status(401).send("Invalid PIN");
+    }
+
+    req.club = club;
+    req.shortCode = shortCode;
+    next();
+  } catch (e) {
+    return res.status(500).send("Server error");
+  }
+}
+
+// PIN-protected list (used by ad-manager portal)
+app.get("/api/ads/list", requireClubPin, (req, res) => {
+  const files = listAds(req.shortCode);
+  res.json({ ads: files.map((f) => `/ads/${req.shortCode}/${encodeURIComponent(f)}`) });
+});
+
+// PIN-protected upload (multipart form field name: files)
+app.post("/api/ads/upload", requireClubPin, adsUpload.array("files", 30), (req, res) => {
+  const dir = ensureClubDir(req.shortCode);
+
+  for (const f of req.files || []) {
+    const ext = path.extname(f.originalname || "").toLowerCase();
+    if (![".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(ext)) continue;
+
+    const base = path.basename(f.originalname).replace(/[^a-z0-9._-]/gi, "_");
+    const name = `${Date.now()}_${base}`;
+    fs.writeFileSync(path.join(dir, name), f.buffer);
+  }
+
+  const files = listAds(req.shortCode);
+  res.json({ ads: files.map((f) => `/ads/${req.shortCode}/${encodeURIComponent(f)}`) });
+});
+
+// PIN-protected delete
+app.delete("/api/ads/delete", requireClubPin, (req, res) => {
+  const name = path.basename(String(req.query.name || ""));
+  if (!name) return res.status(400).send("Missing name");
+
+  const fp = path.join(adsDir, req.shortCode, name);
+  try {
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+  } catch (_) {}
+
+  const files = listAds(req.shortCode);
+  res.json({ ads: files.map((f) => `/ads/${req.shortCode}/${encodeURIComponent(f)}`) });
+});
+
+// Public ads list for tablets (no PIN). Cached by SW; keep no-store to prevent stale lists.
+app.get("/ads/:course/ads.json", (req, res) => {
+  const shortCode = safeId(req.params.course);
+  const files = shortCode ? listAds(shortCode) : [];
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ads: files.map((f) => `/ads/${shortCode}/${encodeURIComponent(f)}`) });
+});
+
+// Serve ad images (public)
+app.get("/ads/:course/:file", (req, res, next) => {
+  const shortCode = safeId(req.params.course);
+  const file = path.basename(req.params.file);
+  const fp = path.join(adsDir, shortCode, file);
+  if (!fs.existsSync(fp)) return next();
+  return res.sendFile(fp);
+});
+
 
 // ----- Start -----
 const PORT = process.env.PORT || 8080;
