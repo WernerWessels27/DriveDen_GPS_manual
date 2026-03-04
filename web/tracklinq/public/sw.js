@@ -2,7 +2,7 @@
 // Updated to precache local Leaflet + Rotate plugin for full offline mode.
 
 const CACHE_PREFIX = 'tracklinq-';
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on GitHub Pages subpaths too)
@@ -13,6 +13,7 @@ const withScope = (path) => new URL(path.replace(/^\//, ''), SCOPE_URL).toString
 const APP_SHELL = [
   'gps.html',
   'mapper.html',
+  'ad-manager.html',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -36,6 +37,14 @@ async function safePrecache(cache, paths) {
     }
   });
   await Promise.all(tasks);
+}
+
+
+// Normalize cache keys (ignore cache-busting params like ?ts=...)
+function normalizeUrlForCache(input) {
+  const u = new URL(typeof input === 'string' ? input : input.url);
+  if (u.searchParams.has('ts')) u.searchParams.delete('ts');
+  return u.toString();
 }
 
 self.addEventListener('install', (event) => {
@@ -73,6 +82,7 @@ self.addEventListener('fetch', (event) => {
   if (!isSameOrigin) return;
 
   const pathname = url.pathname.toLowerCase();
+  const cacheKey = normalizeUrlForCache(req);
   const isHtmlNav = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
   const isJson = pathname.endsWith('.json');
   const isImage = req.destination === 'image' || /\.(png|jpg|jpeg|gif|webp|svg|ico)$/.test(pathname);
@@ -85,11 +95,11 @@ self.addEventListener('fetch', (event) => {
       try {
         const net = await fetch(req);
         // Cache the latest HTML for offline
-        cache.put(req.url, net.clone());
+        cache.put(cacheKey, net.clone());
         return net;
       } catch {
         // Try exact match, then fall back to gps.html (app entry)
-        return (await cache.match(req.url)) || (await cache.match(withScope('gps.html')));
+        return (await cache.match(cacheKey)) || (await cache.match(withScope('gps.html')));
       }
     })());
     return;
@@ -99,7 +109,7 @@ self.addEventListener('fetch', (event) => {
   if (isJson || isImage) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(req.url);
+      const cached = await cache.match(cacheKey);
 
       const netPromise = fetch(req).then((res) => {
         if (res && res.ok) cache.put(req.url, res.clone());
@@ -115,11 +125,11 @@ self.addEventListener('fetch', (event) => {
   if (isStatic) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(req.url);
+      const cached = await cache.match(cacheKey);
       if (cached) return cached;
 
       const net = await fetch(req);
-      if (net && net.ok) cache.put(req.url, net.clone());
+      if (net && net.ok) cache.put(cacheKey, net.clone());
       return net;
     })());
     return;
@@ -128,11 +138,11 @@ self.addEventListener('fetch', (event) => {
   // Default: cache-first, then network
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(req.url);
+    const cached = await cache.match(cacheKey);
     if (cached) return cached;
 
     const net = await fetch(req);
-    if (net && net.ok) cache.put(req.url, net.clone());
+    if (net && net.ok) cache.put(cacheKey, net.clone());
     return net;
   })());
 });
