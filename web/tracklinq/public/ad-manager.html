@@ -1,1 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Ads Manager</title>
+  <style>
+    :root{ color-scheme: dark; }
+    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#0b0b0d; color:#fff; }
+    .wrap{ max-width:980px; margin:0 auto; padding:18px; }
+    .card{ background:#121218; border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+    h1{ margin:0 0 10px 0; font-size:20px; }
+    .sub{ opacity:.8; margin-bottom:14px; line-height:1.35; }
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    button,.btn{
+      background:#1e1e2a; color:#fff; border:1px solid rgba(255,255,255,.12);
+      padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:600;
+      text-decoration:none; display:inline-block;
+    }
+    button:hover,.btn:hover{ filter:brightness(1.06); }
+    input[type=file]{ color:#fff; }
+    .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin-top:12px; }
+    .thumb{
+      background:#0f0f15; border:1px solid rgba(255,255,255,.10); border-radius:14px;
+      overflow:hidden; position:relative;
+    }
+    .thumb img{ width:100%; height:140px; object-fit:cover; display:block; }
+    .thumb .meta{ padding:10px; font-size:12px; opacity:.85; word-break:break-word; }
+    .thumb .del{
+      position:absolute; top:10px; right:10px;
+      background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.18);
+      border-radius:10px; padding:6px 8px; font-size:12px;
+    }
+    .ok{ color:#9cfca7; font-weight:700; }
+    .bad{ color:#ff9aa2; font-weight:700; }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .hint{ font-size:12px; opacity:.75; }
+    .pill{ display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); margin-left:6px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Ads Manager</h1>
+        <div class="sub">
+          Upload sponsor images for this course. All tablets logged in with the <b>club PIN</b> will automatically show the same ads.
+          <span class="pill">5 min idle</span><span class="pill">10 sec per slide</span>
+          <div class="hint">Recommended: 1920×1080 JPG/PNG, landscape.</div>
+        </div>
+      </div>
+      <a class="btn" id="backBtn" href="#">Back to GPS</a>
+    </div>
+
+    <div class="card">
+      <div id="status" class="sub">Checking access…</div>
+
+      <div class="row" style="margin-top:10px;">
+        <input id="fileInput" type="file" accept="image/*" multiple />
+        <button id="uploadBtn">Upload</button>
+        <button id="refreshBtn">Refresh</button>
+      </div>
+
+      <div id="count" class="sub" style="margin-top:10px;"></div>
+      <div id="grid" class="grid"></div>
+    </div>
+  </div>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+  const q = (k)=> new URLSearchParams(location.search).get(k);
+
+  let courseId = (q('course')||'').trim();
+  let pin = (q('pin')||'').trim().toUpperCase();
+
+  async function getIndex(){
+    const res = await fetch('/courses/index.json', { cache:'reload' });
+    if(!res.ok) throw new Error('index.json missing');
+    return res.json();
+  }
+  async function loadCourseJson(id){
+    const res = await fetch(`/courses/${id}.json`, { cache:'reload' });
+    if(!res.ok) throw new Error('course missing');
+    return res.json();
+  }
+  async function isPinValid(courseId, courseJson, candidate){
+    if(!candidate || candidate.length !== 10) return false;
+    try{
+      const idx = await getIndex();
+      const c = (idx.courses||[]).find(x=>x.id===courseId);
+      if(c?.pin && c.pin.trim().toUpperCase()===candidate) return true;
+    }catch(_){}
+    const metaPin=(courseJson?.course?.pin||'').trim().toUpperCase();
+    if(metaPin && metaPin===candidate) return true;
+    return false;
+  }
+
+  async function ensureAccess(){
+    if(!courseId){
+      $('#status').innerHTML = '<span class="bad">Missing course id.</span>';
+      return null;
+    }
+    let courseJson = null;
+    try{ courseJson = await loadCourseJson(courseId); }catch(_){}
+    if(!courseJson){
+      $('#status').innerHTML = '<span class="bad">Course not found.</span>';
+      return null;
+    }
+    if(pin.length !== 10){
+      pin = (prompt(`Enter PIN for ${courseJson?.course?.name || courseId}:`)||'').trim().toUpperCase();
+    }
+    const ok = await isPinValid(courseId, courseJson, pin);
+    if(!ok){
+      $('#status').innerHTML = '<span class="bad">Invalid PIN.</span>';
+      return null;
+    }
+
+    localStorage.setItem(`pin_${courseId}`, pin);
+    localStorage.setItem(`mode_${courseId}`, 'club');
+
+    $('#status').innerHTML = `<span class="ok">Access granted</span> — ${courseJson?.course?.name || courseId}`;
+    $('#backBtn').href = `gps.html?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`;
+    return courseJson;
+  }
+
+  async function apiList(){
+    const res = await fetch(`/api/ads/list?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}&ts=${Date.now()}`);
+    if(!res.ok) throw new Error('list failed');
+    return res.json();
+  }
+
+  async function apiUpload(files){
+    const fd = new FormData();
+    for(const f of files) fd.append('files', f, f.name);
+    const res = await fetch(`/api/ads/upload?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`, {
+      method:'POST',
+      body: fd
+    });
+    if(!res.ok){
+      const t = await res.text().catch(()=> '');
+      throw new Error(t || 'upload failed');
+    }
+    return res.json();
+  }
+
+  async function apiDelete(name){
+    const res = await fetch(`/api/ads/delete?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}`, {
+      method:'DELETE'
+    });
+    if(!res.ok) throw new Error('delete failed');
+    return res.json();
+  }
+
+  async function render(){
+    const grid = $('#grid');
+    grid.innerHTML = '';
+    let data = null;
+    try{ data = await apiList(); }catch(e){
+      $('#count').textContent = 'Could not load ads.';
+      return;
+    }
+    const ads = Array.isArray(data.ads) ? data.ads : [];
+    $('#count').textContent = ads.length ? `Saved ads: ${ads.length}` : 'No ads uploaded yet.';
+    for(const url of ads){
+      const name = (url.split('/').pop()||'');
+      const div = document.createElement('div');
+      div.className = 'thumb';
+      div.innerHTML = `
+        <button class="del" title="Delete" data-name="${name}">Delete</button>
+        <img src="${url}?ts=${Date.now()}" alt="ad">
+        <div class="meta">${name}</div>
+      `;
+      div.querySelector('.del').addEventListener('click', async ()=>{
+        if(!confirm('Delete this ad?')) return;
+        await apiDelete(name);
+        render();
+      });
+      grid.appendChild(div);
+    }
+  }
+
+  $('#uploadBtn').addEventListener('click', async ()=>{
+    const files = $('#fileInput').files;
+    if(!files || !files.length) return alert('Select one or more images first.');
+    try{
+      $('#uploadBtn').textContent = 'Uploading…';
+      await apiUpload(files);
+      $('#fileInput').value = '';
+      await render();
+    }catch(e){
+      alert(String(e.message||e));
+    }finally{
+      $('#uploadBtn').textContent = 'Upload';
+    }
+  });
+
+  $('#refreshBtn').addEventListener('click', ()=> render());
+
+  (async ()=>{
+    const ok = await ensureAccess();
+    if(ok) render();
+  })();
+</script>
+</body>
+</html>
 
