@@ -317,7 +317,7 @@ body.dark .rp-btn{background:#16a34a}
 </style>
 
 <style id="adsStyle">
-  /* Ads overlay (minimal, isolated) */
+  /* Ads overlay (append-only, isolated) */
   .adsOverlay{
     position:fixed;
     inset:0;
@@ -1771,10 +1771,6 @@ const RULES = {
 
 <script id="adsScript">
 (function(){
-  // ---------------- Ads (club-specific, server-hosted + SW cached) ----------------
-  // Club uploads ads once via ad-manager.html; all tablets logged in with the club PIN see the same ads.
-  // GPS shows them as a full-screen overlay after 5 minutes of no interaction, rotating every 10s.
-
   const ADS_IDLE_MS = 5 * 60 * 1000;
   const ADS_SLIDE_MS = 10 * 1000;
 
@@ -1785,12 +1781,12 @@ const RULES = {
   let slideTimer = null;
   let idleTimer = null;
   let refreshTimer = null;
+  let started = false;
 
   function markInteraction(){
     lastTouch = Date.now();
     hide();
   }
-
   function bindInteraction(){
     const opts = { passive:true };
     ['touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
@@ -1845,40 +1841,38 @@ const RULES = {
     }, 2000);
   }
 
-  async function init(courseId){
-    try{
-      const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-      if (mode !== 'club'){ enabled = false; return; }
+  async function start(courseId){
+    if (started) return;
+    started = true;
 
-      bindInteraction();
-      lastTouch = Date.now();
+    // only in club mode
+    const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
+    if (mode !== 'club'){ enabled = false; return; }
 
-      urls = await fetchList(courseId);
+    bindInteraction();
+    lastTouch = Date.now();
+
+    urls = await fetchList(courseId);
+    enabled = urls.length > 0;
+
+    if (enabled){
+      try{ const pre = new Image(); pre.src = urls[0]; }catch(_){}
+    }
+
+    startIdleLoop();
+
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(async ()=>{
+      const m = (localStorage.getItem(`mode_${courseId}`)||'').trim();
+      if (m !== 'club') return;
+      const latest = await fetchList(courseId);
+      urls = latest;
       enabled = urls.length > 0;
-
-      if (enabled){
-        try{ const pre = new Image(); pre.src = urls[0]; }catch(_){}
-      }
-
-      startIdleLoop();
-
-      if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(async ()=>{
-        const m = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-        if (m !== 'club') return;
-        const latest = await fetchList(courseId);
-        urls = latest;
-        enabled = urls.length > 0;
-        if (!enabled) hide();
-      }, 120000);
-
-    }catch(_){}
+      if (!enabled) hide();
+    }, 120000);
   }
 
-  // Expose a safe hook so gps.html can call it without modifying existing UI.
-  window.__initAds = init;
-
-  // Shortcut: 'A' opens ad manager in club mode (no UI changes)
+  // Open ads manager shortcut (club only) â€” no UI changes
   window.addEventListener('keydown', (e)=>{
     if ((e.key||'').toLowerCase() !== 'a') return;
     try{
@@ -1890,6 +1884,18 @@ const RULES = {
       location.href = `ad-manager.html?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`;
     }catch(_){}
   });
+
+  // APPEND-ONLY HOOK: poll for a loaded courseId without touching existing code
+  const poll = setInterval(()=>{
+    try{
+      const courseId = window.state?.course?.course?.id || window.state?.meta?.id;
+      if (courseId){
+        clearInterval(poll);
+        start(courseId);
+      }
+    }catch(_){}
+  }, 500);
+
 })();
 </script>
 
