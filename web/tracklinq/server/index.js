@@ -164,14 +164,22 @@ app.all("/admin/seed", async (req, res) => {
 
 
 // ========== ADS SYSTEM (Club-managed overlays) ==========
-// Ads are stored per club (folder name = club short_code).
-// Public tablets fetch:    GET /ads/<short_code>/ads.json
-// Club portal uses PIN:    GET/POST/DELETE /api/ads/*?course=<short_code>&pin=<PIN>
+// IMPORTANT: Club PINs are currently managed in public/courses/index.json (NOT the DB).
+// - ad-manager.html uploads ads for a club (identified by short_code) after PIN validation.
+// - tablets fetch ads list publicly via: GET /ads/<short_code>/ads.json
+//
+// PIN-protected endpoints (portal):
+//   GET    /api/ads/list?course=<short_code>&pin=<PIN>
+//   POST   /api/ads/upload?course=<short_code>&pin=<PIN>   (multipart field name: files)
+//   DELETE /api/ads/delete?course=<short_code>&pin=<PIN>&name=<filename>
 
 const adsDir = process.env.ADS_DIR || path.join(publicDir, "ads");
 if (!fs.existsSync(adsDir)) fs.mkdirSync(adsDir, { recursive: true });
 
-const adsUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const adsUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB each
+});
 
 function safeId(id) {
   return String(id || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
@@ -191,35 +199,64 @@ function listAds(shortCode) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-async function resolveClubByPin(pin) {
-  const { rows } = await query(
-    "SELECT id, name, short_code FROM clubs WHERE pin_code = $1 AND is_active = TRUE LIMIT 1",
-    [pin]
-  );
-  return rows[0] || null;
+// Read course index JSON (source of truth for PINs + active flag)
+function readCoursesIndex() {
+  const p = path.join(publicDir, "courses", "index.json");
+  const raw = fs.readFileSync(p, "utf8");
+  const j = JSON.parse(raw);
+  const courses = Array.isArray(j.courses) ? j.courses : [];
+  return courses;
 }
 
-async function requireClubPin(req, res, next) {
-  const course = safeId(req.query.course); // expected to match club short_code
-  const pin = String(req.query.pin || "").trim();
+function normalizePin(pin) {
+  return String(pin || "").trim().toUpperCase();
+}
+
+function resolveCourseByPin(pin) {
+  const want = normalizePin(pin);
+  if (!want) return null;
+
+  const courses = readCoursesIndex();
+
+  // Match on exact PIN (case-insensitive) and must be active === true
+  // Accept both fields: pin or PIN (just in case)
+  const hit = courses.find((c) => {
+    const active = c.active === true || c.ACTIVE === true;
+    const storedPin = normalizePin(c.pin ?? c.PIN);
+    return active && storedPin && storedPin === want;
+  });
+
+  if (!hit) return null;
+
+  const shortCode = safeId(
+    hit.shortCode ?? hit.shortcode ?? hit.SHORTCODE ?? hit.short_code ?? hit.courseShortCode
+  );
+  const name = String(hit.name ?? hit.NAME ?? "").trim();
+
+  if (!shortCode) return null;
+
+  return { shortCode, name };
+}
+
+function requireClubPin(req, res, next) {
+  const course = safeId(req.query.course); // expected to match short_code
+  const pin = normalizePin(req.query.pin);
 
   if (!course) return res.status(400).send("Missing course");
   if (!pin) return res.status(400).send("Missing pin");
 
   try {
-    const club = await resolveClubByPin(pin);
+    const club = resolveCourseByPin(pin);
     if (!club) return res.status(401).send("Invalid PIN");
 
-    const shortCode = safeId(club.short_code);
-    if (!shortCode || shortCode !== course) {
-      return res.status(401).send("Invalid PIN");
-    }
+    if (club.shortCode !== course) return res.status(401).send("Invalid PIN");
 
-    req.club = club;
-    req.shortCode = shortCode;
+    req.shortCode = club.shortCode;
+    req.clubName = club.name;
     next();
   } catch (e) {
-    return res.status(500).send("Server error");
+    // If index.json missing/corrupt, surface error clearly (helps debugging)
+    return res.status(500).send("Ads auth error");
   }
 }
 
@@ -276,6 +313,8 @@ app.get("/ads/:course/:file", (req, res, next) => {
   if (!fs.existsSync(fp)) return next();
   return res.sendFile(fp);
 });
+
+
 
 
 // ----- Start -----
