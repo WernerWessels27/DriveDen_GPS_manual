@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Ads Manager</title>
+  <title>DriveDen GPS — Ads Manager</title>
   <style>
     :root{ color-scheme: dark; }
     body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#0b0b0d; color:#fff; }
@@ -12,31 +12,30 @@
     h1{ margin:0 0 10px 0; font-size:20px; }
     .sub{ opacity:.8; margin-bottom:14px; line-height:1.35; }
     .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-    .row2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    @media (max-width:720px){ .row2{ grid-template-columns:1fr; } }
     button,.btn{
       background:#1e1e2a; color:#fff; border:1px solid rgba(255,255,255,.12);
       padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:600;
       text-decoration:none; display:inline-block;
     }
     button:hover,.btn:hover{ filter:brightness(1.06); }
-    input,select{
+    input{
       background:#0f0f15; color:#fff; border:1px solid rgba(255,255,255,.12);
       padding:10px 12px; border-radius:12px; outline:none; width:100%;
     }
     input::placeholder{ opacity:.6; }
-    input[type=file]{ color:#fff; padding:10px 0; border:none; background:transparent; }
-    .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin-top:12px; }
+    input[type=file]{ color:#fff; padding:10px 0; border:none; background:transparent; width:auto; }
+    .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-top:12px; }
     .thumb{
       background:#0f0f15; border:1px solid rgba(255,255,255,.10); border-radius:14px;
       overflow:hidden; position:relative;
     }
-    .thumb img{ width:100%; height:140px; object-fit:cover; display:block; }
+    .thumb img{ width:100%; height:150px; object-fit:cover; display:block; }
     .thumb .meta{ padding:10px; font-size:12px; opacity:.85; word-break:break-word; }
     .thumb .del{
       position:absolute; top:10px; right:10px;
+      width:34px; height:34px; display:flex; align-items:center; justify-content:center;
       background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.18);
-      border-radius:10px; padding:6px 8px; font-size:12px;
+      border-radius:10px; font-size:16px; line-height:1;
     }
     .ok{ color:#9cfca7; font-weight:700; }
     .bad{ color:#ff9aa2; font-weight:700; }
@@ -46,6 +45,7 @@
     .divider{ height:1px; background:rgba(255,255,255,.08); margin:14px 0; }
     .small{ font-size:12px; opacity:.8; }
     .readonly{ opacity:.75; }
+    .spacer{ flex:1; }
   </style>
 </head>
 <body>
@@ -63,27 +63,25 @@
     </div>
 
     <div class="card">
-      <div id="status" class="sub">Load your club…</div>
+      <div id="status" class="sub">Enter your club PIN…</div>
 
-      <div class="row2" style="margin-top:10px;">
-        <div>
-          <div class="small">Club</div>
-          <select id="clubSelect">
-            <option value="">Loading clubs…</option>
-          </select>
-          <div class="hint">Pick your club, or leave blank and enter a PIN to auto-detect.</div>
-        </div>
-        <div>
+      <div class="row" style="margin-top:10px;">
+        <div style="flex:1; min-width:260px;">
           <div class="small">Club PIN</div>
           <input id="pinInput" type="text" inputmode="text" maxlength="10" placeholder="e.g. WGC1234567" />
-          <div class="hint">10 characters. Used to secure uploads.</div>
+          <div class="hint">10 characters. Must match an active club in courses/index.json.</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; min-width:160px;">
+          <button id="loadBtn">Load</button>
+          <button id="logoutBtn" disabled>Logout</button>
         </div>
       </div>
 
       <div class="row" style="margin-top:12px;">
-        <button id="loadBtn">Load Club</button>
+        <span class="small readonly">Club: <b id="clubNameLabel">—</b></span>
         <span class="small readonly">Short code: <b id="shortCodeLabel">—</b></span>
-        <span class="small readonly">Course ID: <b id="courseIdLabel">—</b></span>
+        <span class="spacer"></span>
+        <button id="refreshBtn" disabled>Refresh</button>
       </div>
 
       <div class="divider"></div>
@@ -91,7 +89,6 @@
       <div class="row" style="margin-top:10px;">
         <input id="fileInput" type="file" accept="image/*" multiple />
         <button id="uploadBtn" disabled>Upload</button>
-        <button id="refreshBtn" disabled>Refresh</button>
       </div>
 
       <div id="count" class="sub" style="margin-top:10px;"></div>
@@ -101,7 +98,6 @@
 
 <script>
   const $ = (s)=>document.querySelector(s);
-  const q = (k)=> new URLSearchParams(location.search).get(k);
 
   let coursesIndex = [];
   let club = null; // { id, name, shortCode, pin }
@@ -113,45 +109,15 @@
     return String(v||'').trim().toUpperCase();
   }
 
+  function setStatus(ok, msg){
+    $('#status').innerHTML = ok ? `<span class="ok">${msg}</span>` : `<span class="bad">${msg}</span>`;
+  }
+
   async function getIndex(){
     const res = await fetch('/courses/index.json', { cache:'reload' });
     if(!res.ok) throw new Error('index.json missing');
     const j = await res.json();
     return Array.isArray(j.courses) ? j.courses : [];
-  }
-
-  function setStatus(ok, msg){
-    $('#status').innerHTML = ok ? `<span class="ok">${msg}</span>` : `<span class="bad">${msg}</span>`;
-  }
-
-  function fillClubSelect(){
-    const sel = $('#clubSelect');
-    sel.innerHTML = '<option value="">— Auto-detect from PIN —</option>';
-    for(const c of coursesIndex){
-      const active = c.active === true || c.ACTIVE === true;
-      if(!active) continue;
-      const id = String(c.id||'').trim();
-      const name = String(c.name||c.NAME||id).trim();
-      const shortCode = String(c.shortCode||c.shortcode||c.SHORTCODE||c.short_code||'').trim();
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = `${name} (${shortCode || id})`;
-      sel.appendChild(opt);
-    }
-  }
-
-  function pickClubById(id){
-    const c = coursesIndex.find(x => String(x.id||'').trim() === id);
-    if(!c) return null;
-    const active = c.active === true || c.ACTIVE === true;
-    if(!active) return null;
-
-    return {
-      id: String(c.id||'').trim(),
-      name: String(c.name||c.NAME||'').trim(),
-      shortCode: safeId(c.shortCode||c.shortcode||c.SHORTCODE||c.short_code||c.courseShortCode),
-      pin: normPin(c.pin ?? c.PIN)
-    };
   }
 
   function pickClubByPin(pin){
@@ -164,15 +130,21 @@
       return active && stored && stored === want;
     });
 
-    if(hits.length === 1){
-      return pickClubById(String(hits[0].id||'').trim());
-    }
-    return null;
+    if(hits.length !== 1) return null;
+
+    const c = hits[0];
+    return {
+      id: String(c.id||'').trim(),
+      name: String(c.name||c.NAME||c.id||'').trim(),
+      shortCode: safeId(c.shortCode||c.shortcode||c.SHORTCODE||c.short_code||c.courseShortCode),
+      pin: want
+    };
   }
 
   function updateLabels(){
+    $('#clubNameLabel').textContent = club?.name || '—';
     $('#shortCodeLabel').textContent = club?.shortCode || '—';
-    $('#courseIdLabel').textContent = club?.id || '—';
+
     if(club?.id && club?.pin){
       $('#backBtn').href = `gps.html?course=${encodeURIComponent(club.id)}&pin=${encodeURIComponent(club.pin)}`;
     }else{
@@ -183,63 +155,47 @@
   function enableControls(enabled){
     $('#uploadBtn').disabled = !enabled;
     $('#refreshBtn').disabled = !enabled;
+    $('#logoutBtn').disabled = !enabled;
   }
 
-  async function ensureAccess(){
-    const selectedId = ($('#clubSelect').value || '').trim();
-    let pin = normPin($('#pinInput').value);
-
-    if(selectedId){
-      const c = pickClubById(selectedId);
-      if(!c){
-        setStatus(false, 'Club not found or not active.');
-        enableControls(false);
-        club = null;
-        updateLabels();
-        return false;
-      }
-      if(pin.length !== 10){
-        setStatus(false, 'Please enter the 10‑character Club PIN.');
-        enableControls(false);
-        club = null;
-        updateLabels();
-        return false;
-      }
-      if(c.pin && c.pin !== pin){
-        setStatus(false, 'Invalid PIN for selected club.');
-        enableControls(false);
-        club = null;
-        updateLabels();
-        return false;
-      }
-      club = { ...c, pin };
-    }else{
-      if(pin.length !== 10){
-        setStatus(false, 'Enter your 10‑character Club PIN to auto-detect your club.');
-        enableControls(false);
-        club = null;
-        updateLabels();
-        return false;
-      }
-      const c = pickClubByPin(pin);
-      if(!c){
-        setStatus(false, 'PIN not found in courses/index.json (or club inactive).');
-        enableControls(false);
-        club = null;
-        updateLabels();
-        return false;
-      }
-      club = { ...c, pin };
-      $('#clubSelect').value = club.id;
+  async function login(){
+    const pin = normPin($('#pinInput').value);
+    if(pin.length !== 10){
+      setStatus(false, 'Please enter the 10‑character Club PIN.');
+      club = null;
+      updateLabels();
+      enableControls(false);
+      return false;
     }
 
-    localStorage.setItem('ads_last_pin', club.pin);
-    localStorage.setItem('ads_last_course_id', club.id);
+    const c = pickClubByPin(pin);
+    if(!c){
+      setStatus(false, 'PIN not found in courses/index.json (or club inactive).');
+      club = null;
+      updateLabels();
+      enableControls(false);
+      return false;
+    }
 
-    setStatus(true, `Access granted — ${club.name || club.id}`);
+    club = c;
+    localStorage.setItem('ads_last_pin', club.pin);
+
+    setStatus(true, `Access granted — ${club.name}`);
     updateLabels();
     enableControls(true);
+    await render();
     return true;
+  }
+
+  function logout(){
+    club = null;
+    $('#pinInput').value = '';
+    localStorage.removeItem('ads_last_pin');
+    setStatus(false, 'Enter your club PIN…');
+    updateLabels();
+    enableControls(false);
+    $('#grid').innerHTML = '';
+    $('#count').textContent = '';
   }
 
   async function apiList(){
@@ -280,8 +236,8 @@
     const grid = $('#grid');
     grid.innerHTML = '';
     $('#count').textContent = '';
-    let data = null;
 
+    let data;
     try{
       data = await apiList();
     }catch(e){
@@ -297,23 +253,26 @@
       const div = document.createElement('div');
       div.className = 'thumb';
       div.innerHTML = `
-        <button class="del" title="Delete" data-name="${name}">Delete</button>
+        <button class="del" title="Delete" data-name="${name}">×</button>
         <img src="${url}?ts=${Date.now()}" alt="ad">
         <div class="meta">${name}</div>
       `;
       div.querySelector('.del').addEventListener('click', async ()=>{
         if(!confirm('Delete this ad?')) return;
-        await apiDelete(name);
-        render();
+        try{
+          await apiDelete(name);
+          await render();
+        }catch(e){
+          alert(String(e.message||e));
+        }
       });
       grid.appendChild(div);
     }
   }
 
-  $('#loadBtn').addEventListener('click', async ()=>{
-    const ok = await ensureAccess();
-    if(ok) render();
-  });
+  $('#loadBtn').addEventListener('click', ()=> login());
+  $('#logoutBtn').addEventListener('click', ()=> logout());
+  $('#refreshBtn').addEventListener('click', ()=> render());
 
   $('#uploadBtn').addEventListener('click', async ()=>{
     if(!club) return;
@@ -331,26 +290,28 @@
     }
   });
 
-  $('#refreshBtn').addEventListener('click', ()=> render());
-
   (async ()=>{
     try{
       coursesIndex = await getIndex();
-      fillClubSelect();
 
-      const qpCourseId = (q('course')||'').trim();
-      const qpPin = normPin(q('pin')||'');
       const lastPin = normPin(localStorage.getItem('ads_last_pin')||'');
-      const lastCourseId = (localStorage.getItem('ads_last_course_id')||'').trim();
+      if(lastPin) $('#pinInput').value = lastPin;
 
-      if(qpCourseId) $('#clubSelect').value = qpCourseId;
-      else if(lastCourseId) $('#clubSelect').value = lastCourseId;
-
-      $('#pinInput').value = qpPin || lastPin || '';
-
-      setStatus(false, 'Select a club or enter PIN, then click “Load Club”.');
+      setStatus(false, 'Enter your club PIN, then click “Load”.');
       updateLabels();
       enableControls(false);
+
+      // Auto-login if last PIN exists and is valid
+      if(lastPin && lastPin.length === 10){
+        const c = pickClubByPin(lastPin);
+        if(c){
+          club = c;
+          setStatus(true, `Access granted — ${club.name}`);
+          updateLabels();
+          enableControls(true);
+          await render();
+        }
+      }
     }catch(e){
       setStatus(false, 'Could not load courses/index.json');
       enableControls(false);
