@@ -1775,36 +1775,98 @@ const RULES = {
 
 
 <script id="adsScript">
+/*
+  Ads overlay (club + guest):
+  - Club mode: fetch list from /api/ads/list?course=<id>&pin=<pin>, fallback to /ads/<id>/ads.json
+  - Guest mode: show /guest-splash.png only
+  - Offline-friendly: keep last known list in localStorage and prefetch images when online
+  - Shows after 5 minutes idle, rotates every 10 seconds, tap anywhere to dismiss
+*/
 (function(){
-  const ADS_IDLE_MS = 5 * 60 * 1000;
+  const ADS_IDLE_MS  = 5 * 60 * 1000;
   const ADS_SLIDE_MS = 10 * 1000;
+  const REFRESH_MS   = 2 * 60 * 1000;
+  const POLL_MS      = 400;
 
-  let lastTouch = Date.now();
-  let enabled = false;
+  let lastInteraction = Date.now();
   let urls = [];
   let idx = 0;
   let slideTimer = null;
   let idleTimer = null;
   let refreshTimer = null;
-  let started = false;
+  let startedForCourse = null;
+
+  const overlay = () => document.getElementById('adsOverlay');
+  const imgEl   = () => document.getElementById('adsImg');
+
+  function now(){ return Date.now(); }
+
+  function dismiss(){
+    const ov = overlay();
+    if (ov) ov.style.display = 'none';
+    if (slideTimer){ clearInterval(slideTimer); slideTimer = null; }
+  }
 
   function markInteraction(){
-    lastTouch = Date.now();
-    hide();
-  }
-  function bindInteraction(){
-    const opts = { passive:true };
-    ['touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
-      window.addEventListener(ev, markInteraction, opts);
-    });
-    const ov = document.getElementById('adsOverlay');
-    if (ov) ov.addEventListener('click', markInteraction, opts);
+    lastInteraction = now();
+    dismiss();
   }
 
-  async function fetchList(courseId){
-    const url = `/ads/${encodeURIComponent(courseId)}/ads.json?ts=${Date.now()}`;
+  function bindInteractionOnce(){
+    if (bindInteractionOnce._done) return;
+    bindInteractionOnce._done = true;
+    const opts = { passive:true, capture:true };
+    ['pointerdown','touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
+      window.addEventListener(ev, markInteraction, opts);
+    });
+    const ov = overlay();
+    if (ov) ov.addEventListener('click', markInteraction, { passive:true });
+  }
+
+  function isGuest(courseId){
+    return ((localStorage.getItem(`mode_${courseId}`)||'').trim()) === 'guest';
+  }
+
+  function getPin(courseId){
+    return (localStorage.getItem(`pin_${courseId}`)||'').trim().toUpperCase();
+  }
+
+  function cacheKey(courseId){ return `adsCache_${courseId}`; }
+
+  function loadCachedUrls(courseId){
     try{
-      const res = await fetch(url, { cache:'no-store' });
+      const raw = localStorage.getItem(cacheKey(courseId));
+      if (!raw) return [];
+      const j = JSON.parse(raw);
+      const arr = Array.isArray(j.urls) ? j.urls : [];
+      return arr.filter(Boolean);
+    }catch(_){
+      return [];
+    }
+  }
+
+  function saveCachedUrls(courseId, arr){
+    try{
+      localStorage.setItem(cacheKey(courseId), JSON.stringify({ updatedAt: now(), urls: arr }));
+    }catch(_){}
+  }
+
+  async function fetchClubList(courseId){
+    const pin = getPin(courseId);
+    if (!pin || pin.length !== 10) return [];
+    const api = `/api/ads/list?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}&ts=${now()}`;
+    try{
+      const res = await fetch(api, { cache:'no-store' });
+      if (res.ok){
+        const j = await res.json();
+        const arr = Array.isArray(j.ads) ? j.ads : [];
+        return arr.filter(Boolean);
+      }
+    }catch(_){}
+    // fallback to static
+    const fallback = `/ads/${encodeURIComponent(courseId)}/ads.json?ts=${now()}`;
+    try{
+      const res = await fetch(fallback, { cache:'no-store' });
       if(!res.ok) return [];
       const j = await res.json();
       const arr = Array.isArray(j.ads) ? j.ads : [];
@@ -1814,10 +1876,22 @@ const RULES = {
     }
   }
 
+  function prefetchImages(arr){
+    // Warm browser + SW cache (best-effort)
+    try{
+      arr.slice(0, 24).forEach(u=>{
+        const im = new Image();
+        im.decoding = 'async';
+        im.loading = 'eager';
+        im.src = u + (u.includes('?') ? '&' : '?') + 'pref=' + now();
+      });
+    }catch(_){}
+  }
+
   function show(){
-    if (!enabled || !urls.length) return;
-    const ov = document.getElementById('adsOverlay');
-    const img = document.getElementById('adsImg');
+    if (!urls.length) return;
+    const ov = overlay();
+    const img = imgEl();
     if (!ov || !img) return;
 
     ov.style.display = 'flex';
@@ -1832,74 +1906,75 @@ const RULES = {
     }, ADS_SLIDE_MS);
   }
 
-  function hide(){
-    const ov = document.getElementById('adsOverlay');
-    if (ov) ov.style.display = 'none';
-    if (slideTimer){ clearInterval(slideTimer); slideTimer = null; }
-  }
-
   function startIdleLoop(){
     if (idleTimer) clearInterval(idleTimer);
     idleTimer = setInterval(()=>{
-      if (!enabled || !urls.length) return;
-      if (Date.now() - lastTouch >= ADS_IDLE_MS) show();
-    }, 2000);
+      if (!urls.length) return;
+      if (now() - lastInteraction >= ADS_IDLE_MS) show();
+    }, 1000);
+  }
+
+  async function refreshClub(courseId){
+    const latest = await fetchClubList(courseId);
+    if (latest.length){
+      urls = latest;
+      saveCachedUrls(courseId, latest);
+      prefetchImages(latest);
+    }else{
+      // Keep cached list if we have one (offline or server down)
+      const cached = loadCachedUrls(courseId);
+      urls = cached;
+    }
+    if (!urls.length) dismiss();
+  }
+
+  function setGuestUrls(){
+    urls = ['/guest-splash.png'];
   }
 
   async function start(courseId){
-    if (started) return;
-    started = true;
+    if (!courseId) return;
+    if (startedForCourse === courseId) return;
+    startedForCourse = courseId;
 
-    // only in club mode
-    const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-    if (mode !== 'club'){ enabled = false; return; }
+    bindInteractionOnce();
+    lastInteraction = now();
 
-    bindInteraction();
-    lastTouch = Date.now();
-
-    urls = await fetchList(courseId);
-    enabled = urls.length > 0;
-
-    if (enabled){
-      try{ const pre = new Image(); pre.src = urls[0]; }catch(_){}
+    if (isGuest(courseId)){
+      setGuestUrls();
+      startIdleLoop();
+      return;
     }
+
+    // Club mode
+    urls = loadCachedUrls(courseId);
+    if (urls.length) prefetchImages(urls);
+
+    await refreshClub(courseId);
 
     startIdleLoop();
 
     if (refreshTimer) clearInterval(refreshTimer);
-    refreshTimer = setInterval(async ()=>{
-      const m = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-      if (m !== 'club') return;
-      const latest = await fetchList(courseId);
-      urls = latest;
-      enabled = urls.length > 0;
-      if (!enabled) hide();
-    }, 120000);
+    refreshTimer = setInterval(()=>refreshClub(courseId), REFRESH_MS);
+
+    // Also refresh whenever device comes back online
+    window.addEventListener('online', ()=>refreshClub(courseId), { passive:true });
   }
 
-  // Open ads manager shortcut (club only) — no UI changes
-  window.addEventListener('keydown', (e)=>{
-    if ((e.key||'').toLowerCase() !== 'a') return;
-    try{
-      const courseId = window.state?.course?.course?.id || window.state?.meta?.id;
-      if (!courseId) return;
-      const mode = (localStorage.getItem(`mode_${courseId}`)||'').trim();
-      if (mode !== 'club') return;
-      const pin = (localStorage.getItem(`pin_${courseId}`)||'').trim();
-      location.href = `ad-manager.html?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`;
-    }catch(_){}
-  });
-
-  // APPEND-ONLY HOOK: poll for a loaded courseId without touching existing code
+  // Start when the app has chosen a course
   const poll = setInterval(()=>{
     try{
-      const courseId = window.state?.course?.course?.id || window.state?.meta?.id;
+      // state is a global const in gps.html
+      const courseId =
+        (typeof state !== 'undefined' && state && state.meta && state.meta.id) ? state.meta.id :
+        (typeof q === 'function' ? (q('course')||'').trim() : '');
+
       if (courseId){
         clearInterval(poll);
         start(courseId);
       }
     }catch(_){}
-  }, 500);
+  }, POLL_MS);
 
 })();
 </script>
