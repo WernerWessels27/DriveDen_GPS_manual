@@ -1776,51 +1776,138 @@ const RULES = {
 
 <script id="adsScript">
 /*
-  Ads overlay (club + guest):
-  - Club mode: fetch list from /api/ads/list?course=<id>&pin=<pin>, fallback to /ads/<id>/ads.json
-  - Guest mode: show /guest-splash.png only
-  - Offline-friendly: keep last known list in localStorage and prefetch images when online
-  - Shows after 5 minutes idle, rotates every 10 seconds, tap anywhere to dismiss
+  Ads overlay (club + guest) — DriveDen GPS
+  Goals:
+  - Club mode (PIN login): show club-specific ads after 5 min idle, rotate every 10s
+  - Guest mode: show DriveDen splash image after 5 min idle
+  - Offline-first: use cached list in localStorage; refresh when online; SW caches ads.json + images
+  Notes:
+  - We use the COURSE SHORTCODE for ads storage (/ads/<shortCode>/...), falling back to course id if no shortcode.
+  - We intentionally do NOT depend on DevTools Network tab; requests may be served by the Service Worker.
 */
 (function(){
-  const ADS_IDLE_MS  = 5 * 60 * 1000;
-  const ADS_SLIDE_MS = 10 * 1000;
-  const REFRESH_MS   = 2 * 60 * 1000;
-  const POLL_MS      = 400;
+  const ADS_IDLE_MS  = 5 * 60 * 1000;  // 5 minutes
+  const ADS_SLIDE_MS = 10 * 1000;      // 10 seconds
+  const POLL_MS      = 500;
+  const REFRESH_MS   = 60 * 60 * 1000; // 1 hour while online (lightweight)
 
+  let idleTimer = null;
+  let slideTimer = null;
+  let refreshTimer = null;
   let lastInteraction = Date.now();
   let urls = [];
   let idx = 0;
-  let slideTimer = null;
-  let idleTimer = null;
-  let refreshTimer = null;
-  let startedForCourse = null;
+  let startedForKey = null;
 
-  const overlay = () => document.getElementById('adsOverlay');
-  const imgEl   = () => document.getElementById('adsImg');
-
-  function now(){ return Date.now(); }
-
-  function dismiss(){
-    const ov = overlay();
-    if (ov) ov.style.display = 'none';
-    if (slideTimer){ clearInterval(slideTimer); slideTimer = null; }
-  }
+  const now = ()=>Date.now();
 
   function markInteraction(){
     lastInteraction = now();
     dismiss();
   }
 
+  function overlay(){
+    return document.getElementById('adsOverlay');
+  }
+  function imgEl(){
+    return document.getElementById('adsImage');
+  }
+
+  function ensureOverlay(){
+    let ov = overlay();
+    if (ov) return ov;
+
+    ov = document.createElement('div');
+    ov.id = 'adsOverlay';
+    ov.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'background:rgba(0,0,0,0.78)',
+      'display:none',
+      'align-items:center',
+      'justify-content:center',
+      'z-index:999999',
+      'touch-action:manipulation'
+    ].join(';');
+
+    const img = document.createElement('img');
+    img.id = 'adsImage';
+    img.alt = 'advertisement';
+    img.style.cssText = [
+      'max-width:100%',
+      'max-height:100%',
+      'object-fit:contain',
+      'image-rendering:auto'
+    ].join(';');
+
+    // If an image is broken (404/offline), skip to next. If all broken, dismiss.
+    img.addEventListener('error', ()=>{
+      if (!urls.length) { dismiss(); return; }
+      // try next image quickly
+      const start = idx;
+      let tries = 0;
+      const step = ()=>{
+        tries++;
+        idx = (idx + 1) % urls.length;
+        img.src = urls[idx];
+        if (idx === start || tries > urls.length + 2){
+          // everything failed
+          dismiss();
+          markInteraction();
+        }
+      };
+      setTimeout(step, 250);
+    });
+
+    ov.appendChild(img);
+    document.body.appendChild(ov);
+
+    // click/tap anywhere closes
+    ov.addEventListener('click', markInteraction, { passive:true });
+
+    return ov;
+  }
+
   function bindInteractionOnce(){
     if (bindInteractionOnce._done) return;
     bindInteractionOnce._done = true;
     const opts = { passive:true, capture:true };
+
+    // IMPORTANT: On desktop, mousemove will constantly reset idle.
+    // That's fine for tablets (no mouse). Keep it, but you can remove 'mousemove' if you want desktop testing easier.
     ['pointerdown','touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
       window.addEventListener(ev, markInteraction, opts);
     });
-    const ov = overlay();
-    if (ov) ov.addEventListener('click', markInteraction, { passive:true });
+
+    ensureOverlay();
+  }
+
+  // Determine mode/pin based on the EXISTING login system
+  function getCourseMeta(){
+    try{
+      if (typeof state !== 'undefined' && state && state.meta) return state.meta;
+    }catch(_){}
+    return null;
+  }
+
+  function getCourseIdFromUrl(){
+    try{
+      if (typeof q === 'function') return (q('course')||'').trim();
+    }catch(_){}
+    return '';
+  }
+
+  function courseAdsKey(meta){
+    // Prefer shortCode when present, because ads are stored under /ads/<shortCode>/
+    const sc = (meta && (meta.shortCode || meta.shortcode || meta.SHORTCODE || meta.short_code)) ? String(meta.shortCode || meta.shortcode || meta.SHORTCODE || meta.short_code).trim() : '';
+    const id = (meta && meta.id) ? String(meta.id).trim() : '';
+    return (sc || id || getCourseIdFromUrl()).trim();
+  }
+
+  function courseIdKey(meta){
+    // For localStorage keys, the app uses meta.id (courseId).
+    const id = (meta && meta.id) ? String(meta.id).trim() : '';
+    return (id || getCourseIdFromUrl()).trim();
   }
 
   function isGuest(courseId){
@@ -1829,6 +1916,11 @@ const RULES = {
 
   function getPin(courseId){
     return (localStorage.getItem(`pin_${courseId}`)||'').trim().toUpperCase();
+  }
+
+  function isClub(courseId){
+    const pin = getPin(courseId);
+    return pin && pin.length === 10 && !isGuest(courseId);
   }
 
   function cacheKey(courseId){ return `adsCache_${courseId}`; }
@@ -1851,10 +1943,12 @@ const RULES = {
     }catch(_){}
   }
 
-  async function fetchClubList(courseId){
+  async function fetchClubList(courseId, adsKey){
     const pin = getPin(courseId);
     if (!pin || pin.length !== 10) return [];
-    const api = `/api/ads/list?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}&ts=${now()}`;
+
+    // 1) API list (PIN-protected)
+    const api = `/api/ads/list?course=${encodeURIComponent(adsKey)}&pin=${encodeURIComponent(pin)}&ts=${now()}`;
     try{
       const res = await fetch(api, { cache:'no-store' });
       if (res.ok){
@@ -1863,8 +1957,9 @@ const RULES = {
         return arr.filter(Boolean);
       }
     }catch(_){}
-    // fallback to static
-    const fallback = `/ads/${encodeURIComponent(courseId)}/ads.json?ts=${now()}`;
+
+    // 2) Fallback to static list (public)
+    const fallback = `/ads/${encodeURIComponent(adsKey)}/ads.json?ts=${now()}`;
     try{
       const res = await fetch(fallback, { cache:'no-store' });
       if(!res.ok) return [];
@@ -1879,7 +1974,7 @@ const RULES = {
   function prefetchImages(arr){
     // Warm browser + SW cache (best-effort)
     try{
-      arr.slice(0, 24).forEach(u=>{
+      arr.slice(0, 30).forEach(u=>{
         const im = new Image();
         im.decoding = 'async';
         im.loading = 'eager';
@@ -1888,9 +1983,16 @@ const RULES = {
     }catch(_){}
   }
 
+  function dismiss(){
+    const ov = overlay();
+    if (!ov) return;
+    ov.style.display = 'none';
+    if (slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+  }
+
   function show(){
     if (!urls.length) return;
-    const ov = overlay();
+    const ov = ensureOverlay();
     const img = imgEl();
     if (!ov || !img) return;
 
@@ -1914,33 +2016,36 @@ const RULES = {
     }, 1000);
   }
 
-  async function refreshClub(courseId){
-    const latest = await fetchClubList(courseId);
+  async function refreshClub(courseId, adsKey){
+    const latest = await fetchClubList(courseId, adsKey);
     if (latest.length){
       urls = latest;
       saveCachedUrls(courseId, latest);
       prefetchImages(latest);
     }else{
-      // Keep cached list if we have one (offline or server down)
-      const cached = loadCachedUrls(courseId);
-      urls = cached;
+      urls = loadCachedUrls(courseId);
     }
     if (!urls.length) dismiss();
   }
 
   function setGuestUrls(){
-    urls = ['/guest-splash.png'];
+    // Support either location (root OR /images) so you don't get a broken icon
+    urls = ['/guest-splash.png', '/images/guest-splash.png'];
   }
 
-  async function start(courseId){
-    if (!courseId) return;
-    if (startedForCourse === courseId) return;
-    startedForCourse = courseId;
+  async function start(meta){
+    const courseId = courseIdKey(meta);
+    const adsKey = courseAdsKey(meta);
+
+    if (!courseId || !adsKey) return;
+    if (startedForKey === courseId) return;
+    startedForKey = courseId;
 
     bindInteractionOnce();
     lastInteraction = now();
 
-    if (isGuest(courseId)){
+    // Guest mode: only show splash (offline)
+    if (isGuest(courseId) || !isClub(courseId)){
       setGuestUrls();
       startIdleLoop();
       return;
@@ -1950,33 +2055,52 @@ const RULES = {
     urls = loadCachedUrls(courseId);
     if (urls.length) prefetchImages(urls);
 
-    await refreshClub(courseId);
+    await refreshClub(courseId, adsKey);
 
     startIdleLoop();
 
     if (refreshTimer) clearInterval(refreshTimer);
-    refreshTimer = setInterval(()=>refreshClub(courseId), REFRESH_MS);
+    refreshTimer = setInterval(()=>refreshClub(courseId, adsKey), REFRESH_MS);
 
-    // Also refresh whenever device comes back online
-    window.addEventListener('online', ()=>refreshClub(courseId), { passive:true });
+    window.addEventListener('online', ()=>refreshClub(courseId, adsKey), { passive:true });
   }
 
-  // Start when the app has chosen a course
+  // Debug helpers (optional)
+  window.__adsDebug = {
+    showNow: ()=>{ lastInteraction = now() - ADS_IDLE_MS - 1; show(); },
+    resetIdle: ()=>{ lastInteraction = now(); dismiss(); },
+    state: ()=>({
+      startedForKey,
+      lastInteraction,
+      urlsCount: urls.length,
+      idx,
+      meta: getCourseMeta(),
+      courseIdFromUrl: getCourseIdFromUrl()
+    })
+  };
+
+  // Start when course meta is available, fallback to URL course id
   const poll = setInterval(()=>{
     try{
-      // state is a global const in gps.html
-      const courseId =
-        (typeof state !== 'undefined' && state && state.meta && state.meta.id) ? state.meta.id :
-        (typeof q === 'function' ? (q('course')||'').trim() : '');
-
-      if (courseId){
+      const meta = getCourseMeta();
+      if (meta && (meta.id || meta.shortCode || meta.shortcode || meta.SHORTCODE)){
         clearInterval(poll);
-        start(courseId);
+        start(meta);
+        return;
+      }
+      // If meta isn't ready, but URL has course id, still start in guest splash mode (no club ads) as fallback.
+      const cid = getCourseIdFromUrl();
+      if (cid){
+        // Create a minimal meta for fallback
+        const fake = { id: cid, shortCode: cid };
+        clearInterval(poll);
+        start(fake);
       }
     }catch(_){}
   }, POLL_MS);
 
 })();
+
 </script>
 
 </body>
