@@ -1,11 +1,17 @@
-// TrackLinq GPS — Service Worker for offline support (offline-first + vendor precache)
-// Updated to precache local Leaflet + Rotate plugin for full offline mode.
+// DriveDen GPS — Service Worker (offline-first + smart ads caching)
+// v8: fixes cache key normalization + adds offline-friendly Ads strategy
+//
+// Goals:
+// - GPS stays fully offline-capable (app shell + vendor + courses)
+// - Club ads work offline (cache ads.json + images)
+// - Ads update automatically when online (stale-while-revalidate for ads.json)
+// - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
-const CACHE_PREFIX = 'tracklinq-';
-const CACHE_VERSION = 'v7';
+const CACHE_PREFIX = 'driveden-gps-';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
-// Build absolute URLs relative to the SW scope (works on GitHub Pages subpaths too)
+// Build absolute URLs relative to the SW scope (works on subpaths too)
 const SCOPE_URL = new URL(self.registration.scope);
 const withScope = (path) => new URL(path.replace(/^\//, ''), SCOPE_URL).toString();
 
@@ -22,6 +28,9 @@ const APP_SHELL = [
   'vendor/leaflet/leaflet.css',
   'vendor/leaflet/leaflet.js',
   'vendor/leaflet-rotate/leaflet-rotate.js',
+
+  // OPTIONAL: If you add a guest idle splash image, add it here too, e.g.:
+  // 'images/guest-idle.png',
 ];
 
 // Cache helper that won’t fail install if a file is missing (404) or temporarily unreachable
@@ -39,11 +48,16 @@ async function safePrecache(cache, paths) {
   await Promise.all(tasks);
 }
 
-
 // Normalize cache keys (ignore cache-busting params like ?ts=...)
+// Also strips typical "cache bust" params, but keeps meaningful ones.
 function normalizeUrlForCache(input) {
   const u = new URL(typeof input === 'string' ? input : input.url);
-  if (u.searchParams.has('ts')) u.searchParams.delete('ts');
+
+  // common cache-busters
+  ['ts', 't', 'v', '_'].forEach((k) => {
+    if (u.searchParams.has(k)) u.searchParams.delete(k);
+  });
+
   return u.toString();
 }
 
@@ -65,84 +79,139 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// Strategy:
+// Helpers
+async function cachePutNormalized(cache, req, res) {
+  const key = normalizeUrlForCache(req);
+  await cache.put(key, res.clone());
+}
+
+async function cacheMatchNormalized(cache, req) {
+  const key = normalizeUrlForCache(req);
+  return cache.match(key);
+}
+
+// Strategies:
 // - HTML navigations: network-first with offline fallback to cached gps.html
-// - JSON + images: stale-while-revalidate (fast + keeps fresh when online)
-// - CSS/JS/fonts: cache-first (since we want full offline)
+// - /api/ads/* (manager endpoints): network-only (do not cache)
+// - /ads/*/ads.json : stale-while-revalidate (offline works; refresh when online)
+// - /ads/* images: cache-first (offline works; refresh when online via versioned filenames)
+// - Other JSON/images: stale-while-revalidate
+// - CSS/JS/fonts: cache-first
 // - Everything else: cache-first, then network
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
   const isSameOrigin = url.origin === self.location.origin;
-
-  // Only handle same-origin requests; let cross-origin go to network
   if (!isSameOrigin) return;
 
   const pathname = url.pathname.toLowerCase();
-  const cacheKey = normalizeUrlForCache(req);
   const isHtmlNav = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
+
+  const isApiAds = pathname.startsWith('/api/ads/');
+  const isAdsJson = pathname.startsWith('/ads/') && pathname.endsWith('/ads.json');
+  const isAdsAsset = pathname.startsWith('/ads/') && !pathname.endsWith('/ads.json');
+
   const isJson = pathname.endsWith('.json');
   const isImage = req.destination === 'image' || /\.(png|jpg|jpeg|gif|webp|svg|ico)$/.test(pathname);
   const isStatic = req.destination === 'style' || req.destination === 'script' || /\.(css|js|mjs|woff2?|ttf|otf)$/.test(pathname);
 
-  // HTML pages: network first
+  // 1) HTML navigations: network-first
   if (isHtmlNav) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       try {
         const net = await fetch(req);
-        // Cache the latest HTML for offline
-        cache.put(cacheKey, net.clone());
+        if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
-        // Try exact match, then fall back to gps.html (app entry)
-        return (await cache.match(cacheKey)) || (await cache.match(withScope('gps.html')));
+        return (await cacheMatchNormalized(cache, req)) || (await cache.match(withScope('gps.html')));
       }
     })());
     return;
   }
 
-  // JSON / images: stale-while-revalidate
-  if (isJson || isImage) {
+  // 2) Ads Manager API: network-only (never cache)
+  if (isApiAds) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // 3) ads.json: stale-while-revalidate
+  if (isAdsJson) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(cacheKey);
+      const cached = await cacheMatchNormalized(cache, req);
 
-      const netPromise = fetch(req).then((res) => {
-        if (res && res.ok) cache.put(req.url, res.clone());
+      const netPromise = fetch(req).then(async (res) => {
+        if (res && res.ok) await cachePutNormalized(cache, req, res);
         return res;
       }).catch(() => null);
 
-      return cached || (await netPromise) || fetch(req);
+      return cached || (await netPromise) || new Response(JSON.stringify({ ads: [] }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     })());
     return;
   }
 
-  // CSS/JS/fonts and other static: cache-first
+  // 4) Ad images/assets: cache-first
+  if (isAdsAsset && isImage) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cacheMatchNormalized(cache, req);
+      if (cached) return cached;
+
+      try {
+        const net = await fetch(req);
+        if (net && net.ok) await cachePutNormalized(cache, req, net);
+        return net;
+      } catch {
+        return cached || new Response('', { status: 404 });
+      }
+    })());
+    return;
+  }
+
+  // 5) Other JSON/images: stale-while-revalidate
+  if (isJson || isImage) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cacheMatchNormalized(cache, req);
+
+      const netPromise = fetch(req).then(async (res) => {
+        if (res && res.ok) await cachePutNormalized(cache, req, res);
+        return res;
+      }).catch(() => null);
+
+      return cached || (await netPromise) || new Response('', { status: 504 });
+    })());
+    return;
+  }
+
+  // 6) CSS/JS/fonts: cache-first
   if (isStatic) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(cacheKey);
+      const cached = await cacheMatchNormalized(cache, req);
       if (cached) return cached;
 
       const net = await fetch(req);
-      if (net && net.ok) cache.put(cacheKey, net.clone());
+      if (net && net.ok) await cachePutNormalized(cache, req, net);
       return net;
     })());
     return;
   }
 
-  // Default: cache-first, then network
+  // 7) Default: cache-first, then network
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(cacheKey);
+    const cached = await cacheMatchNormalized(cache, req);
     if (cached) return cached;
 
     const net = await fetch(req);
-    if (net && net.ok) cache.put(cacheKey, net.clone());
+    if (net && net.ok) await cachePutNormalized(cache, req, net);
     return net;
   })());
 });
