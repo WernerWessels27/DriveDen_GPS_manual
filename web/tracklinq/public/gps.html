@@ -1775,193 +1775,78 @@ const RULES = {
 
 
 <script id="adsScript">
-/*
-  Ads overlay (club + guest) — DriveDen GPS
-  Goals:
-  - Club mode (PIN login): show club-specific ads after 5 min idle, rotate every 10s
-  - Guest mode: show DriveDen splash image after 5 min idle
-  - Offline-first: use cached list in localStorage; refresh when online; SW caches ads.json + images
-  Notes:
-  - We use the COURSE SHORTCODE for ads storage (/ads/<shortCode>/...), falling back to course id if no shortcode.
-  - We intentionally do NOT depend on DevTools Network tab; requests may be served by the Service Worker.
-*/
 (function(){
-  const ADS_IDLE_MS  = 5 * 60 * 1000;  // 5 minutes
-  const ADS_SLIDE_MS = 10 * 1000;      // 10 seconds
-  const POLL_MS      = 500;
-  const REFRESH_MS   = 60 * 60 * 1000; // 1 hour while online (lightweight)
+  const ADS_IDLE_MS = 5 * 60 * 1000;
+  const ADS_SLIDE_MS = 10 * 1000;
 
-  let idleTimer = null;
-  let slideTimer = null;
-  let refreshTimer = null;
-  let lastInteraction = Date.now();
+  let lastTouch = Date.now();
+  let enabled = false;
   let urls = [];
   let idx = 0;
+  let slideTimer = null;
+  let idleTimer = null;
+  let refreshTimer = null;
   let startedForKey = null;
+  let metaSnapshot = null;
 
-  const now = ()=>Date.now();
+  function now(){ return Date.now(); }
+  function q(name){ return new URL(location.href).searchParams.get(name); }
+  function norm(v){ return String(v || '').trim(); }
 
   function markInteraction(){
-    lastInteraction = now();
+    lastTouch = now();
     dismiss();
   }
 
-  function overlay(){
-    return document.getElementById('adsOverlay');
-  }
-  function imgEl(){
-    return document.getElementById('adsImage');
-  }
-
-  function ensureOverlay(){
-    let ov = overlay();
-    if (ov) return ov;
-
-    ov = document.createElement('div');
-    ov.id = 'adsOverlay';
-    ov.style.cssText = [
-      'position:fixed',
-      'inset:0',
-      'background:rgba(0,0,0,0.78)',
-      'display:none',
-      'align-items:center',
-      'justify-content:center',
-      'z-index:999999',
-      'touch-action:manipulation'
-    ].join(';');
-
-    const img = document.createElement('img');
-    img.id = 'adsImage';
-    img.alt = 'advertisement';
-    img.style.cssText = [
-      'max-width:100%',
-      'max-height:100%',
-      'object-fit:contain',
-      'image-rendering:auto'
-    ].join(';');
-
-    // If an image is broken (404/offline), skip to next. If all broken, dismiss.
-    img.addEventListener('error', ()=>{
-      if (!urls.length) { dismiss(); return; }
-      // try next image quickly
-      const start = idx;
-      let tries = 0;
-      const step = ()=>{
-        tries++;
-        idx = (idx + 1) % urls.length;
-        img.src = urls[idx];
-        if (idx === start || tries > urls.length + 2){
-          // everything failed
-          dismiss();
-          markInteraction();
-        }
-      };
-      setTimeout(step, 250);
-    });
-
-    ov.appendChild(img);
-    document.body.appendChild(ov);
-
-    // click/tap anywhere closes
-    ov.addEventListener('click', markInteraction, { passive:true });
-
-    return ov;
-  }
-
-  function bindInteractionOnce(){
-    if (bindInteractionOnce._done) return;
-    bindInteractionOnce._done = true;
-    const opts = { passive:true, capture:true };
-
-    // IMPORTANT: On desktop, mousemove will constantly reset idle.
-    // That's fine for tablets (no mouse). Keep it, but you can remove 'mousemove' if you want desktop testing easier.
-    ['pointerdown','touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
+  function bindInteraction(){
+    const opts = { passive:true };
+    ['touchstart','mousedown','mousemove','keydown','wheel'].forEach(ev=>{
       window.addEventListener(ev, markInteraction, opts);
     });
-
-    ensureOverlay();
+    const ov = document.getElementById('adsOverlay');
+    if (ov) ov.addEventListener('click', markInteraction, opts);
   }
 
-  // Determine mode/pin based on the EXISTING login system
-  function getCourseMeta(){
-    try{
-      if (typeof state !== 'undefined' && state && state.meta) return state.meta;
-    }catch(_){}
-    return null;
+  function getMeta(){
+    const meta = window.state?.course?.course || window.state?.meta || null;
+    if (!meta) return null;
+    return {
+      id: norm(meta.id),
+      name: norm(meta.name),
+      short_code: norm(meta.short_code || meta.shortCode || meta.shortcode || meta.SHORTCODE)
+    };
   }
 
   function getCourseIdFromUrl(){
+    return norm(q('course'));
+  }
+
+  function getModeKey(courseId){
+    return `mode_${courseId}`;
+  }
+
+  function isGuest(meta){
+    if (norm(q('guest')) === '1') return true;
+    const courseId = meta?.id || getCourseIdFromUrl();
+    if (!courseId) return false;
+    return norm(localStorage.getItem(getModeKey(courseId))) === 'guest';
+  }
+
+  function isClub(meta){
+    const courseId = meta?.id || getCourseIdFromUrl();
+    if (!courseId) return false;
+    return norm(localStorage.getItem(getModeKey(courseId))) === 'club';
+  }
+
+  function getAdsKey(meta){
+    return norm(meta?.short_code || meta?.id || getCourseIdFromUrl());
+  }
+
+  async function fetchClubAds(adsKey){
+    if (!adsKey) return [];
+    const url = `/ads/${encodeURIComponent(adsKey)}/ads.json?ts=${now()}`;
     try{
-      if (typeof q === 'function') return (q('course')||'').trim();
-    }catch(_){}
-    return '';
-  }
-
-  function courseAdsKey(meta){
-    // Prefer shortCode when present, because ads are stored under /ads/<shortCode>/
-    const sc = (meta && (meta.shortCode || meta.shortcode || meta.SHORTCODE || meta.short_code)) ? String(meta.shortCode || meta.shortcode || meta.SHORTCODE || meta.short_code).trim() : '';
-    const id = (meta && meta.id) ? String(meta.id).trim() : '';
-    return (sc || id || getCourseIdFromUrl()).trim();
-  }
-
-  function courseIdKey(meta){
-    // For localStorage keys, the app uses meta.id (courseId).
-    const id = (meta && meta.id) ? String(meta.id).trim() : '';
-    return (id || getCourseIdFromUrl()).trim();
-  }
-
-  function isGuest(courseId){
-    return ((localStorage.getItem(`mode_${courseId}`)||'').trim()) === 'guest';
-  }
-
-  function getPin(courseId){
-    return (localStorage.getItem(`pin_${courseId}`)||'').trim().toUpperCase();
-  }
-
-  function isClub(courseId){
-    const pin = getPin(courseId);
-    return pin && pin.length === 10 && !isGuest(courseId);
-  }
-
-  function cacheKey(courseId){ return `adsCache_${courseId}`; }
-
-  function loadCachedUrls(courseId){
-    try{
-      const raw = localStorage.getItem(cacheKey(courseId));
-      if (!raw) return [];
-      const j = JSON.parse(raw);
-      const arr = Array.isArray(j.urls) ? j.urls : [];
-      return arr.filter(Boolean);
-    }catch(_){
-      return [];
-    }
-  }
-
-  function saveCachedUrls(courseId, arr){
-    try{
-      localStorage.setItem(cacheKey(courseId), JSON.stringify({ updatedAt: now(), urls: arr }));
-    }catch(_){}
-  }
-
-  async function fetchClubList(courseId, adsKey){
-    const pin = getPin(courseId);
-    if (!pin || pin.length !== 10) return [];
-
-    // 1) API list (PIN-protected)
-    const api = `/api/ads/list?course=${encodeURIComponent(adsKey)}&pin=${encodeURIComponent(pin)}&ts=${now()}`;
-    try{
-      const res = await fetch(api, { cache:'no-store' });
-      if (res.ok){
-        const j = await res.json();
-        const arr = Array.isArray(j.ads) ? j.ads : [];
-        return arr.filter(Boolean);
-      }
-    }catch(_){}
-
-    // 2) Fallback to static list (public)
-    const fallback = `/ads/${encodeURIComponent(adsKey)}/ads.json?ts=${now()}`;
-    try{
-      const res = await fetch(fallback, { cache:'no-store' });
+      const res = await fetch(url, { cache:'no-store' });
       if(!res.ok) return [];
       const j = await res.json();
       const arr = Array.isArray(j.ads) ? j.ads : [];
@@ -1971,136 +1856,196 @@ const RULES = {
     }
   }
 
-  function prefetchImages(arr){
-    // Warm browser + SW cache (best-effort)
+  async function fetchGuestSplashUrls(){
+    const candidates = ['/images/guest-splash.png', '/guest-splash.png'];
+    const ok = [];
+    for (const u of candidates){
+      try{
+        const res = await fetch(u, { cache:'no-store' });
+        if (res && res.ok) ok.push(u);
+      }catch(_){}
+    }
+    return ok;
+  }
+
+  function persistUrls(key, list){
     try{
-      arr.slice(0, 30).forEach(u=>{
-        const im = new Image();
-        im.decoding = 'async';
-        im.loading = 'eager';
-        im.src = u + (u.includes('?') ? '&' : '?') + 'pref=' + now();
-      });
+      localStorage.setItem(`ads_urls_${key}`, JSON.stringify(list || []));
     }catch(_){}
   }
 
-  function dismiss(){
-    const ov = overlay();
-    if (!ov) return;
-    ov.style.display = 'none';
-    if (slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+  function restoreUrls(key){
+    try{
+      const raw = localStorage.getItem(`ads_urls_${key}`) || '[]';
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.filter(Boolean) : [];
+    }catch(_){
+      return [];
+    }
+  }
+
+  function prefetchImages(list){
+    (list || []).forEach((u)=>{
+      try{
+        const img = new Image();
+        img.src = u;
+      }catch(_){}
+    });
+  }
+
+  function setImageWithFallback(imgEl, startIndex){
+    if (!imgEl || !urls.length) return false;
+
+    let tries = 0;
+    let current = startIndex % urls.length;
+
+    const apply = () => {
+      imgEl.onerror = () => {
+        tries += 1;
+        if (tries >= urls.length){
+          dismiss();
+          return;
+        }
+        current = (current + 1) % urls.length;
+        idx = current;
+        imgEl.src = urls[current];
+      };
+      imgEl.src = urls[current];
+    };
+
+    apply();
+    return true;
   }
 
   function show(){
-    if (!urls.length) return;
-    const ov = ensureOverlay();
-    const img = imgEl();
+    if (!enabled || !urls.length) return;
+    const ov = document.getElementById('adsOverlay');
+    const img = document.getElementById('adsImg');
     if (!ov || !img) return;
 
     ov.style.display = 'flex';
     idx = idx % urls.length;
-    img.src = urls[idx];
+    setImageWithFallback(img, idx);
 
     if (slideTimer) clearInterval(slideTimer);
     slideTimer = setInterval(()=>{
       if (ov.style.display === 'none') return;
       idx = (idx + 1) % urls.length;
-      img.src = urls[idx];
+      setImageWithFallback(img, idx);
     }, ADS_SLIDE_MS);
+  }
+
+  function dismiss(){
+    const ov = document.getElementById('adsOverlay');
+    if (ov) ov.style.display = 'none';
+    if (slideTimer){
+      clearInterval(slideTimer);
+      slideTimer = null;
+    }
   }
 
   function startIdleLoop(){
     if (idleTimer) clearInterval(idleTimer);
     idleTimer = setInterval(()=>{
-      if (!urls.length) return;
-      if (now() - lastInteraction >= ADS_IDLE_MS) show();
-    }, 1000);
+      if (!enabled || !urls.length) return;
+      if (now() - lastTouch >= ADS_IDLE_MS) show();
+    }, 2000);
   }
 
-  async function refreshClub(courseId, adsKey){
-    const latest = await fetchClubList(courseId, adsKey);
-    if (latest.length){
-      urls = latest;
-      saveCachedUrls(courseId, latest);
-      prefetchImages(latest);
-    }else{
-      urls = loadCachedUrls(courseId);
-    }
-    if (!urls.length) dismiss();
-  }
+  async function refreshUrls(meta){
+    const adsKey = getAdsKey(meta);
+    let latest = [];
 
-  function setGuestUrls(){
-    // Support either location (root OR /images) so you don't get a broken icon
-    urls = ['/guest-splash.png', '/images/guest-splash.png'];
-  }
-
-  async function start(meta){
-    const courseId = courseIdKey(meta);
-    const adsKey = courseAdsKey(meta);
-
-    if (!courseId || !adsKey) return;
-    if (startedForKey === courseId) return;
-    startedForKey = courseId;
-
-    bindInteractionOnce();
-    lastInteraction = now();
-
-    // Guest mode: only show splash (offline)
-    if (isGuest(courseId) || !isClub(courseId)){
-      setGuestUrls();
-      startIdleLoop();
+    if (isGuest(meta)){
+      latest = await fetchGuestSplashUrls();
+      if (!latest.length){
+        latest = ['/images/guest-splash.png', '/guest-splash.png'];
+      }
+      startedForKey = 'guest';
+      metaSnapshot = meta || { id:getCourseIdFromUrl(), short_code:'', name:'Guest' };
+    } else if (isClub(meta)){
+      latest = await fetchClubAds(adsKey);
+      if (!latest.length){
+        latest = restoreUrls(adsKey);
+      }
+      startedForKey = adsKey;
+      metaSnapshot = meta;
+    } else {
+      enabled = false;
+      urls = [];
+      dismiss();
       return;
     }
 
-    // Club mode
-    urls = loadCachedUrls(courseId);
-    if (urls.length) prefetchImages(urls);
+    urls = (latest || []).filter(Boolean);
+    enabled = urls.length > 0;
 
-    await refreshClub(courseId, adsKey);
+    if (enabled){
+      const persistKey = startedForKey === 'guest' ? 'guest' : adsKey;
+      persistUrls(persistKey, urls);
+      prefetchImages(urls);
+    } else {
+      dismiss();
+    }
+  }
 
+  async function start(meta){
+    const key = isGuest(meta) ? 'guest' : getAdsKey(meta);
+    if (!key) return;
+
+    bindInteraction();
+    lastTouch = now();
+
+    await refreshUrls(meta);
     startIdleLoop();
 
     if (refreshTimer) clearInterval(refreshTimer);
-    refreshTimer = setInterval(()=>refreshClub(courseId, adsKey), REFRESH_MS);
+    refreshTimer = setInterval(async ()=>{
+      await refreshUrls(getMeta() || meta);
+    }, 120000);
 
-    window.addEventListener('online', ()=>refreshClub(courseId, adsKey), { passive:true });
+    window.addEventListener('online', async ()=>{
+      await refreshUrls(getMeta() || meta);
+    });
   }
 
-  // Debug helpers (optional)
+  // Open ads manager shortcut (club only)
+  window.addEventListener('keydown', (e)=>{
+    if ((e.key||'').toLowerCase() !== 'a') return;
+    try{
+      const meta = getMeta();
+      if (!isClub(meta)) return;
+      const courseId = meta?.id || getCourseIdFromUrl();
+      const pin = norm(localStorage.getItem(`pin_${courseId}`));
+      location.href = `ad-manager.html?course=${encodeURIComponent(courseId)}&pin=${encodeURIComponent(pin)}`;
+    }catch(_){}
+  });
+
+  // Start when course metadata is available; for guest we can still start with URL course.
+  const poll = setInterval(async ()=>{
+    try{
+      const meta = getMeta();
+      const courseFromUrl = getCourseIdFromUrl();
+      if (meta || courseFromUrl){
+        clearInterval(poll);
+        await start(meta || { id: courseFromUrl, name: '', short_code: '' });
+      }
+    }catch(_){}
+  }, 500);
+
   window.__adsDebug = {
-    showNow: ()=>{ lastInteraction = now() - ADS_IDLE_MS - 1; show(); },
-    resetIdle: ()=>{ lastInteraction = now(); dismiss(); },
+    showNow: ()=>{ lastTouch = now() - ADS_IDLE_MS - 1; show(); },
+    resetIdle: ()=>{ lastTouch = now(); dismiss(); },
     state: ()=>({
       startedForKey,
-      lastInteraction,
+      lastInteraction: lastTouch,
       urlsCount: urls.length,
-      idx,
-      meta: getCourseMeta(),
+      urls: urls.slice(),
+      meta: metaSnapshot,
       courseIdFromUrl: getCourseIdFromUrl()
     })
   };
-
-  // Start when course meta is available, fallback to URL course id
-  const poll = setInterval(()=>{
-    try{
-      const meta = getCourseMeta();
-      if (meta && (meta.id || meta.shortCode || meta.shortcode || meta.SHORTCODE)){
-        clearInterval(poll);
-        start(meta);
-        return;
-      }
-      // If meta isn't ready, but URL has course id, still start in guest splash mode (no club ads) as fallback.
-      const cid = getCourseIdFromUrl();
-      if (cid){
-        // Create a minimal meta for fallback
-        const fake = { id: cid, shortCode: cid };
-        clearInterval(poll);
-        start(fake);
-      }
-    }catch(_){}
-  }, POLL_MS);
-
 })();
-
 </script>
 
 </body>
