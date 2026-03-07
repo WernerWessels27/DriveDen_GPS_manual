@@ -1788,10 +1788,12 @@ const RULES = {
   let refreshTimer = null;
   let startedForKey = null;
   let metaSnapshot = null;
+  let coursesIndexCache = null;
 
   function now(){ return Date.now(); }
   function q(name){ return new URL(location.href).searchParams.get(name); }
   function norm(v){ return String(v || '').trim(); }
+  function safeId(v){ return String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g,''); }
 
   function markInteraction(){
     lastTouch = now();
@@ -1821,6 +1823,33 @@ const RULES = {
     return norm(q('course'));
   }
 
+  async function getCoursesIndex(){
+    if (coursesIndexCache) return coursesIndexCache;
+    try{
+      const res = await fetch('/courses/index.json', { cache:'reload' });
+      if (!res.ok) throw new Error('index');
+      const j = await res.json();
+      coursesIndexCache = Array.isArray(j.courses) ? j.courses : [];
+    }catch(_){
+      coursesIndexCache = [];
+    }
+    return coursesIndexCache;
+  }
+
+  async function resolveShortCode(meta){
+    const direct = norm(meta?.short_code || meta?.shortCode || meta?.shortcode || meta?.SHORTCODE);
+    if (direct) return safeId(direct);
+
+    const courseId = norm(meta?.id || getCourseIdFromUrl());
+    if (!courseId) return '';
+
+    const courses = await getCoursesIndex();
+    const hit = courses.find(c => norm(c.id).toLowerCase() === courseId.toLowerCase());
+    if (!hit) return safeId(courseId);
+
+    return safeId(hit.short_code || hit.shortCode || hit.shortcode || hit.SHORTCODE || hit.id || courseId);
+  }
+
   function getModeKey(courseId){
     return `mode_${courseId}`;
   }
@@ -1836,10 +1865,6 @@ const RULES = {
     const courseId = meta?.id || getCourseIdFromUrl();
     if (!courseId) return false;
     return norm(localStorage.getItem(getModeKey(courseId))) === 'club';
-  }
-
-  function getAdsKey(meta){
-    return norm(meta?.short_code || meta?.id || getCourseIdFromUrl());
   }
 
   async function fetchClubAds(adsKey){
@@ -1953,23 +1978,27 @@ const RULES = {
   }
 
   async function refreshUrls(meta){
-    const adsKey = getAdsKey(meta);
     let latest = [];
+    let persistKey = '';
 
     if (isGuest(meta)){
       latest = await fetchGuestSplashUrls();
       if (!latest.length){
-        latest = ['/images/guest-splash.png', '/guest-splash.png'];
+        latest = restoreUrls('guest');
+        if (!latest.length) latest = ['/images/guest-splash.png', '/guest-splash.png'];
       }
       startedForKey = 'guest';
+      persistKey = 'guest';
       metaSnapshot = meta || { id:getCourseIdFromUrl(), short_code:'', name:'Guest' };
     } else if (isClub(meta)){
+      const adsKey = await resolveShortCode(meta);
       latest = await fetchClubAds(adsKey);
       if (!latest.length){
         latest = restoreUrls(adsKey);
       }
       startedForKey = adsKey;
-      metaSnapshot = meta;
+      persistKey = adsKey;
+      metaSnapshot = { ...(meta || {}), short_code: adsKey };
     } else {
       enabled = false;
       urls = [];
@@ -1981,7 +2010,6 @@ const RULES = {
     enabled = urls.length > 0;
 
     if (enabled){
-      const persistKey = startedForKey === 'guest' ? 'guest' : adsKey;
       persistUrls(persistKey, urls);
       prefetchImages(urls);
     } else {
@@ -1990,9 +2018,6 @@ const RULES = {
   }
 
   async function start(meta){
-    const key = isGuest(meta) ? 'guest' : getAdsKey(meta);
-    if (!key) return;
-
     bindInteraction();
     lastTouch = now();
 
@@ -2009,7 +2034,6 @@ const RULES = {
     });
   }
 
-  // Open ads manager shortcut (club only)
   window.addEventListener('keydown', (e)=>{
     if ((e.key||'').toLowerCase() !== 'a') return;
     try{
@@ -2021,7 +2045,6 @@ const RULES = {
     }catch(_){}
   });
 
-  // Start when course metadata is available; for guest we can still start with URL course.
   const poll = setInterval(async ()=>{
     try{
       const meta = getMeta();
