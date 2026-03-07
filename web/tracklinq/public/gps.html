@@ -1918,46 +1918,53 @@ const RULES = {
     });
   }
 
-  function setImageWithFallback(imgEl, startIndex){
-    if (!imgEl || !urls.length) return false;
+  function renderAt(currentIndex){
+    const ov = document.getElementById('adsOverlay');
+    const img = document.getElementById('adsImg');
+    if (!ov || !img || !urls.length) return false;
 
     let tries = 0;
-    let current = startIndex % urls.length;
+    let n = ((currentIndex % urls.length) + urls.length) % urls.length;
 
-    const apply = () => {
-      imgEl.onerror = () => {
-        tries += 1;
-        if (tries >= urls.length){
-          dismiss();
-          return;
-        }
-        current = (current + 1) % urls.length;
-        idx = current;
-        imgEl.src = urls[current];
-      };
-      imgEl.src = urls[current];
+    img.onerror = () => {
+      tries += 1;
+      if (tries >= urls.length){
+        dismiss();
+        return;
+      }
+      n = (n + 1) % urls.length;
+      idx = n;
+      img.src = urls[n];
     };
 
-    apply();
+    img.src = urls[n];
     return true;
+  }
+
+  function startSlider(){
+    if (slideTimer){
+      clearInterval(slideTimer);
+      slideTimer = null;
+    }
+    if (!enabled || urls.length <= 1) return;
+
+    slideTimer = setInterval(()=>{
+      const ov = document.getElementById('adsOverlay');
+      if (!ov || ov.style.display === 'none') return;
+      idx = (idx + 1) % urls.length;
+      renderAt(idx);
+    }, ADS_SLIDE_MS);
   }
 
   function show(){
     if (!enabled || !urls.length) return;
     const ov = document.getElementById('adsOverlay');
-    const img = document.getElementById('adsImg');
-    if (!ov || !img) return;
+    if (!ov) return;
 
     ov.style.display = 'flex';
-    idx = idx % urls.length;
-    setImageWithFallback(img, idx);
-
-    if (slideTimer) clearInterval(slideTimer);
-    slideTimer = setInterval(()=>{
-      if (ov.style.display === 'none') return;
-      idx = (idx + 1) % urls.length;
-      setImageWithFallback(img, idx);
-    }, ADS_SLIDE_MS);
+    idx = ((idx % urls.length) + urls.length) % urls.length;
+    renderAt(idx);
+    startSlider();
   }
 
   function dismiss(){
@@ -1993,9 +2000,7 @@ const RULES = {
     } else if (isClub(meta)){
       const adsKey = await resolveShortCode(meta);
       latest = await fetchClubAds(adsKey);
-      if (!latest.length){
-        latest = restoreUrls(adsKey);
-      }
+      if (!latest.length) latest = restoreUrls(adsKey);
       startedForKey = adsKey;
       persistKey = adsKey;
       metaSnapshot = { ...(meta || {}), short_code: adsKey };
@@ -2006,12 +2011,22 @@ const RULES = {
       return;
     }
 
-    urls = (latest || []).filter(Boolean);
+    const nextUrls = (latest || []).filter(Boolean);
+    const changed = JSON.stringify(nextUrls) !== JSON.stringify(urls);
+    urls = nextUrls;
     enabled = urls.length > 0;
 
     if (enabled){
       persistUrls(persistKey, urls);
       prefetchImages(urls);
+      if (idx >= urls.length) idx = 0;
+      if (changed){
+        const ov = document.getElementById('adsOverlay');
+        if (ov && ov.style.display !== 'none'){
+          renderAt(idx);
+          startSlider();
+        }
+      }
     } else {
       dismiss();
     }
@@ -2059,11 +2074,14 @@ const RULES = {
   window.__adsDebug = {
     showNow: ()=>{ lastTouch = now() - ADS_IDLE_MS - 1; show(); },
     resetIdle: ()=>{ lastTouch = now(); dismiss(); },
+    next: ()=>{ if (!urls.length) return; idx = (idx + 1) % urls.length; renderAt(idx); startSlider(); },
     state: ()=>({
       startedForKey,
       lastInteraction: lastTouch,
       urlsCount: urls.length,
       urls: urls.slice(),
+      currentIndex: idx,
+      hasSlideTimer: !!slideTimer,
       meta: metaSnapshot,
       courseIdFromUrl: getCourseIdFromUrl()
     })
