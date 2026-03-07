@@ -1980,7 +1980,9 @@ const RULES = {
     if (idleTimer) clearInterval(idleTimer);
     idleTimer = setInterval(()=>{
       if (!enabled || !urls.length) return;
-      if (now() - lastTouch >= ADS_IDLE_MS) show();
+      const ov = document.getElementById('adsOverlay');
+      const isVisible = !!ov && ov.style.display !== 'none';
+      if (!isVisible && (now() - lastTouch >= ADS_IDLE_MS)) show();
     }, 2000);
   }
 
