@@ -3,46 +3,192 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>TrackLinq — Login</title>
+  <title>DriveDen GPS — Login</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <style>
     :root {
-      --green:#16a34a; --green-d:#0f6b31;
-      --bg:#f7faf7; --card:#ffffff; --text:#0f172a; --muted:#4b5563; --border:#e5e7eb;
+      --green:#16a34a;
+      --green-d:#0f6b31;
+      --bg:#f7faf7;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#4b5563;
+      --border:#e5e7eb;
     }
-    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica Neue,Arial;color:var(--text);background:var(--bg);}
-    .wrap{min-height:100%;display:grid;place-items:center;padding:24px;}
-    .card{width:100%;max-width:640px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,.06);}
-    h1{margin:0 0 10px;font-size:22px;}
-    p{margin:4px 0 16px;color:var(--muted);}
-    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
-    .tab{cursor:pointer;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#fff;text-align:center;font-weight:700;}
-    .tab.active{background:var(--green);color:#fff;border-color:var(--green);}
-    .group{margin:12px 0;}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
-    input,select{width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--text);}
-    .row{display:grid;grid-template-columns:1fr auto;gap:8px;}
-    .btn{cursor:pointer;padding:12px 14px;border-radius:12px;border:1px solid var(--green);background:var(--green);color:#fff;font-weight:800;}
-    .btn.secondary{background:#fff;color:var(--green);}
-    .muted{color:var(--muted);font-size:12px;}
-    .hidden{display:none;}
-    .foot{margin-top:10px;display:flex;justify-content:space-between;align-items:center;}
-    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;}
-    .on{background:#16a34a}.off{background:#b91c1c}
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica Neue,Arial;
+      color:var(--text);
+      background:var(--bg);
+    }
+
+    .wrap{
+      min-height:100%;
+      display:grid;
+      place-items:center;
+      padding:24px;
+    }
+
+    .card{
+      width:100%;
+      max-width:640px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:20px;
+      box-shadow:0 8px 24px rgba(0,0,0,.06);
+    }
+
+    h1{
+      margin:0 0 10px;
+      font-size:22px;
+    }
+
+    p{
+      margin:4px 0 16px;
+      color:var(--muted);
+    }
+
+    .tabs{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-bottom:12px;
+    }
+
+    .tab{
+      cursor:pointer;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:#fff;
+      text-align:center;
+      font-weight:700;
+    }
+
+    .tab.active{
+      background:var(--green);
+      color:#fff;
+      border-color:var(--green);
+    }
+
+    .group{
+      margin:12px 0;
+    }
+
+    label{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+
+    input{
+      width:100%;
+      box-sizing:border-box;
+      padding:12px 14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#fff;
+      color:var(--text);
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:8px;
+    }
+
+    .btn{
+      cursor:pointer;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--green);
+      background:var(--green);
+      color:#fff;
+      font-weight:800;
+    }
+
+    .btn.secondary{
+      background:#fff;
+      color:var(--green);
+    }
+
+    .muted{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .hidden{
+      display:none;
+    }
+
+    .foot{
+      margin-top:10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      display:inline-block;
+      margin-right:6px;
+    }
+
+    .on{background:#16a34a}
+    .off{background:#b91c1c}
+
+    .searchWrap{
+      position:relative;
+    }
+
+    .suggestions{
+      position:absolute;
+      top:calc(100% + 6px);
+      left:0;
+      right:0;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:#fff;
+      max-height:220px;
+      overflow-y:auto;
+      display:none;
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      z-index:20;
+    }
+
+    .suggestion{
+      padding:10px 12px;
+      cursor:pointer;
+      border-bottom:1px solid #eee;
+    }
+
+    .suggestion:last-child{
+      border-bottom:none;
+    }
+
+    .suggestion:hover,
+    .suggestion.active{
+      background:#f3f4f6;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>TrackLinq</h1>
+      <h1>DriveDen GPS</h1>
       <p>Login with your club PIN or continue as a guest.</p>
 
       <div class="tabs">
         <button id="tabClub" class="tab active">Club (PIN)</button>
-        <button id="tabGuest" class="tab">Guest (Choose Course)</button>
+        <button id="tabGuest" class="tab">Guest (Search Course)</button>
       </div>
 
-      <!-- Club (PIN) -->
       <div id="clubPane">
         <div class="group">
           <label>Enter 10-digit Club PIN</label>
@@ -54,146 +200,264 @@
         </div>
       </div>
 
-      <!-- Guest -->
       <div id="guestPane" class="hidden">
         <div class="group">
-          <label>Choose Course</label>
-          <select id="courseSelect"></select>
+          <label>Search Course</label>
+          <div class="searchWrap">
+            <input id="courseSearch" autocomplete="off" placeholder="Start typing a club name..."/>
+            <div id="suggestions" class="suggestions"></div>
+          </div>
         </div>
+
         <div class="row">
           <button class="btn" id="guestLoginBtn">Continue as Guest</button>
           <button class="btn secondary" id="refreshBtn">Refresh List</button>
         </div>
+
         <div class="muted" style="margin-top:8px">Guest mode won’t ask for a PIN.</div>
       </div>
 
       <div class="foot">
-        <div id="status"><span class="dot off" id="netDot"></span><span id="netTxt">Offline</span></div>
-        <div class="muted">v2.2</div>
+        <div id="status">
+          <span class="dot off" id="netDot"></span><span id="netTxt">Offline</span>
+        </div>
+        <div class="muted">DriveDen GPS</div>
       </div>
     </div>
   </div>
 
   <script>
     // SW register
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
     }
 
     // Online/offline badge
-    const netDot = document.getElementById('netDot');
-    const netTxt = document.getElementById('netTxt');
-    function updateNet(){
+    const netDot = document.getElementById("netDot");
+    const netTxt = document.getElementById("netTxt");
+
+    function updateNet() {
       const on = navigator.onLine;
-      netDot.className = 'dot ' + (on ? 'on':'off');
-      netTxt.textContent = on ? 'Online' : 'Offline';
+      netDot.className = "dot " + (on ? "on" : "off");
+      netTxt.textContent = on ? "Online" : "Offline";
     }
-    window.addEventListener('online', updateNet);
-    window.addEventListener('offline', updateNet);
+
+    window.addEventListener("online", updateNet);
+    window.addEventListener("offline", updateNet);
     updateNet();
 
     // Tabs
-    const tabClub = document.getElementById('tabClub');
-    const tabGuest = document.getElementById('tabGuest');
-    const clubPane = document.getElementById('clubPane');
-    const guestPane = document.getElementById('guestPane');
+    const tabClub = document.getElementById("tabClub");
+    const tabGuest = document.getElementById("tabGuest");
+    const clubPane = document.getElementById("clubPane");
+    const guestPane = document.getElementById("guestPane");
 
-    function setTab(which){
-      const isClub = which==='club';
-      tabClub.classList.toggle('active', isClub);
-      tabGuest.classList.toggle('active', !isClub);
-      clubPane.classList.toggle('hidden', !isClub);
-      guestPane.classList.toggle('hidden', isClub);
+    function setTab(which) {
+      const isClub = which === "club";
+      tabClub.classList.toggle("active", isClub);
+      tabGuest.classList.toggle("active", !isClub);
+      clubPane.classList.toggle("hidden", !isClub);
+      guestPane.classList.toggle("hidden", isClub);
     }
-    tabClub.addEventListener('click', ()=>setTab('club'));
-    tabGuest.addEventListener('click', ()=>setTab('guest'));
 
-    // Cache-first fetch helpers for index + course JSON
+    tabClub.addEventListener("click", () => setTab("club"));
+    tabGuest.addEventListener("click", () => setTab("guest"));
+
+    // Cache-first fetch helper for index
     async function getIndexCacheFirst() {
-      let res = await caches.match('/courses/index.json');
+      let res = await caches.match("/courses/index.json");
       if (!res) {
         try {
-          res = await fetch('/courses/index.json', { cache: 'reload' });
-          // save snapshot for deep-offline fallback
+          res = await fetch("/courses/index.json", { cache: "reload" });
           const txt = await res.clone().text();
-          localStorage.setItem('course_index_snapshot', txt);
+          localStorage.setItem("course_index_snapshot", txt);
           return JSON.parse(txt);
         } catch (_) {
-          // deep-offline fallback to snapshot
-          const snap = localStorage.getItem('course_index_snapshot');
+          const snap = localStorage.getItem("course_index_snapshot");
           if (snap) return JSON.parse(snap);
-          throw new Error('No index.json available');
+          throw new Error("No index.json available");
         }
       }
+
       try {
         const json = await res.json();
-        localStorage.setItem('course_index_snapshot', JSON.stringify(json));
+        localStorage.setItem("course_index_snapshot", JSON.stringify(json));
         return json;
-      } catch(_) {
-        const snap = localStorage.getItem('course_index_snapshot');
+      } catch (_) {
+        const snap = localStorage.getItem("course_index_snapshot");
         if (snap) return JSON.parse(snap);
-        throw new Error('Bad index.json cache');
+        throw new Error("Bad index.json cache");
       }
     }
 
-    async function loadCourseJsonCacheFirst(id){
+    // Search data
+    let courses = [];
+    let selectedCourse = null;
+    let visibleMatches = [];
+    let activeSuggestionIndex = -1;
+
+    const searchInput = document.getElementById("courseSearch");
+    const suggestions = document.getElementById("suggestions");
+
+    async function loadCourses() {
+      const idx = await getIndexCacheFirst();
+      courses = (idx.courses || []).map(c => ({
+        id: c.id,
+        name: c.name || c.id
+      }));
+    }
+
+    function closeSuggestions() {
+      suggestions.style.display = "none";
+      suggestions.innerHTML = "";
+      visibleMatches = [];
+      activeSuggestionIndex = -1;
+    }
+
+    function selectCourse(course) {
+      selectedCourse = course.id;
+      searchInput.value = course.name;
+      closeSuggestions();
+    }
+
+    function renderSuggestions(matches) {
+      suggestions.innerHTML = "";
+      visibleMatches = matches.slice(0, 8);
+      activeSuggestionIndex = -1;
+
+      if (!visibleMatches.length) {
+        closeSuggestions();
+        return;
+      }
+
+      visibleMatches.forEach((course, index) => {
+        const div = document.createElement("div");
+        div.className = "suggestion";
+        div.textContent = course.name;
+        div.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          selectCourse(course);
+        });
+        suggestions.appendChild(div);
+      });
+
+      suggestions.style.display = "block";
+    }
+
+    function updateActiveSuggestion() {
+      const items = suggestions.querySelectorAll(".suggestion");
+      items.forEach((el, i) => {
+        el.classList.toggle("active", i === activeSuggestionIndex);
+      });
+    }
+
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      selectedCourse = null;
+
+      if (q.length < 2) {
+        closeSuggestions();
+        return;
+      }
+
+      const matches = courses.filter(c => c.name.toLowerCase().includes(q));
+      renderSuggestions(matches);
+    });
+
+    searchInput.addEventListener("keydown", (e) => {
+      if (!visibleMatches.length) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, visibleMatches.length - 1);
+        updateActiveSuggestion();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
+        updateActiveSuggestion();
+      } else if (e.key === "Enter") {
+        if (activeSuggestionIndex >= 0 && visibleMatches[activeSuggestionIndex]) {
+          e.preventDefault();
+          selectCourse(visibleMatches[activeSuggestionIndex]);
+        }
+      } else if (e.key === "Escape") {
+        closeSuggestions();
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!suggestions.contains(e.target) && e.target !== searchInput) {
+        closeSuggestions();
+      }
+    });
+
+    document.getElementById("refreshBtn").addEventListener("click", async () => {
+      try {
+        await loadCourses();
+        closeSuggestions();
+      } catch (_) {
+        alert("Could not refresh course list.");
+      }
+    });
+
+    loadCourses().catch(() => {
+      alert("Could not load course list (go online once to cache it).");
+    });
+
+    // Find a course by PIN
+    async function loadCourseJsonCacheFirst(id) {
       const url = `/courses/${id}.json`;
       let res = await caches.match(url);
-      if (!res) res = await fetch(url, { cache: 'reload' });
+      if (!res) res = await fetch(url, { cache: "reload" });
       return res.json();
     }
 
-    // Populate guest courses
-    async function populateCourses() {
-      try {
-        const idx = await getIndexCacheFirst();
-        const sel = document.getElementById('courseSelect');
-        sel.innerHTML = '';
-        (idx.courses || []).forEach(c => {
-          const opt = document.createElement('option');
-          opt.value = c.id;
-          opt.textContent = `${c.name} (${c.id})`;
-          sel.appendChild(opt);
-        });
-      } catch (e) {
-        alert('Could not load course list (online once to cache it).');
-      }
-    }
-    populateCourses();
-    document.getElementById('refreshBtn').addEventListener('click', populateCourses);
-
-    // Find a course by PIN (index.json primary, then per-course JSON fallback)
     async function findCourseByPin(pin) {
       const idx = await getIndexCacheFirst();
-      const inIndex = (idx.courses || []).find(c => (c.pin||'').trim().toUpperCase() === pin);
+      const inIndex = (idx.courses || []).find(c => (c.pin || "").trim().toUpperCase() === pin);
       if (inIndex) return inIndex;
-      // fallback: scan each course.json
+
       for (const c of (idx.courses || [])) {
         try {
           const j = await loadCourseJsonCacheFirst(c.id);
-          const metaPin = (j?.course?.pin || '').trim().toUpperCase();
-          if (metaPin && metaPin === pin) return { id: c.id, name: j?.course?.name || c.id, pin: metaPin };
-        } catch(_) {}
+          const metaPin = (j?.course?.pin || "").trim().toUpperCase();
+          if (metaPin && metaPin === pin) {
+            return { id: c.id, name: j?.course?.name || c.id, pin: metaPin };
+          }
+        } catch (_) {}
       }
       return null;
     }
 
     // Club login
-    document.getElementById('clubLoginBtn').addEventListener('click', async () => {
-      const raw = (document.getElementById('clubPin').value || '').trim().toUpperCase();
-      if (raw.length !== 10) { alert('PIN must be exactly 10 characters.'); return; }
+    document.getElementById("clubLoginBtn").addEventListener("click", async () => {
+      const raw = (document.getElementById("clubPin").value || "").trim().toUpperCase();
+      if (raw.length !== 10) {
+        alert("PIN must be exactly 10 characters.");
+        return;
+      }
+
       const course = await findCourseByPin(raw);
-      if (!course) { alert('Invalid PIN for any known course.'); return; }
+      if (!course) {
+        alert("Invalid PIN for any known course.");
+        return;
+      }
+
       localStorage.setItem(`pin_${course.id}`, raw);
       location.href = `/gps.html?course=${encodeURIComponent(course.id)}&pin=${encodeURIComponent(raw)}`;
     });
-    document.getElementById('clubPin').addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('clubLoginBtn').click(); });
+
+    document.getElementById("clubPin").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("clubLoginBtn").click();
+    });
 
     // Guest login
-    document.getElementById('guestLoginBtn').addEventListener('click', () => {
-      const id = document.getElementById('courseSelect').value;
-      if (!id) { alert('Pick a course'); return; }
-      location.href = `/gps.html?course=${encodeURIComponent(id)}&guest=1`;
+    document.getElementById("guestLoginBtn").addEventListener("click", () => {
+      if (!selectedCourse) {
+        alert("Search and select a course first.");
+        return;
+      }
+      location.href = `/gps.html?course=${encodeURIComponent(selectedCourse)}&guest=1`;
     });
   </script>
 </body>
