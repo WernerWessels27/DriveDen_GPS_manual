@@ -12,7 +12,7 @@
   
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>TrackLinq GPS</title>
+  <title>DriveDen GPS</title>
 
   <link rel="manifest" href="/manifest.webmanifest">
 
@@ -694,8 +694,14 @@ BACK:  dotIcon('transparent', 12),
       initialFramed:false,
       followCart:false,
       cartAlt:null,
+      cartLatLng:null,
       lastAutoAdvanceTs:0,
-      lastAutoAdvanceHole:0
+      lastAutoAdvanceHole:0,
+      lastFollowTs:0,
+      lastFollowLat:null,
+      lastFollowLng:null,
+      lastGpsAdvanceTs:0,
+      lastGpsAdvanceFrom:null
     };
 
     // Distance helpers
@@ -706,6 +712,7 @@ BACK:  dotIcon('transparent', 12),
       const aa=s1*s1 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
       return 2*R*Math.atan2(Math.sqrt(aa),Math.sqrt(1-aa));
     }
+    function distMeters(a,b){ return haversine(a,b); }
     const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
     function pinAlt(pin){ if(!pin) return null; return (pin.alt ?? pin.ele ?? pin.elev ?? pin.elevation ?? pin.height ?? null); }
     function fmtElev(deltaM){ if(deltaM===null||!Number.isFinite(deltaM)) return ''; const sign = deltaM>0? '▲' : (deltaM<0? '▼' : '•'); return `${sign}${Math.round(Math.abs(deltaM))}m`; }
@@ -999,38 +1006,45 @@ function ensureInitialFraming(){
 function maybeAutoAdvanceByGps(){
   try{
     if (!state.course || !state.course.holes) return;
-    const curr = state.course.holes[String(state.hole)];
-    const nextHoleNum = state.hole + 1;
-    const next = state.course.holes[String(nextHoleNum)];
-    if (!curr || !next) return;
-
     const cart = state.cartLatLng;
     if (!cart) return;
 
-    const currBack = curr.pins?.BACK;
-    const nextTee  = next.pins?.TEE;
-    if (!currBack || !nextTee) return;
+    const currHoleNum = Number(state.hole) || 1;
+    const curr = state.course.holes[String(currHoleNum)];
+    const nextHoleNum = currHoleNum + 1;
+    const next = state.course.holes[String(nextHoleNum)];
+    if (!curr || !next) return;
 
+    const currTee = curr.pins?.TEE;
+    const currBack = curr.pins?.BACK;
+    const nextTee = next.pins?.TEE;
+    if (!nextTee) return;
+
+    const dCurrTee = currTee ? distMeters(cart, currTee) : Infinity;
+    const dCurrBack = currBack ? distMeters(cart, currBack) : Infinity;
     const dNextTee = distMeters(cart, nextTee);
-    const dCurrBack = distMeters(cart, currBack);
 
     const now = Date.now();
     const COOLDOWN_MS = 45000;
-    const TEE_RADIUS_M = 40;
-    const BACK_EXIT_M  = 18;
+    const NEXT_TEE_RADIUS_M = 45;
+    const BACK_EXIT_M = 18;
+    const MUCH_CLOSER_MARGIN_M = 20;
 
-    if (dNextTee <= TEE_RADIUS_M && dCurrBack >= BACK_EXIT_M && dNextTee < dCurrBack){
-      if ((now - (state.lastGpsAdvanceTs||0)) < COOLDOWN_MS) return;
-      if (state.lastGpsAdvanceFrom === state.hole) return;
+    const nearNextTee = dNextTee <= NEXT_TEE_RADIUS_M;
+    const hasExitedCurrentHole = dCurrBack >= BACK_EXIT_M;
+    const nextTeeClearlyCloser = (dCurrTee - dNextTee) >= MUCH_CLOSER_MARGIN_M;
+
+    if (nearNextTee && (hasExitedCurrentHole || nextTeeClearlyCloser)){
+      if ((now - (state.lastGpsAdvanceTs || 0)) < COOLDOWN_MS) return;
+      if (state.lastGpsAdvanceFrom === currHoleNum) return;
 
       state.lastGpsAdvanceTs = now;
-      state.lastGpsAdvanceFrom = state.hole;
-
+      state.lastGpsAdvanceFrom = currHoleNum;
       state.hole = nextHoleNum;
       state.initialFramed = false;
       renderHole();
     }
-  }catch(_){}
+  }catch(_){ }
 }
 
 function followCartViewIfNeeded(){
@@ -1062,7 +1076,9 @@ function followCartViewIfNeeded(){
 }
 
 navigator.geolocation.watchPosition((pos)=>{
-        const { latitude, longitude } = pos.coords;
+        const { latitude, longitude, altitude } = pos.coords;
+        state.cartLatLng = { lat: latitude, lng: longitude };
+        if (Number.isFinite(altitude)) state.cartAlt = altitude;
         if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
         updateCartAndChips();
@@ -1728,11 +1744,6 @@ const RULES = {
       "• Otherwise: play as it lies or take unplayable (1 stroke)."
     ]
   }
-  lastFollowTs: 0,
-  lastFollowLat: null,
-  lastFollowLng: null,
-  lastGpsAdvanceTs: 0,
-  lastGpsAdvanceFrom: null,
 };
 
 (function initRulesGuide(){
