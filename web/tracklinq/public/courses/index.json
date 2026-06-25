@@ -17,6 +17,14 @@
     }
     ,
         {
+      "id": "dainfern-golf-club",
+      "name": "Dainfern Golf Club",
+      "short_code": "DGC",
+      "pin": "DGC1234567",
+      "active": true
+    }
+    ,
+        {
       "id": "steyn-city-golf-club",
       "name": "Steyn City Golf Club",
       "short_code": "SCG",
