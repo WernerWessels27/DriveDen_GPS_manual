@@ -815,6 +815,24 @@ body.dark .rp-btn{background:#16a34a}
       const pad = [Math.round(sz.x*pctX), Math.round(sz.y*pctY)];
       map.fitBounds(bounds,{ paddingTopLeft: pad, paddingBottomRight: pad, maxZoom: 19, animate:true });
     }
+    function tightenHoleZoom(a,b){
+      let done = false;
+      const run = () => {
+        if (done) return;
+        done = true;
+        try{
+          const p1 = map.latLngToContainerPoint(L.latLng(a[0],a[1]));
+          const p2 = map.latLngToContainerPoint(L.latLng(b[0],b[1]));
+          const screenRatio = Math.abs(p2.x - p1.x) / Math.max(1, map.getSize().x);
+          const maxZoom = (typeof map.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : 19;
+          if (screenRatio > 0 && screenRatio < 0.5 && map.getZoom() < maxZoom){
+            map.zoomIn(1, { animate:true });
+          }
+        }catch(_){ }
+      };
+      map.once('moveend', run);
+      setTimeout(run, 450);
+    }
     function maxHoleNum(){
       const ks = Object.keys(state.course?.holes||{}).map(k=>+k).filter(Number.isFinite);
       return ks.length? Math.max(...ks) : state.hole;
@@ -822,13 +840,21 @@ body.dark .rp-btn{background:#16a34a}
 
     function doHoleView(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
-      if (p.TEE && p.BACK) fitBetween([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]);
+      if (p.TEE && p.BACK){
+        const teeBack = [[p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]];
+        fitBetween(teeBack[0], teeBack[1]);
+        tightenHoleZoom(teeBack[0], teeBack[1]);
+      }
     }
     function doCartView(silent){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       const cart = fromCart();
       if (cart && p.BACK){ fitBetweenPercent([cart.lat,cart.lng],[p.BACK.lat,p.BACK.lng], 0.15, 0.18); }
-      else if (p.TEE && p.BACK){ fitBetweenPercent([p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng], 0.15, 0.18); } // fallback
+      else if (p.TEE && p.BACK){
+        const teeBack = [[p.TEE.lat,p.TEE.lng],[p.BACK.lat,p.BACK.lng]];
+        fitBetweenPercent(teeBack[0], teeBack[1], 0.15, 0.18);
+        tightenHoleZoom(teeBack[0], teeBack[1]);
+      } // fallback
     }
     
 function updateBearingForHole(){
