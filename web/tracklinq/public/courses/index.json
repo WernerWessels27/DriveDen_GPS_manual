@@ -16,6 +16,14 @@
       "active": true
     }
     ,
+        {
+      "id": "steyn-city-golf-club",
+      "name": "Steyn City Golf Club",
+      "short_code": "SCG",
+      "pin": "SCG1234567",
+      "active": true
+    }
+    ,
     {
       "id": "Home",
       "name": "Home",
