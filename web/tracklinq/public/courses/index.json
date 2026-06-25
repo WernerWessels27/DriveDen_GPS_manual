@@ -17,6 +17,14 @@
     }
     ,
         {
+      "id": "pecanwood-golf-club",
+      "name": "Pecanwood Golf Club",
+      "short_code": "PGC",
+      "pin": "PGC1234567",
+      "active": true
+    }
+    ,
+        {
       "id": "dainfern-golf-club",
       "name": "Dainfern Golf Club",
       "short_code": "DGC",
