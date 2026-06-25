@@ -560,6 +560,15 @@ body.dark .rp-btn{background:#16a34a}
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
       return L.icon({ iconUrl:`data:image/svg+xml;utf8,${svg}`, iconSize:[size,size], iconAnchor:[size/2,size/2] });
     }
+    function customSvgIcon(svgPath, size=36, anchorX=null, anchorY=null){
+      const svg=encodeURIComponent(`<?xml version="1.0"?>
+        <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 40 40'>${svgPath}</svg>`);
+      return L.icon({
+        iconUrl:`data:image/svg+xml;utf8,${svg}`,
+        iconSize:[size,size],
+        iconAnchor:[anchorX ?? (size/2), anchorY ?? (size/2)]
+      });
+    }
     
     const TOILET_SVG = `
       <!-- background -->
@@ -592,19 +601,46 @@ body.dark .rp-btn{background:#16a34a}
                C 24.2 30.1, 25.3 31.2, 26.7 31.2 C 28.1 31.2, 29.2 30.1, 29.2 28.7
                C 29.2 27.8, 28.8 26.8, 28.0 25.6 Z' fill='white'/>
     `;
-const ICONS = {
+
+    const MID_FLAG_SVG = `
+      <ellipse cx='20' cy='35.5' rx='6.5' ry='2.2' fill='rgba(0,0,0,0.18)'/>
+      <circle cx='20' cy='31.2' r='3.2' fill='#16a34a' stroke='#166534' stroke-width='1'/>
+      <rect x='19.1' y='7' width='1.8' height='23' rx='0.9' fill='#374151'/>
+      <g>
+        <path d='M20 8.5 C 24 7.2, 27.8 8.2, 31 10.5 L31 18.6 C 27.2 16.6, 24 15.9, 20 17.2 Z' fill='#fbbf24' stroke='#b45309' stroke-width='1' stroke-linejoin='round'/>
+        <path d='M20.8 10.5 C 23.8 9.6, 26.2 10, 28.3 11.3' fill='none' stroke='rgba(255,255,255,0.45)' stroke-width='1.1' stroke-linecap='round'/>
+        <animateTransform attributeName='transform' type='rotate' values='0 20 8.5; -5 20 8.5; 2 20 8.5; -3 20 8.5; 0 20 8.5' dur='3.6s' repeatCount='indefinite'/>
+      </g>
+    `;
+
+    const CART_SVG = `
+      <ellipse cx='20' cy='35.5' rx='11' ry='2.2' fill='rgba(0,0,0,0.18)'/>
+      <rect x='10.2' y='8.1' width='16.8' height='4' rx='1.8' fill='#38bdf8' stroke='#0f172a' stroke-width='1.1'/>
+      <rect x='11.7' y='12' width='1.8' height='9.2' rx='0.7' fill='#475569'/>
+      <rect x='23.8' y='12' width='1.8' height='9.2' rx='0.7' fill='#475569'/>
+      <path d='M10.2 20.8 H28.4 L31.1 27.2 H16.2 C 13.4 27.2 11.4 26.1 10.2 23.6 Z' fill='#f8fafc' stroke='#0f172a' stroke-width='1.1' stroke-linejoin='round'/>
+      <path d='M15.8 16.4 H24.2 V20.8 H15.8 Z' fill='#dbeafe' stroke='#94a3b8' stroke-width='0.7'/>
+      <path d='M8.7 22.8 H15.4 V27.2 H10.6 C 9.1 27.2 8 26.1 8 24.7 C 8 23.9 8.3 23.2 8.7 22.8 Z' fill='#2563eb' stroke='#0f172a' stroke-width='1.1' stroke-linejoin='round'/>
+      <path d='M21.3 22.8 H29.3 L31.1 27.2 H21.3 Z' fill='#93c5fd' stroke='#0f172a' stroke-width='1.1' stroke-linejoin='round'/>
+      <path d='M27 14.2 L31 13.2 L31.8 15.6 L28.3 16.4 Z' fill='#22c55e' stroke='#14532d' stroke-width='0.9' stroke-linejoin='round'/>
+      <circle cx='14' cy='30.2' r='3.6' fill='#111827'/>
+      <circle cx='14' cy='30.2' r='1.55' fill='#e5e7eb'/>
+      <circle cx='27.8' cy='30.2' r='3.6' fill='#111827'/>
+      <circle cx='27.8' cy='30.2' r='1.55' fill='#e5e7eb'/>
+      <circle cx='18.2' cy='22.4' r='0.95' fill='#0f172a'/>
+    `;
+
+    const ICONS = {
       TEE: dotIcon('#16a34a', 14),
-
-FRONT: dotIcon('transparent', 12), 
-BACK:  dotIcon('transparent', 12), 
-
-      MID: dotIcon('#fbbf24', 12),
+      FRONT: dotIcon('transparent', 12), 
+      BACK:  dotIcon('transparent', 12), 
+      MID: customSvgIcon(MID_FLAG_SVG, 34, 17, 30),
       TOILET: largeSymbolIcon(TOILET_SVG, 36),
       TAPS: largeSymbolIcon(TAP_SVG, 36),
       STAKE_WHITE: dotIcon('#ffffff', 8),
       STAKE_RED: dotIcon('#ef4444', 8),
       STAKE_YELLOW: dotIcon('#fbbf24', 8),
-      CART: L.divIcon({className:'', html:'<div class=\"cartSvgIcon\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" aria-hidden=\"true\"> <path fill=\"currentColor\" d=\"M7 6h9.5l2 5H20v2h-1l-1 6h-2l.25-1.5H8.75L9 19H7l-1.5-9H4V8h2l1-2zm1.2 2L7.6 9h9.3l-0.6-1H8.2z\"/> <circle cx=\"9\" cy=\"20\" r=\"1.5\" fill=\"currentColor\"/><circle cx=\"17\" cy=\"20\" r=\"1.5\" fill=\"currentColor\"/> </svg></div>', iconSize:[28,28], iconAnchor:[14,14]}),
+      CART: customSvgIcon(CART_SVG, 36, 18, 30),
       LAYUP: dotIcon('#111111', 12)
     };
 
