@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v8: fixes cache key normalization + adds offline-friendly Ads strategy
+// v9: network-first course JSON so new courses appear automatically when online
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v9';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -113,6 +113,8 @@ self.addEventListener('fetch', (event) => {
   const isAdsJson = pathname.startsWith('/ads/') && pathname.endsWith('/ads.json');
   const isAdsAsset = pathname.startsWith('/ads/') && !pathname.endsWith('/ads.json');
 
+  const isCourseJson = pathname.startsWith('/courses/') && pathname.endsWith('.json');
+
   const isJson = pathname.endsWith('.json');
   const isImage = req.destination === 'image' || /\.(png|jpg|jpeg|gif|webp|svg|ico)$/.test(pathname);
   const isStatic = req.destination === 'style' || req.destination === 'script' || /\.(css|js|mjs|woff2?|ttf|otf)$/.test(pathname);
@@ -132,13 +134,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2) Ads Manager API: network-only (never cache)
+  // 2) Course JSON: network-first when online, cached fallback when offline
+  // This keeps /courses/index.json fresh so newly uploaded courses appear in the PWA/browser automatically.
+  if (isCourseJson) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      try {
+        const net = await fetch(req);
+        if (net && net.ok) await cachePutNormalized(cache, req, net);
+        return net;
+      } catch {
+        const cached = await cacheMatchNormalized(cache, req);
+        return cached || new Response('', { status: 504 });
+      }
+    })());
+    return;
+  }
+
+  // 3) Ads Manager API: network-only (never cache)
   if (isApiAds) {
     event.respondWith(fetch(req));
     return;
   }
 
-  // 3) ads.json: stale-while-revalidate
+  // 4) ads.json: stale-while-revalidate
   if (isAdsJson) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -156,7 +176,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4) Ad images/assets: cache-first
+  // 5) Ad images/assets: cache-first
   if (isAdsAsset && isImage) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -174,7 +194,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 5) Other JSON/images: stale-while-revalidate
+  // 6) Other JSON/images: stale-while-revalidate
   if (isJson || isImage) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -190,7 +210,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 6) CSS/JS/fonts: cache-first
+  // 7) CSS/JS/fonts: cache-first
   if (isStatic) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -204,7 +224,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 7) Default: cache-first, then network
+  // 8) Default: cache-first, then network
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cacheMatchNormalized(cache, req);
