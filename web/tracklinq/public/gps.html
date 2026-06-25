@@ -619,16 +619,34 @@ BACK:  dotIcon('transparent', 12),
     $('#zoomInBtn')?.addEventListener('click', ()=>map.zoomIn());
     $('#zoomOutBtn')?.addEventListener('click', ()=>map.zoomOut());
 
-    // Data (cache-first)
+    // Data (network-first for courses, cached fallback for offline)
     async function getIndex(){
-      let res=await caches.match('/courses/index.json');
-      if(!res) res=await fetch('/courses/index.json', { cache:'reload' });
+      try{
+        const fresh = await fetch(`/courses/index.json?ts=${Date.now()}`, { cache:'no-store' });
+        if(fresh && fresh.ok) return fresh.json();
+      }catch(_){}
+
+      let res = null;
+      try{
+        res = await caches.match('/courses/index.json');
+      }catch(_){}
+
+      if(!res) res = await fetch('/courses/index.json', { cache:'reload' });
       return res.json();
     }
     async function loadCourseJson(id){
       const url=`/courses/${id}.json`;
-      let res=await caches.match(url);
-      if(!res) res=await fetch(url, { cache:'reload' });
+      try{
+        const fresh = await fetch(`${url}?ts=${Date.now()}`, { cache:'no-store' });
+        if(fresh && fresh.ok) return fresh.json();
+      }catch(_){}
+
+      let res = null;
+      try{
+        res = await caches.match(url);
+      }catch(_){}
+
+      if(!res) res = await fetch(url, { cache:'reload' });
       return res.json();
     }
     async function pickCourseFromIndex(idx){
