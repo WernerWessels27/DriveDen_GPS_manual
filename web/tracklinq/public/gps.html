@@ -820,6 +820,37 @@ body.dark .rp-btn{background:#16a34a}
     // Markers & fitting
     function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
+    function fitBetween(a,b, opts={}){
+      const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
+      map.fitBounds(bounds,{ padding: opts.padding || [60,60], paddingTopLeft: opts.paddingTopLeft, paddingBottomRight: opts.paddingBottomRight, maxZoom: opts.maxZoom ?? 19, animate: opts.animate ?? true });
+      updateFocusMask();
+    }
+    function fitBetweenPercent(a,b, pctX=0.15, pctY=0.18){
+      const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
+      const sz = map.getSize();
+      const pad = [Math.round(sz.x*pctX), Math.round(sz.y*pctY)];
+      map.fitBounds(bounds,{ paddingTopLeft: pad, paddingBottomRight: pad, maxZoom: 19, animate:true });
+      updateFocusMask();
+    }
+    function tightenHoleZoom(a,b){
+      let done = false;
+      const run = () => {
+        if (done) return;
+        done = true;
+        try{
+          const p1 = map.latLngToContainerPoint(L.latLng(a[0],a[1]));
+          const p2 = map.latLngToContainerPoint(L.latLng(b[0],b[1]));
+          const screenRatio = Math.abs(p2.x - p1.x) / Math.max(1, map.getSize().x);
+          const maxZoom = (typeof map.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : 19;
+          if (screenRatio > 0 && screenRatio < 0.5 && map.getZoom() < maxZoom){
+            map.zoomIn(1, { animate:true });
+          }
+          updateFocusMask();
+        }catch(_){ }
+      };
+      map.once('moveend', run);
+      setTimeout(run, 450);
+    }
     function clearFocusMask(){
       if (state.focusRaf){ cancelAnimationFrame(state.focusRaf); state.focusRaf = null; }
       if (holeFocusCtx){ holeFocusCtx.clearRect(0, 0, holeFocusCanvas.width || 1, holeFocusCanvas.height || 1); }
@@ -865,14 +896,13 @@ body.dark .rp-btn{background:#16a34a}
       for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.closePath();
     }
-    function paintFocusLevel(ctx, size, pts, alpha){
+    function cutFocusHole(ctx, pts, blurPx=0, opacity=1){
       ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.filter = blurPx ? `blur(${blurPx}px)` : 'none';
+      ctx.fillStyle = `rgba(0,0,0,${opacity})`;
       drawFocusPath(ctx, pts);
-      ctx.clip();
-      ctx.clearRect(0, 0, size.x, size.y);
-      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-      ctx.fillRect(0, 0, size.x, size.y);
+      ctx.fill();
       ctx.restore();
     }
     function redrawFocusMaskNow(){
@@ -884,36 +914,29 @@ body.dark .rp-btn{background:#16a34a}
         const size = resizeFocusCanvas();
         const ctx = holeFocusCtx;
         const inner = pointsForOutline(outline, 1);
-        const soft1 = pointsForOutline(outline, 1.08);
-        const soft2 = pointsForOutline(outline, 1.18);
-        const soft3 = pointsForOutline(outline, 1.32);
+        const feather1 = pointsForOutline(outline, 1.10);
+        const feather2 = pointsForOutline(outline, 1.22);
+        const feather3 = pointsForOutline(outline, 1.42);
+        const feather4 = pointsForOutline(outline, 1.70);
 
         ctx.clearRect(0, 0, size.x, size.y);
+        ctx.filter = 'none';
         holeFocusCanvas.style.display = 'block';
 
-        // Far outside = most faded, then progressively lighter toward the hole outline.
-        ctx.fillStyle = 'rgba(255,255,255,0.56)';
+        // White-out everything first, then softly cut the hole back through the overlay.
+        // This creates a blurred fade instead of visible opacity bands.
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = 'rgba(255,255,255,0.94)';
         ctx.fillRect(0, 0, size.x, size.y);
 
-        paintFocusLevel(ctx, size, soft3, 0.36);
-        paintFocusLevel(ctx, size, soft2, 0.22);
-        paintFocusLevel(ctx, size, soft1, 0.10);
+        cutFocusHole(ctx, feather4, 46, 0.18);
+        cutFocusHole(ctx, feather3, 34, 0.28);
+        cutFocusHole(ctx, feather2, 24, 0.36);
+        cutFocusHole(ctx, feather1, 14, 0.46);
+        cutFocusHole(ctx, inner, 0, 1);
 
-        // Actual hole outline area stays fully clear.
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-out';
-        drawFocusPath(ctx, inner);
-        ctx.fill();
-        ctx.restore();
-
-        // Very subtle edge only, so there is no harsh solid fade line.
-        ctx.save();
+        ctx.filter = 'none';
         ctx.globalCompositeOperation = 'source-over';
-        drawFocusPath(ctx, inner);
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-        ctx.lineWidth = 1.25;
-        ctx.stroke();
-        ctx.restore();
       }catch(_){
         clearFocusMask();
       }
