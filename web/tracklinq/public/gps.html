@@ -652,7 +652,7 @@ body.dark .rp-btn{background:#16a34a}
     ).addTo(map);
 
     const holeFocusPane = map.createPane('holeFocusPane');
-    holeFocusPane.style.zIndex = 350;
+    holeFocusPane.style.zIndex = 450;
     holeFocusPane.style.pointerEvents = 'none';
 
     // Custom zoom buttons
@@ -821,8 +821,14 @@ body.dark .rp-btn{background:#16a34a}
       state.focusOutline = null;
     }
     function getCurrentHoleOutline(){
-      const outline = state.course?.holes?.[String(state.hole)]?.outline;
+      const h = state.course?.holes?.[String(state.hole)];
+      if (!h) return [];
+
+      // Preferred mapper structure: hole.outline
+      // Extra fallbacks keep older/test JSON structures from breaking the focus mask.
+      const outline = h.outline || h.holeOutline || h.pins?.OUTLINE || h.pins?.HOLE_OUTLINE || h.pins?.HoleOutline;
       if (!Array.isArray(outline) || outline.length < 3) return [];
+
       return outline
         .map(p => ({ lat:Number(p.lat), lng:Number(p.lng) }))
         .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
@@ -832,23 +838,26 @@ body.dark .rp-btn{background:#16a34a}
       const outline = getCurrentHoleOutline();
       if (outline.length < 3) return;
       try{
-        const b = map.getBounds().pad(3);
+        // Use a world-sized outer ring instead of only the current screen bounds.
+        // This keeps the faded surround visible after Hole View / Cart View pans, zooms, or rotates the map.
         const outer = [
-          [b.getSouth(), b.getWest()],
-          [b.getSouth(), b.getEast()],
-          [b.getNorth(), b.getEast()],
-          [b.getNorth(), b.getWest()]
+          [-85, -180],
+          [-85,  180],
+          [ 85,  180],
+          [ 85, -180]
         ];
         const inner = outline.map(p => [p.lat, p.lng]);
+
         state.focusMask = L.polygon([outer, inner], {
           pane:'holeFocusPane',
           stroke:false,
           fill:true,
           fillColor:'#ffffff',
-          fillOpacity:0.58,
+          fillOpacity:0.62,
           fillRule:'evenodd',
           interactive:false
         }).addTo(map);
+
         state.focusOutline = L.polygon(inner, {
           pane:'holeFocusPane',
           color:'#ffffff',
@@ -1093,6 +1102,8 @@ function ensureInitialFraming(){
       updateChips(p);
       ensureInitialFraming();
       updateLayupUI();
+      setTimeout(updateFocusMask, 150);
+      setTimeout(updateFocusMask, 650);
     }
 
     
