@@ -651,6 +651,10 @@ body.dark .rp-btn{background:#16a34a}
       { maxZoom: 19 }
     ).addTo(map);
 
+    map.createPane('cartPane');
+    map.getPane('cartPane').style.zIndex = '900';
+    map.getPane('cartPane').style.pointerEvents = 'none';
+
     const holeFocusCanvas = document.createElement('canvas');
     holeFocusCanvas.style.position = 'absolute';
     holeFocusCanvas.style.inset = '0';
@@ -892,8 +896,19 @@ body.dark .rp-btn{background:#16a34a}
     function drawFocusPath(ctx, pts){
       if (!pts || pts.length < 3) return;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+
+      // Smooth the mapper outline so the focus area does not show sharp polygon corners.
+      const last = pts[pts.length - 1];
+      const first = pts[0];
+      ctx.moveTo((last.x + first.x) / 2, (last.y + first.y) / 2);
+
+      for (let i=0; i<pts.length; i++){
+        const cur = pts[i];
+        const next = pts[(i + 1) % pts.length];
+        const mid = L.point((cur.x + next.x) / 2, (cur.y + next.y) / 2);
+        ctx.quadraticCurveTo(cur.x, cur.y, mid.x, mid.y);
+      }
+
       ctx.closePath();
     }
     function cutFocusHole(ctx, pts, blurPx=0, opacity=1){
@@ -929,11 +944,11 @@ body.dark .rp-btn{background:#16a34a}
         ctx.fillStyle = 'rgba(255,255,255,0.94)';
         ctx.fillRect(0, 0, size.x, size.y);
 
-        cutFocusHole(ctx, feather4, 46, 0.18);
-        cutFocusHole(ctx, feather3, 34, 0.28);
-        cutFocusHole(ctx, feather2, 24, 0.36);
-        cutFocusHole(ctx, feather1, 14, 0.46);
-        cutFocusHole(ctx, inner, 0, 1);
+        cutFocusHole(ctx, feather4, 78, 0.14);
+        cutFocusHole(ctx, feather3, 58, 0.24);
+        cutFocusHole(ctx, feather2, 40, 0.34);
+        cutFocusHole(ctx, feather1, 26, 0.48);
+        cutFocusHole(ctx, inner, 12, 0.88);
 
         ctx.filter = 'none';
         ctx.globalCompositeOperation = 'source-over';
@@ -1276,7 +1291,7 @@ navigator.geolocation.watchPosition((pos)=>{
         const { latitude, longitude, altitude } = pos.coords;
         state.cartLatLng = { lat: latitude, lng: longitude };
         if (Number.isFinite(altitude)) state.cartAlt = altitude;
-        if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART' }).addTo(map);
+        if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART', pane:'cartPane', zIndexOffset:2000 }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
         updateCartAndChips();
       
