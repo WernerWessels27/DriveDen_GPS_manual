@@ -651,9 +651,16 @@ body.dark .rp-btn{background:#16a34a}
       { maxZoom: 19 }
     ).addTo(map);
 
-    const holeFocusPane = map.createPane('holeFocusPane');
-    holeFocusPane.style.zIndex = 450;
-    holeFocusPane.style.pointerEvents = 'none';
+    const holeFocusCanvas = document.createElement('canvas');
+    holeFocusCanvas.style.position = 'absolute';
+    holeFocusCanvas.style.inset = '0';
+    holeFocusCanvas.style.width = '100%';
+    holeFocusCanvas.style.height = '100%';
+    holeFocusCanvas.style.zIndex = '450';
+    holeFocusCanvas.style.pointerEvents = 'none';
+    holeFocusCanvas.style.display = 'none';
+    const holeFocusCtx = holeFocusCanvas.getContext('2d');
+    $('#map').appendChild(holeFocusCanvas);
 
     // Custom zoom buttons
     $('#zoomInBtn')?.addEventListener('click', ()=>map.zoomIn());
@@ -760,8 +767,7 @@ body.dark .rp-btn{background:#16a34a}
       lastFollowLng:null,
       lastGpsAdvanceTs:0,
       lastGpsAdvanceFrom:null,
-      focusMask:null,
-      focusOutline:null
+      focusRaf:null
     };
 
     // Distance helpers
@@ -815,10 +821,9 @@ body.dark .rp-btn{background:#16a34a}
     function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
     function clearFocusMask(){
-      if (state.focusMask){ try{ map.removeLayer(state.focusMask); }catch(_){} }
-      if (state.focusOutline){ try{ map.removeLayer(state.focusOutline); }catch(_){} }
-      state.focusMask = null;
-      state.focusOutline = null;
+      if (state.focusRaf){ cancelAnimationFrame(state.focusRaf); state.focusRaf = null; }
+      if (holeFocusCtx){ holeFocusCtx.clearRect(0, 0, holeFocusCanvas.width || 1, holeFocusCanvas.height || 1); }
+      holeFocusCanvas.style.display = 'none';
     }
     function getCurrentHoleOutline(){
       const h = state.course?.holes?.[String(state.hole)];
@@ -833,69 +838,91 @@ body.dark .rp-btn{background:#16a34a}
         .map(p => ({ lat:Number(p.lat), lng:Number(p.lng) }))
         .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
     }
-    function updateFocusMask(){
-      clearFocusMask();
+    function resizeFocusCanvas(){
+      const size = map.getSize();
+      const ratio = window.devicePixelRatio || 1;
+      const w = Math.max(1, Math.round(size.x * ratio));
+      const h = Math.max(1, Math.round(size.y * ratio));
+      if (holeFocusCanvas.width !== w || holeFocusCanvas.height !== h){
+        holeFocusCanvas.width = w;
+        holeFocusCanvas.height = h;
+      }
+      holeFocusCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      return size;
+    }
+    function pointsForOutline(outline, scale=1){
+      const pts = outline.map(p => map.latLngToContainerPoint(L.latLng(p.lat, p.lng)));
+      if (scale === 1 || pts.length < 3) return pts;
+      const c = pts.reduce((a,p)=>({x:a.x+p.x, y:a.y+p.y}), {x:0,y:0});
+      c.x /= pts.length;
+      c.y /= pts.length;
+      return pts.map(p => L.point(c.x + (p.x - c.x) * scale, c.y + (p.y - c.y) * scale));
+    }
+    function drawFocusPath(ctx, pts){
+      if (!pts || pts.length < 3) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+    }
+    function paintFocusLevel(ctx, size, pts, alpha){
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      drawFocusPath(ctx, pts);
+      ctx.clip();
+      ctx.clearRect(0, 0, size.x, size.y);
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillRect(0, 0, size.x, size.y);
+      ctx.restore();
+    }
+    function redrawFocusMaskNow(){
+      state.focusRaf = null;
       const outline = getCurrentHoleOutline();
-      if (outline.length < 3) return;
+      if (outline.length < 3){ clearFocusMask(); return; }
+
       try{
-        // Use a world-sized outer ring instead of only the current screen bounds.
-        // This keeps the faded surround visible after Hole View / Cart View pans, zooms, or rotates the map.
-        const outer = [
-          [-85, -180],
-          [-85,  180],
-          [ 85,  180],
-          [ 85, -180]
-        ];
-        const inner = outline.map(p => [p.lat, p.lng]);
+        const size = resizeFocusCanvas();
+        const ctx = holeFocusCtx;
+        const inner = pointsForOutline(outline, 1);
+        const soft1 = pointsForOutline(outline, 1.08);
+        const soft2 = pointsForOutline(outline, 1.18);
+        const soft3 = pointsForOutline(outline, 1.32);
 
-        state.focusMask = L.polygon([outer, inner], {
-          pane:'holeFocusPane',
-          stroke:false,
-          fill:true,
-          fillColor:'#ffffff',
-          fillOpacity:0.62,
-          fillRule:'evenodd',
-          interactive:false
-        }).addTo(map);
+        ctx.clearRect(0, 0, size.x, size.y);
+        holeFocusCanvas.style.display = 'block';
 
-        state.focusOutline = L.polygon(inner, {
-          pane:'holeFocusPane',
-          color:'#ffffff',
-          weight:2,
-          opacity:0.18,
-          fill:false,
-          interactive:false
-        }).addTo(map);
+        // Far outside = most faded, then progressively lighter toward the hole outline.
+        ctx.fillStyle = 'rgba(255,255,255,0.56)';
+        ctx.fillRect(0, 0, size.x, size.y);
+
+        paintFocusLevel(ctx, size, soft3, 0.36);
+        paintFocusLevel(ctx, size, soft2, 0.22);
+        paintFocusLevel(ctx, size, soft1, 0.10);
+
+        // Actual hole outline area stays fully clear.
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        drawFocusPath(ctx, inner);
+        ctx.fill();
+        ctx.restore();
+
+        // Very subtle edge only, so there is no harsh solid fade line.
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        drawFocusPath(ctx, inner);
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1.25;
+        ctx.stroke();
+        ctx.restore();
       }catch(_){
         clearFocusMask();
       }
     }
-    function fitBetween(a,b, opts={}){ const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1])); map.fitBounds(bounds,{ padding: opts.padding || [60,60], paddingTopLeft: opts.paddingTopLeft, paddingBottomRight: opts.paddingBottomRight, maxZoom: opts.maxZoom ?? 19, animate: opts.animate ?? true }); }
-    function fitBetweenPercent(a,b, pctX=0.15, pctY=0.18){
-      const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
-      const sz = map.getSize();
-      const pad = [Math.round(sz.x*pctX), Math.round(sz.y*pctY)];
-      map.fitBounds(bounds,{ paddingTopLeft: pad, paddingBottomRight: pad, maxZoom: 19, animate:true });
+    function updateFocusMask(){
+      if (state.focusRaf) cancelAnimationFrame(state.focusRaf);
+      state.focusRaf = requestAnimationFrame(redrawFocusMaskNow);
     }
-    function tightenHoleZoom(a,b){
-      let done = false;
-      const run = () => {
-        if (done) return;
-        done = true;
-        try{
-          const p1 = map.latLngToContainerPoint(L.latLng(a[0],a[1]));
-          const p2 = map.latLngToContainerPoint(L.latLng(b[0],b[1]));
-          const screenRatio = Math.abs(p2.x - p1.x) / Math.max(1, map.getSize().x);
-          const maxZoom = (typeof map.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : 19;
-          if (screenRatio > 0 && screenRatio < 0.5 && map.getZoom() < maxZoom){
-            map.zoomIn(1, { animate:true });
-          }
-        }catch(_){ }
-      };
-      map.once('moveend', run);
-      setTimeout(run, 450);
-    }
-    map.on('moveend zoomend resize', ()=> updateFocusMask());
+    map.on('move zoom zoomend moveend resize viewreset rotate rotateend', ()=> updateFocusMask());
 
     function maxHoleNum(){
       const ks = Object.keys(state.course?.holes||{}).map(k=>+k).filter(Number.isFinite);
