@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v9: network-first course JSON so new courses appear automatically when online
+// v10: network-first course JSON + forced refresh for hole outline updates
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
