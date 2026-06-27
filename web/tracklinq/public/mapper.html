@@ -112,21 +112,22 @@
 
     <h3>Place Pins</h3>
     <div class="toolgrid" id="tools">
-      <div class="tool" data-tool="TEE"><span>🏌️‍♂️</span><span>TEE</span></div>
+      <div class="tool" data-tool="TEE"><span>ðŸŒï¸â€â™‚ï¸</span><span>TEE</span></div>
       <div class="tool" data-tool="FRONT"><span class="dot" style="background:#ffffff"></span><span>FRONT</span></div>
       <div class="tool" data-tool="MID"><span class="dot" style="background:#fbbf24"></span><span>MID (flag)</span></div>
       <div class="tool" data-tool="BACK"><span class="dot" style="background:#ef4444"></span><span>BACK</span></div>
-      <div class="tool" data-tool="TOILET"><span>🚻</span><span>Toilet</span></div>
-      <div class="tool" data-tool="TAPS"><span>🚰</span><span>Tap</span></div>
+      <div class="tool" data-tool="TOILET"><span>ðŸš»</span><span>Toilet</span></div>
+      <div class="tool" data-tool="TAPS"><span>ðŸš°</span><span>Tap</span></div>
       <div class="tool" data-tool="STAKE_WHITE"><span class="dot" style="background:#ffffff"></span><span>Stake (White)</span></div>
       <div class="tool" data-tool="STAKE_RED"><span class="dot" style="background:#ef4444"></span><span>Stake (Red)</span></div>
       <div class="tool" data-tool="STAKE_YELLOW"><span class="dot" style="background:#fbbf24"></span><span>Stake (Yellow)</span></div>
-      <div class="tool" data-tool="NO_GO"><span>⛔</span><span>No-Go Zone</span></div>
-      <div class="tool" data-tool="MOVE"><span>✥</span><span>Move/Select</span></div>
-      <div class="tool" data-tool="ERASE"><span>🗑️</span><span>Erase</span></div>
+      <div class="tool" data-tool="NO_GO"><span>â›”</span><span>No-Go Zone</span></div>
+      <div class="tool" data-tool="OUTLINE"><span>ðŸŸ¦</span><span>Hole Outline</span></div>
+      <div class="tool" data-tool="MOVE"><span>âœ¥</span><span>Move/Select</span></div>
+      <div class="tool" data-tool="ERASE"><span>ðŸ—‘ï¸</span><span>Erase</span></div>
     </div>
     <div class="muted" style="margin-top:6px;">
-      Click a tool, then click the map to place. For <strong>No‑Go Zone</strong>, click to add vertices, then double‑click or press “Finish Zone” to complete.
+      Click a tool, then click the map to place. For <strong>Noâ€‘Go Zone</strong> or <strong>Hole Outline</strong>, click to add vertices, then doubleâ€‘click or press finish to complete.
     </div>
 
     <div class="nogobar" id="nogobar">
@@ -135,10 +136,19 @@
       <button id="cancelNoGo">Cancel Zone</button>
     </div>
 
+    <div class="nogobar" id="outlinebar">
+      <button id="finishOutline">Finish Outline</button>
+      <button id="undoOutline">Undo Point</button>
+      <button id="clearOutline">Clear Outline</button>
+      <button id="cancelOutline">Cancel Outline</button>
+    </div>
+
     <div class="saveRow">
       <button id="saveHole">Save Hole</button>
       <button id="clearHole">Clear Hole</button>
       <button id="downloadJson">Download Course JSON</button>
+      <input id="importJsonFile" type="file" accept="application/json,.json" style="display:none" />
+      <button id="importJson">Import Course JSON</button>
       <button id="loadLocal">Load Saved (Local)</button>
       <button id="saveLocal">Save (Local)</button>
     </div>
@@ -176,7 +186,7 @@
     }
 
     // Emoji icons for taps/toilet that look exactly like the toolbar previews
-    function emojiIcon(char='🚻', size=22){
+    function emojiIcon(char='ðŸš»', size=22){
       const svg=encodeURIComponent(`<?xml version="1.0"?>
         <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 ${size} ${size}'>
           <text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' font-size='${size*0.9}px'>${char}</text>
@@ -208,8 +218,8 @@
       FRONT: dotIcon('#ffffff', 8),
       MID: flagMidIcon(34),        // larger for visibility when viewing entire hole
       BACK: dotIcon('#ef4444', 8),
-      TOILET: emojiIcon('🚻', 22), // same style as toolbar
-      TAPS: emojiIcon('🚰', 22),   // same style as toolbar
+      TOILET: emojiIcon('ðŸš»', 22), // same style as toolbar
+      TAPS: emojiIcon('ðŸš°', 22),   // same style as toolbar
       STAKE_WHITE: dotIcon('#ffffff', 6),
       STAKE_RED: dotIcon('#ef4444', 6),
       STAKE_YELLOW: dotIcon('#fbbf24', 6)
@@ -232,6 +242,9 @@
       drawingNoGo: false,
       currentNoGoPts: [],
       currentNoGoLayer: null,
+      drawingOutline: false,
+      currentOutlinePts: [],
+      currentOutlineLayer: null,
     };
 
     // --- UI Init ---
@@ -270,16 +283,24 @@
     document.querySelector('[data-tool="MOVE"]').classList.add('active');
 
     function setTool(tool){
-      // finalize/cancel any in-progress no-go
+      // finalize/cancel any in-progress polygon drawing
       if (state.drawingNoGo) cancelNoGo();
+      if (state.drawingOutline) cancelOutline();
       state.tool = tool;
+      $('#nogobar').classList.remove('show');
+      $('#outlinebar').classList.remove('show');
+
       if (tool==='NO_GO'){
         $('#nogobar').classList.add('show');
         map.dragging.disable();
         map.doubleClickZoom.disable();
         status('No-Go: click to add points; double-click or "Finish Zone" to complete.');
+      } else if (tool==='OUTLINE'){
+        $('#outlinebar').classList.add('show');
+        map.dragging.disable();
+        map.doubleClickZoom.disable();
+        status('Outline: click around the visible/playable hole area; double-click or "Finish Outline" to complete.');
       } else {
-        $('#nogobar').classList.remove('show');
         map.dragging.enable();
         map.doubleClickZoom.enable();
         status('');
@@ -305,6 +326,13 @@
         state.drawingNoGo = true;
         state.currentNoGoPts.push([lat,lng]);
         drawNoGoPreview();
+        return;
+      }
+
+      if (tool==='OUTLINE'){
+        state.drawingOutline = true;
+        state.currentOutlinePts.push([lat,lng]);
+        drawOutlinePreview();
         return;
       }
 
@@ -342,13 +370,15 @@
         pins[key].push(base);
         m = addMarker(ICONS[key], base, key.replace('STAKE_','Stake '), false, key, pins[key].length-1);
       }
-      status(`${tool} placed at ${lat.toFixed(6)}, ${lng.toFixed(6)}${Number.isFinite(ele)?' • Elev '+ele+'m':''}`);
+      status(`${tool} placed at ${lat.toFixed(6)}, ${lng.toFixed(6)}${Number.isFinite(ele)?' â€¢ Elev '+ele+'m':''}`);
     });
 
     // Double-click to finish no-go
     map.on('dblclick', (e)=>{
       if (state.tool==='NO_GO' && state.drawingNoGo && state.currentNoGoPts.length>=3){
         finishNoGo();
+      } else if (state.tool==='OUTLINE' && state.drawingOutline && state.currentOutlinePts.length>=3){
+        finishOutline();
       }
     });
 
@@ -392,11 +422,72 @@
       status('No-Go zone cancelled');
     }
 
+    function drawOutlinePreview(){
+      if (state.currentOutlineLayer) { map.removeLayer(state.currentOutlineLayer); }
+      const pts = state.currentOutlinePts.map(([la,ln])=> L.latLng(la,ln));
+      if (pts.length < 3){
+        state.currentOutlineLayer = L.polyline(pts, { color:'#0ea5e9', weight:2, dashArray:'4,4' }).addTo(map);
+      } else {
+        state.currentOutlineLayer = L.polygon(pts, { color:'#0ea5e9', weight:2, fill:true, fillColor:'#0ea5e9', fillOpacity:0.12 }).addTo(map);
+      }
+    }
+
+    function drawSavedOutline(outline){
+      if (!Array.isArray(outline) || outline.length < 3) return;
+      const latlngs = outline.map(pt => L.latLng(pt.lat, pt.lng));
+      L.polygon(latlngs, { color:'#0ea5e9', weight:2, fill:true, fillColor:'#0ea5e9', fillOpacity:0.10, interactive:false }).addTo(map);
+    }
+
+    function finishOutline(){
+      if (state.currentOutlinePts.length < 3) return;
+      const hKey = String(state.hole);
+      const h = state.course.holes[hKey] || { par:4, stroke:1, pins:{} };
+      h.par = parseInt($('#holePar').value,10) || 4;
+      h.stroke = parseInt($('#holeStroke').value,10) || 1;
+      h.pins = h.pins || {};
+      h.outline = state.currentOutlinePts.map(([lat,lng])=>({lat,lng}));
+      state.course.holes[hKey] = h;
+      if (state.currentOutlineLayer){ map.removeLayer(state.currentOutlineLayer); }
+      state.currentOutlineLayer = null;
+      state.currentOutlinePts = [];
+      state.drawingOutline = false;
+      loadHoleToUI();
+      status('Hole outline saved');
+    }
+
+    function undoOutline(){
+      if (!state.currentOutlinePts.length) return;
+      state.currentOutlinePts.pop();
+      drawOutlinePreview();
+    }
+
+    function cancelOutline(){
+      if (state.currentOutlineLayer){ map.removeLayer(state.currentOutlineLayer); }
+      state.currentOutlineLayer = null;
+      state.currentOutlinePts = [];
+      state.drawingOutline = false;
+      status('Hole outline cancelled');
+    }
+
+    function clearOutline(){
+      const h = state.course.holes[String(state.hole)];
+      if (h && h.outline) delete h.outline;
+      cancelOutline();
+      loadHoleToUI();
+      status('Hole outline cleared');
+    }
+
     $('#finishNoGo').addEventListener('click', ()=>{
       if (state.currentNoGoPts.length>=3) finishNoGo();
     });
     $('#undoNoGo').addEventListener('click', undoNoGo);
     $('#cancelNoGo').addEventListener('click', cancelNoGo);
+    $('#finishOutline').addEventListener('click', ()=>{
+      if (state.currentOutlinePts.length>=3) finishOutline();
+    });
+    $('#undoOutline').addEventListener('click', undoOutline);
+    $('#clearOutline').addEventListener('click', clearOutline);
+    $('#cancelOutline').addEventListener('click', cancelOutline);
 
     // --- Marker helpers ---
     function clearLiveMarkers(){
@@ -425,7 +516,7 @@
         } else if (rec.listKey){
           pins[rec.listKey][rec.listIndex] = obj;
         }
-        status(`${title} moved to ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}${Number.isFinite(elev)?' • Elev '+elev+'m':''}`);
+        status(`${title} moved to ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}${Number.isFinite(elev)?' â€¢ Elev '+elev+'m':''}`);
       });
 
       marker.on('click', ()=>{
@@ -492,7 +583,63 @@
         const latlngs = poly.map(pt => L.latLng(pt.lat, pt.lng));
         L.polygon(latlngs, { color:'#ef4444', weight:2, fill:true, fillColor:'#ef4444', fillOpacity:0.22 }).addTo(map);
       });
+
+      // Recreate saved hole outline
+      drawSavedOutline(h?.outline);
     }
+
+    function fitMapToCurrentHole(){
+      const h = state.course.holes[String(state.hole)];
+      if (!h) return;
+      const p = h.pins || {};
+      const list = [];
+      ['TEE','FRONT','MID','BACK','TOILET'].forEach(k=>{ if(p[k]) list.push([p[k].lat,p[k].lng]); });
+      (p.TAPS||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (p.STAKE_WHITE||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (p.STAKE_RED||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (p.STAKE_YELLOW||[]).forEach(t=> list.push([t.lat,t.lng]));
+      (h.outline||[]).forEach(t=> list.push([t.lat,t.lng]));
+      if (list.length){ map.fitBounds(L.latLngBounds(list), { padding:[40,40] }); }
+    }
+
+    function loadCourseObject(obj, label='Course JSON'){
+      if (!obj || typeof obj !== 'object' || !obj.course || !obj.holes){
+        alert('This does not look like a valid course JSON file.');
+        return;
+      }
+      state.course = obj;
+      $('#courseId').value = obj.course?.id || '';
+      $('#courseName').value = obj.course?.name || '';
+      $('#coursePin').value = obj.course?.pin || '';
+      const nums = Object.keys(obj.holes||{}).map(k=>+k).filter(n=>Number.isFinite(n));
+      const inferredCount = nums.length ? Math.max(Math.max(...nums), 18) : 18;
+      $('#holeCount').value = String(inferredCount);
+      state.holeCount = inferredCount;
+      state.hole = 1;
+      fillHoleDropdown(inferredCount);
+      $('#holeNo').value = '1';
+      loadHoleToUI();
+      fitMapToCurrentHole();
+      status(`${label} imported`);
+    }
+
+    $('#importJson').addEventListener('click', ()=> $('#importJsonFile').click());
+    $('#importJsonFile').addEventListener('change', (e)=>{
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const obj = JSON.parse(reader.result);
+          loadCourseObject(obj, file.name || 'Course JSON');
+        }catch(_){
+          alert('Failed to import JSON file.');
+        } finally {
+          e.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    });
 
     // --- Save / Load Course ---
     function collectCourse(){
