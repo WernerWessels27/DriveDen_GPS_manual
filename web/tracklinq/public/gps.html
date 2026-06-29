@@ -314,6 +314,9 @@ body.dark .rp-btn{background:#16a34a}
     .cartSvgIcon svg{width:28px;height:28px;}
     .cartSvgIcon svg *{fill:currentColor;stroke:currentColor;}
 
+    /* Hidden for now; functionality remains in code for future use */
+    #flyoverBtn, #penBtnMini { display:none !important; }
+
 </style>
 
 <style id="adsStyle">
@@ -652,7 +655,7 @@ body.dark .rp-btn{background:#16a34a}
     ).addTo(map);
 
     map.createPane('cartPane');
-    map.getPane('cartPane').style.zIndex = '900';
+    map.getPane('cartPane').style.zIndex = '1040';
     map.getPane('cartPane').style.pointerEvents = 'none';
 
     const holeFocusCanvas = document.createElement('canvas');
@@ -665,6 +668,19 @@ body.dark .rp-btn{background:#16a34a}
     holeFocusCanvas.style.display = 'none';
     const holeFocusCtx = holeFocusCanvas.getContext('2d');
     $('#map').appendChild(holeFocusCanvas);
+
+    const cartAboveFocusOverlay = document.createElement('div');
+    cartAboveFocusOverlay.style.position = 'absolute';
+    cartAboveFocusOverlay.style.left = '0';
+    cartAboveFocusOverlay.style.top = '0';
+    cartAboveFocusOverlay.style.width = '36px';
+    cartAboveFocusOverlay.style.height = '36px';
+    cartAboveFocusOverlay.style.zIndex = '1040';
+    cartAboveFocusOverlay.style.pointerEvents = 'none';
+    cartAboveFocusOverlay.style.display = 'none';
+    cartAboveFocusOverlay.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,.45))';
+    cartAboveFocusOverlay.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 40 40" aria-hidden="true">${CART_SVG}</svg>`;
+    $('#map').appendChild(cartAboveFocusOverlay);
 
     // Custom zoom buttons
     $('#zoomInBtn')?.addEventListener('click', ()=>map.zoomIn());
@@ -773,6 +789,24 @@ body.dark .rp-btn{background:#16a34a}
       lastGpsAdvanceFrom:null,
       focusRaf:null
     };
+
+    function updateCartAboveFocusOverlay(){
+      try{
+        const ll = state.cartLatLng || (state.cartMarker ? (()=>{
+          const m = state.cartMarker.getLatLng();
+          return { lat:m.lat, lng:m.lng };
+        })() : null);
+        if (!ll){
+          cartAboveFocusOverlay.style.display = 'none';
+          return;
+        }
+        const pt = map.latLngToContainerPoint(L.latLng(ll.lat, ll.lng));
+        cartAboveFocusOverlay.style.transform = `translate(${Math.round(pt.x - 18)}px, ${Math.round(pt.y - 30)}px)`;
+        cartAboveFocusOverlay.style.display = 'block';
+      }catch(_){
+        cartAboveFocusOverlay.style.display = 'none';
+      }
+    }
 
     // Distance helpers
     const toRad = d => d*Math.PI/180;
@@ -960,7 +994,10 @@ body.dark .rp-btn{background:#16a34a}
       if (state.focusRaf) cancelAnimationFrame(state.focusRaf);
       state.focusRaf = requestAnimationFrame(redrawFocusMaskNow);
     }
-    map.on('move zoom zoomend moveend resize viewreset rotate rotateend', ()=> updateFocusMask());
+    map.on('move zoom zoomend moveend resize viewreset rotate rotateend', ()=>{
+      updateFocusMask();
+      updateCartAboveFocusOverlay();
+    });
 
     function maxHoleNum(){
       const ks = Object.keys(state.course?.holes||{}).map(k=>+k).filter(Number.isFinite);
@@ -1291,8 +1328,10 @@ navigator.geolocation.watchPosition((pos)=>{
         const { latitude, longitude, altitude } = pos.coords;
         state.cartLatLng = { lat: latitude, lng: longitude };
         if (Number.isFinite(altitude)) state.cartAlt = altitude;
-        if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART', pane:'cartPane', zIndexOffset:2000 }).addTo(map);
+        if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART', pane:'cartPane', zIndexOffset:10000 }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
+        if (state.cartMarker && state.cartMarker.setZIndexOffset) state.cartMarker.setZIndexOffset(10000);
+        updateCartAboveFocusOverlay();
         updateCartAndChips();
       
       // GPS-based auto-advance + cart follow
