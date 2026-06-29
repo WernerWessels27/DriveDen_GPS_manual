@@ -16,6 +16,14 @@
       "active": true
     }
     ,
+    {
+      "id": "silverlakes-golf-club",
+      "name": "Silverlakes Golf Club",
+      "short_code": "SLG",
+      "pin": "SLG1234567",
+      "active": true
+    }
+    ,
         {
       "id": "pecanwood-golf-club",
       "name": "Pecanwood Golf Club",
