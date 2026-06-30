@@ -1389,8 +1389,74 @@ navigator.geolocation.watchPosition((pos)=>{
     });
 
     // ---------- Scorecard (classic) with persistence, reopen, clear, and auto-advance ----------
+    const ALL_HISTORY_KEY = 'history_all_courses';
+
+    // Keep current scorecard progress per course, but show saved round history across all courses.
     function histKey(){ return `history_${state.course?.course?.id || state.meta?.id || 'course'}`; }
     function scStateKey(){ return `sc_state_${state.course?.course?.id || state.meta?.id || 'course'}`; }
+
+    function safeHistoryArray(key){
+      try{
+        const arr = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(arr) ? arr : [];
+      }catch(_){
+        return [];
+      }
+    }
+
+    function historyFingerprint(round){
+      const playerSig = (round.players || []).map(p => [p.name, p.hcap, p.out, p.inn, p.net, p.points].join(':')).join('|');
+      return [round.ts || 0, round.id || '', round.course || '', playerSig].join('::');
+    }
+
+    function getAllHistoryRounds(){
+      const keys = [];
+      for(let i=0; i<localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(k === ALL_HISTORY_KEY || (k && k.startsWith('history_'))){
+          keys.push(k);
+        }
+      }
+
+      const seen = new Set();
+      const rounds = [];
+
+      keys.forEach(key => {
+        safeHistoryArray(key).forEach(round => {
+          if(!round || !round.ts) return;
+          const sig = historyFingerprint(round);
+          if(seen.has(sig)) return;
+          seen.add(sig);
+          rounds.push(round);
+        });
+      });
+
+      rounds.sort((a,b) => (b.ts || 0) - (a.ts || 0));
+      return rounds.slice(0, 10);
+    }
+
+    function saveRoundToAllHistory(entry){
+      const seen = new Set();
+      const rounds = [entry, ...getAllHistoryRounds()].filter(round => {
+        const sig = historyFingerprint(round);
+        if(seen.has(sig)) return false;
+        seen.add(sig);
+        return true;
+      });
+      rounds.sort((a,b) => (b.ts || 0) - (a.ts || 0));
+      localStorage.setItem(ALL_HISTORY_KEY, JSON.stringify(rounds.slice(0, 10)));
+    }
+
+    function clearAllHistoryRounds(){
+      const keys = [];
+      for(let i=0; i<localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(k === ALL_HISTORY_KEY || (k && k.startsWith('history_'))){
+          keys.push(k);
+        }
+      }
+      keys.forEach(k => localStorage.removeItem(k));
+    }
 
     function rebuildPlayersGrid(saved){
       const grid = $('#playersGrid');
@@ -1680,11 +1746,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
         useHandicaps: useH,
         players: results
       };
-      const key = histKey();
-      const arr = JSON.parse(localStorage.getItem(key) || '[]');
-      arr.unshift(entry);
-      while (arr.length>10) arr.pop();
-      localStorage.setItem(key, JSON.stringify(arr));
+      saveRoundToAllHistory(entry);
       localStorage.removeItem(scStateKey()); // reset in-progress
       toast('Round saved');
       closeScore();
@@ -1692,7 +1754,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
 
     function openHist(){
       const div = $('#histList');
-      const arr = JSON.parse(localStorage.getItem(histKey()) || '[]');
+      const arr = getAllHistoryRounds();
       if (!arr.length){ div.innerHTML = '<p style="margin:10px 0; color:var(--muted);">No rounds yet.</p>'; }
       else {
         const out = arr.map(r=>{
@@ -1724,7 +1786,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
     function closeHist(){ $('#histModal').style.display='none'; }
     function clearHistory(){
       if (!confirm('Clear all saved rounds?')) return;
-      localStorage.removeItem(histKey());
+      clearAllHistoryRounds();
       $('#histList').innerHTML = '<p style="margin:10px 0; color:var(--muted);">History cleared.</p>';
     }
     $('#historyBtn').addEventListener('click', openHist);
