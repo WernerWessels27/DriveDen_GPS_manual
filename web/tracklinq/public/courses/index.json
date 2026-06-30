@@ -8,6 +8,14 @@
       "active": true
     }
 ,
+        {
+      "id": "reading-country-club",
+      "name": "Reading Country Club",
+      "short_code": "RCC",
+      "pin": "RCC1234567",
+      "active": true
+    }
+,
     {
       "id": "wingate-country-club",
       "name": "Wingate Country Club",
