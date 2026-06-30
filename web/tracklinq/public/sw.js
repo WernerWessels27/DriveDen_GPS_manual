@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -20,7 +20,6 @@ const APP_SHELL = [
   'gps.html',
   'mapper.html',
   'ad-manager.html',
-  'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
 
@@ -107,6 +106,7 @@ self.addEventListener('fetch', (event) => {
   if (!isSameOrigin) return;
 
   const pathname = url.pathname.toLowerCase();
+  const isManifest = pathname.endsWith('.webmanifest');
   const isHtmlNav = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
 
   const isApiAds = pathname.startsWith('/api/ads/');
@@ -118,6 +118,21 @@ self.addEventListener('fetch', (event) => {
   const isJson = pathname.endsWith('.json');
   const isImage = req.destination === 'image' || /\.(png|jpg|jpeg|gif|webp|svg|ico)$/.test(pathname);
   const isStatic = req.destination === 'style' || req.destination === 'script' || /\.(css|js|mjs|woff2?|ttf|otf)$/.test(pathname);
+
+  // 0) Manifest: network-first so PWA start_url/shortcuts update quickly
+  if (isManifest) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const net = await fetch(new Request(req, { cache: 'reload' }));
+        if (net && net.ok) await cachePutNormalized(cache, req, net);
+        return net;
+      } catch {
+        return (await cacheMatchNormalized(cache, req)) || new Response('', { status: 504 });
+      }
+    })());
+    return;
+  }
 
   // 1) HTML navigations: network-first
   if (isHtmlNav) {
