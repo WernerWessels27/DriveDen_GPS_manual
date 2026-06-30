@@ -1,7 +1,7 @@
 {
   "name": "DriveDen GPS",
   "short_name": "DriveDen",
-  "start_url": "/login.html?source=pwa",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
@@ -19,16 +19,5 @@
       "purpose": "any maskable"
     }
   ],
-  "shortcuts": [
-    {
-      "name": "Open GPS",
-      "short_name": "GPS",
-      "url": "/gps.html"
-    },
-    {
-      "name": "Mapper",
-      "short_name": "Mapper",
-      "url": "/mapper.html"
-    }
-  ]
+  "id": "/"
 }
