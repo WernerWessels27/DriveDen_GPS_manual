@@ -1420,20 +1420,21 @@ navigator.geolocation.watchPosition((pos)=>{
     $('#playerCount').addEventListener('change', ()=>rebuildPlayersGrid(null));
 
     function strokesReceived(hcap, holeStrokeIndex){
-      const base = Math.floor(hcap / 18);
-      const rem = hcap % 18;
-      return base + (holeStrokeIndex <= rem ? 1 : 0);
+      const h = Math.max(0, Math.floor(Number(hcap) || 0));
+      const si = Number(holeStrokeIndex);
+      if (!Number.isFinite(si) || si < 1) return 0;
+      const base = Math.floor(h / 18);
+      const rem = h % 18;
+      return base + (si <= rem ? 1 : 0);
     }
     function stablefordPoints(par, gross, recv){
-      if (!Number.isFinite(par) || !Number.isFinite(gross)) return 0;
-      const net = gross - (recv||0);
-      const diff = net - par;
-      if (diff >= 2) return 0;
-      if (diff === 1) return 1;
-      if (diff === 0) return 2;
-      if (diff === -1) return 3;
-      if (diff === -2) return 4;
-      return 5;
+      const p = Number(par);
+      const g = Number(gross);
+      const r = Number(recv) || 0;
+      if (!Number.isFinite(p) || !Number.isFinite(g)) return 0;
+      const net = g - r;
+      const diff = net - p;
+      return Math.max(0, 2 - diff);
     }
 
     function buildScoreTable(players, useHcaps, saved){
@@ -1470,12 +1471,15 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
 
 
       players.forEach((p, idx)=>{
-        html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
-        ordered.forEach(n=>{
+        const scoreInputCell = (n) => {
           const val = saved?.strokes?.[idx]?.[n] ?? '';
-          html += `<td><div class="cellWrap"><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"><div class="mini" data-player="${idx}" data-hole="${n}" style="font-size:10px;color:var(--muted);line-height:1;margin-top:2px;"></div></div></td>`;
-        });
+          return `<td><div class="cellWrap"><input class="strokes" data-player="${idx}" data-hole="${n}" inputmode="numeric" value="${val}"><div class="mini" data-player="${idx}" data-hole="${n}" style="font-size:10px;color:var(--muted);line-height:1;margin-top:2px;"></div></div></td>`;
+        };
+
+        html += `<tr><th style="text-align:left;padding-left:12px;">${p.name} ${useHcaps?`(H${p.hcap})`:''}</th>`;
+        front9.forEach(n=>{ html += scoreInputCell(n); });
         html += `<td class="outCell" data-player="${idx}">0</td>`;
+        back9.forEach(n=>{ html += scoreInputCell(n); });
         html += `<td class="inCell" data-player="${idx}">0</td>`;
         html += `<td class="totCell" data-player="${idx}">0</td>`;
         html += `<td class="netCell" data-player="${idx}">0</td>`;
@@ -1507,9 +1511,9 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
         const holeNo = parseInt(inp.dataset.hole,10);
         const v = parseInt(inp.value,10);
         if (!Number.isFinite(v)) return;
-        const par = holes[holeNo]?.par ?? null;
-        const strokeIdx = holes[holeNo]?.stroke ?? null;
-        const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, strokeIdx||18) : 0;
+        const par = Number(holes[holeNo]?.par);
+        const strokeIdx = Number(holes[holeNo]?.stroke);
+        const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, Number.isFinite(strokeIdx) ? strokeIdx : 18) : 0;
         // Update compact mini text under each score: ± vs par and Stableford points (if handicaps in use)
         (function(){
           const mini = document.querySelector(`.mini[data-player="${playerIdx}"][data-hole="${holeNo}"]`);
@@ -1658,9 +1662,9 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
         const holeNo = parseInt(inp.dataset.hole,10);
         const v = parseInt(inp.value,10);
         if (!Number.isFinite(v)) return;
-        const par = holes[holeNo]?.par ?? null;
-        const strokeIdx = holes[holeNo]?.stroke ?? null;
-        const recv = useH ? strokesReceived(ps[i].hcap, strokeIdx||18) : 0;
+        const par = Number(holes[holeNo]?.par);
+        const strokeIdx = Number(holes[holeNo]?.stroke);
+        const recv = useH ? strokesReceived(ps[i].hcap, Number.isFinite(strokeIdx) ? strokeIdx : 18) : 0;
         const pts = stablefordPoints(par, v, recv);
         results[i].gross += v;
         results[i].points+= pts;
