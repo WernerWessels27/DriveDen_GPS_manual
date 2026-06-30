@@ -8,6 +8,14 @@
       "active": true
     }
 ,
+       {
+      "id": "eye-of-africa",
+      "name": "Eye Of Africa",
+      "short_code": "EOA",
+      "pin": "EOA1234567",
+      "active": true
+    }
+,
         {
       "id": "reading-country-club",
       "name": "Reading Country Club",
