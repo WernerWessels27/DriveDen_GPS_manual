@@ -213,7 +213,8 @@
   
 /* === Rules & Penalties theme integration (override inline light styles) === */
 #rulesBtnMini,
-#penBtnMini {
+#penBtnMini,
+#largeTextBtn {
   background: var(--panel) !important;
   color: var(--text) !important;
   border: 1px solid var(--chip-border) !important;
@@ -314,6 +315,130 @@ body.dark .rp-btn{background:#16a34a}
     .cartSvgIcon svg{width:28px;height:28px;}
     .cartSvgIcon svg *{fill:currentColor;stroke:currentColor;}
 
+
+
+/* === Large text accessibility mode === */
+#largeTextBtn {
+  min-width:120px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+
+#largeTextBtn.on {
+  background:var(--accent) !important;
+  color:#fff !important;
+  border-color:var(--accent-2) !important;
+}
+
+body[data-large-text="on"] .banner h1 {
+  font-size:24px;
+}
+
+body[data-large-text="on"] .btn,
+body[data-large-text="on"] .bubbleBtn,
+body[data-large-text="on"] .unitToggle,
+body[data-large-text="on"] .btnMini {
+  font-size:18px !important;
+  padding:12px 16px !important;
+}
+
+body[data-large-text="on"] .holeBar {
+  top:64px;
+  padding:12px 16px;
+  gap:18px;
+}
+
+body[data-large-text="on"] .holeMeta .par,
+body[data-large-text="on"] .holeMeta .stroke {
+  font-size:18px;
+}
+
+body[data-large-text="on"] .holeMeta .holeNo {
+  font-size:30px;
+}
+
+body[data-large-text="on"] .distStack {
+  top:136px;
+  min-width:300px;
+  gap:12px;
+}
+
+body[data-large-text="on"] .chipV {
+  grid-template-columns:18px 1fr auto;
+  padding:18px 18px;
+  gap:14px;
+  border-radius:18px;
+}
+
+body[data-large-text="on"] .dot {
+  width:14px;
+  height:14px;
+}
+
+body[data-large-text="on"] .smallTxt {
+  font-size:24px;
+}
+
+body[data-large-text="on"] .midTxt {
+  font-size:34px;
+}
+
+body[data-large-text="on"] .midElev {
+  font-size:18px;
+}
+
+body[data-large-text="on"] .viewBtn,
+body[data-large-text="on"] .zoomBtn {
+  width:62px;
+  height:62px;
+  font-size:30px;
+  border-radius:16px;
+}
+
+body[data-large-text="on"] .viewBtn svg,
+body[data-large-text="on"] .zoomBtn svg {
+  width:26px;
+  height:26px;
+}
+
+body[data-large-text="on"] .modal {
+  font-size:18px;
+}
+
+body[data-large-text="on"] .modal h2 {
+  font-size:26px;
+}
+
+body[data-large-text="on"] th,
+body[data-large-text="on"] td,
+body[data-large-text="on"] .modal input,
+body[data-large-text="on"] .modal select,
+body[data-large-text="on"] .rules-pop,
+body[data-large-text="on"] .rules-pop .rp-body,
+body[data-large-text="on"] .rules-pop .rp-head h3 {
+  font-size:18px !important;
+}
+
+body[data-large-text="on"] input.strokes,
+body[data-large-text="on"] input.nameInp,
+body[data-large-text="on"] input.hcapInp {
+  width:88px;
+  padding:10px;
+  font-size:18px;
+}
+
+body[data-large-text="on"] #toast {
+  font-size:16px;
+  padding:12px 16px;
+}
+
+body[data-large-text="on"] .layupLabel {
+  font-size:20px;
+  padding:9px 18px;
+}
+
     /* Hidden for now; functionality remains in code for future use */
     #flyoverBtn, #penBtnMini { display:none !important; }
 
@@ -352,6 +477,9 @@ body.dark .rp-btn{background:#16a34a}
 
   <!-- Rules & Penalties (top-right) -->
   <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
+    <button class="btnMini" id="largeTextBtn" title="Large text" aria-pressed="false" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">
+      <span aria-hidden="true">ðŸ”</span><span>Text</span>
+    </button>
     <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
     <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
       <span>Penalties</span>
@@ -432,17 +560,17 @@ body.dark .rp-btn{background:#16a34a}
     <div class="chipV">
       <span class="dot" style="background:#ffffff"></span>
       <span class="smallTxt">FRONT</span>
-      <span id="dFront" class="smallTxt">–</span>
+      <span id="dFront" class="smallTxt">â€“</span>
     </div>
     <div class="chipV">
       <span class="dot" style="background:#fbbf24"></span>
       <span class="midTxt">MID</span>
-      <span id="dMid" class="midTxt">–</span><span id="dMidElev" class="midElev"></span>
+      <span id="dMid" class="midTxt">â€“</span><span id="dMidElev" class="midElev"></span>
     </div>
     <div class="chipV">
       <span class="dot" style="background:#ef4444"></span>
       <span class="smallTxt">BACK</span>
-      <span id="dBack" class="smallTxt">–</span>
+      <span id="dBack" class="smallTxt">â€“</span>
     </div>
 
     <div class="unitToggle" id="unitBtn">Units: <span id="unitChip">m</span></div>
@@ -450,9 +578,9 @@ body.dark .rp-btn{background:#16a34a}
 
   <!-- Bottom-left stacked view icons -->
   <div class="viewIcons">
-    <button title="Hole View (TEE↔BACK)" class="viewBtn" id="holeViewBtn"><svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" id="golf-3" data-name="Flat Color" xmlns="http://www.w3.org/2000/svg" class="icon flat-color"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <path id="secondary" d="M8.44,12a8.19,8.19,0,0,1,2.3.39,13.58,13.58,0,0,0,3.93.54c3,0,6.33,1.42,6.33,4.54C21,22,14.25,22,12,22c-8.15,0-9-3.81-9-5.44C3,13.7,5,12,8.44,12Z" style="fill: #38b6ff;"/> <path id="primary" d="M8.55,6.11,14,3.38V3a1,1,0,0,1,2,0V16a1,1,0,0,1-2,0V10.62L8.55,7.89a1,1,0,0,1,0-1.78Z" style="fill: #000000;"/> </g> </svg></button>
-    <button title="Flyover (TEE→GREEN)" class="viewBtn" id="flyoverBtn"><svg aria-hidden="true" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <rect fill="currentColor" fill-opacity="0.01"/> <path d="M11 11L19 19M37 37L29 29" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <path d="M37 11L29 19M11 37L19 29" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <rect x="19" y="19" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <path d="M37 18C38.3845 18 39.7379 17.5895 40.889 16.8203C42.0401 16.0511 42.9373 14.9579 43.4672 13.6788C43.997 12.3997 44.1356 10.9922 43.8655 9.63437C43.5954 8.2765 42.9287 7.02922 41.9498 6.05026C40.9708 5.07129 39.7235 4.4046 38.3656 4.13451C37.0078 3.86441 35.6003 4.00303 34.3212 4.53285C33.0421 5.06266 31.9489 5.95987 31.1797 7.11101C30.4105 8.26215 30 9.61553 30 11M37 30C38.3845 30 39.7379 30.4105 40.889 31.1797C42.0401 31.9489 42.9373 33.0421 43.4672 34.3212C43.997 35.6003 44.1356 37.0078 43.8655 38.3656C43.5954 39.7235 42.9287 40.9708 41.9498 41.9497C40.9708 42.9287 39.7235 43.5954 38.3656 43.8655C37.0078 44.1356 35.6003 43.997 34.3212 43.4672C33.0421 42.9373 31.9489 42.0401 31.1797 40.889C30.4105 39.7379 30 38.3845 30 37M11 18C9.61553 18 8.26216 17.5895 7.11101 16.8203C5.95987 16.0511 5.06266 14.9579 4.53285 13.6788C4.00303 12.3997 3.86441 10.9922 4.13451 9.63437C4.4046 8.2765 5.07129 7.02922 6.05026 6.05026C7.02922 5.07129 8.2765 4.4046 9.63437 4.13451C10.9922 3.86441 12.3997 4.00303 13.6788 4.53285C14.9579 5.06266 16.0511 5.95987 16.8203 7.11101C17.5895 8.26215 18 9.61553 18 11M11 30C9.61553 30 8.26216 30.4105 7.11101 31.1797C5.95987 31.9489 5.06266 33.0421 4.53285 34.3212C4.00303 35.6003 3.86441 37.0078 4.13451 38.3656C4.4046 39.7235 5.07129 40.9708 6.05026 41.9497C7.02922 42.9287 8.2765 43.5954 9.63437 43.8655C10.9922 44.1356 12.3997 43.997 13.6788 43.4672C14.9579 42.9373 16.0511 42.0401 16.8203 40.889C17.5895 39.7379 18 38.3845 18 37" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> </g> </svg></button>
-    <button title="Cart View (CART↔BACK)" class="viewBtn" id="cartViewBtn"><svg aria-hidden="true" viewBox="-0.08 0 20.163 20.163" xmlns="http://www.w3.org/2000/svg" fill="currentColor"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <g id="golf-cart" transform="translate(-2 -1.837)"> <path id="secondary" fill="currentColor" d="M20,13H9l-.72-1.45a1,1,0,0,0-.9-.55H4a1,1,0,0,0-1,1v6a1,1,0,0,0,1,1H5a2,2,0,0,1,4,0h6a2,2,0,0,1,4,0h1a1,1,0,0,0,1-1V14A1,1,0,0,0,20,13Z"/> <path id="primary" d="M5,19H4a1,1,0,0,1-1-1V12a1,1,0,0,1,1-1H7.38a1,1,0,0,1,.9.55L9,13H20a1,1,0,0,1,1,1v4a1,1,0,0,1-1,1H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> <path id="primary-2" data-name="primary" d="M6,3v8M17,3l1.82,10M15,19H9m5.82-6-.55-3M7,17a2,2,0,1,0,2,2A2,2,0,0,0,7,17Zm10,0a2,2,0,1,0,2,2A2,2,0,0,0,17,17ZM4,3H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> </g> </g> </svg></button>
+    <button title="Hole View (TEEâ†”BACK)" class="viewBtn" id="holeViewBtn"><svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" id="golf-3" data-name="Flat Color" xmlns="http://www.w3.org/2000/svg" class="icon flat-color"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <path id="secondary" d="M8.44,12a8.19,8.19,0,0,1,2.3.39,13.58,13.58,0,0,0,3.93.54c3,0,6.33,1.42,6.33,4.54C21,22,14.25,22,12,22c-8.15,0-9-3.81-9-5.44C3,13.7,5,12,8.44,12Z" style="fill: #38b6ff;"/> <path id="primary" d="M8.55,6.11,14,3.38V3a1,1,0,0,1,2,0V16a1,1,0,0,1-2,0V10.62L8.55,7.89a1,1,0,0,1,0-1.78Z" style="fill: #000000;"/> </g> </svg></button>
+    <button title="Flyover (TEEâ†’GREEN)" class="viewBtn" id="flyoverBtn"><svg aria-hidden="true" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <rect fill="currentColor" fill-opacity="0.01"/> <path d="M11 11L19 19M37 37L29 29" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <path d="M37 11L29 19M11 37L19 29" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <rect x="19" y="19" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <path d="M37 18C38.3845 18 39.7379 17.5895 40.889 16.8203C42.0401 16.0511 42.9373 14.9579 43.4672 13.6788C43.997 12.3997 44.1356 10.9922 43.8655 9.63437C43.5954 8.2765 42.9287 7.02922 41.9498 6.05026C40.9708 5.07129 39.7235 4.4046 38.3656 4.13451C37.0078 3.86441 35.6003 4.00303 34.3212 4.53285C33.0421 5.06266 31.9489 5.95987 31.1797 7.11101C30.4105 8.26215 30 9.61553 30 11M37 30C38.3845 30 39.7379 30.4105 40.889 31.1797C42.0401 31.9489 42.9373 33.0421 43.4672 34.3212C43.997 35.6003 44.1356 37.0078 43.8655 38.3656C43.5954 39.7235 42.9287 40.9708 41.9498 41.9497C40.9708 42.9287 39.7235 43.5954 38.3656 43.8655C37.0078 44.1356 35.6003 43.997 34.3212 43.4672C33.0421 42.9373 31.9489 42.0401 31.1797 40.889C30.4105 39.7379 30 38.3845 30 37M11 18C9.61553 18 8.26216 17.5895 7.11101 16.8203C5.95987 16.0511 5.06266 14.9579 4.53285 13.6788C4.00303 12.3997 3.86441 10.9922 4.13451 9.63437C4.4046 8.2765 5.07129 7.02922 6.05026 6.05026C7.02922 5.07129 8.2765 4.4046 9.63437 4.13451C10.9922 3.86441 12.3997 4.00303 13.6788 4.53285C14.9579 5.06266 16.0511 5.95987 16.8203 7.11101C17.5895 8.26215 18 9.61553 18 11M11 30C9.61553 30 8.26216 30.4105 7.11101 31.1797C5.95987 31.9489 5.06266 33.0421 4.53285 34.3212C4.00303 35.6003 3.86441 37.0078 4.13451 38.3656C4.4046 39.7235 5.07129 40.9708 6.05026 41.9497C7.02922 42.9287 8.2765 43.5954 9.63437 43.8655C10.9922 44.1356 12.3997 43.997 13.6788 43.4672C14.9579 42.9373 16.0511 42.0401 16.8203 40.889C17.5895 39.7379 18 38.3845 18 37" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> </g> </svg></button>
+    <button title="Cart View (CARTâ†”BACK)" class="viewBtn" id="cartViewBtn"><svg aria-hidden="true" viewBox="-0.08 0 20.163 20.163" xmlns="http://www.w3.org/2000/svg" fill="currentColor"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <g id="golf-cart" transform="translate(-2 -1.837)"> <path id="secondary" fill="currentColor" d="M20,13H9l-.72-1.45a1,1,0,0,0-.9-.55H4a1,1,0,0,0-1,1v6a1,1,0,0,0,1,1H5a2,2,0,0,1,4,0h6a2,2,0,0,1,4,0h1a1,1,0,0,0,1-1V14A1,1,0,0,0,20,13Z"/> <path id="primary" d="M5,19H4a1,1,0,0,1-1-1V12a1,1,0,0,1,1-1H7.38a1,1,0,0,1,.9.55L9,13H20a1,1,0,0,1,1,1v4a1,1,0,0,1-1,1H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> <path id="primary-2" data-name="primary" d="M6,3v8M17,3l1.82,10M15,19H9m5.82-6-.55-3M7,17a2,2,0,1,0,2,2A2,2,0,0,0,7,17Zm10,0a2,2,0,1,0,2,2A2,2,0,0,0,17,17ZM4,3H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> </g> </g> </svg></button>
   </div>
 
   <!-- Bottom-right zoom -->
@@ -536,6 +664,43 @@ body.dark .rp-btn{background:#16a34a}
     function q(name){ return new URL(location.href).searchParams.get(name); }
     function toast(msg, ms=1600){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', ms); }
 
+
+    // Large text accessibility toggle
+    (function(){
+      const key = 'tl_large_text';
+      const saved = localStorage.getItem(key) || 'off';
+
+      function applyLargeText(mode){
+        const on = mode === 'on';
+        document.body.setAttribute('data-large-text', on ? 'on' : 'off');
+        const btn = $('#largeTextBtn');
+        if(btn){
+          btn.classList.toggle('on', on);
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          btn.innerHTML = on
+            ? '<span aria-hidden="true">ðŸ”Ž</span><span>Large</span>'
+            : '<span aria-hidden="true">ðŸ”</span><span>Text</span>';
+        }
+      }
+
+      applyLargeText(saved === 'on' ? 'on' : 'off');
+
+      $('#largeTextBtn')?.addEventListener('click', ()=>{
+        const next = document.body.getAttribute('data-large-text') === 'on' ? 'off' : 'on';
+        localStorage.setItem(key, next);
+        applyLargeText(next);
+        setTimeout(()=>{
+          try{
+            if(typeof updateFocusMask === 'function') updateFocusMask();
+            if(state?.course){
+              const pins = state.course.holes[String(state.hole)]?.pins || {};
+              if(typeof updateChips === 'function') updateChips(pins);
+            }
+          }catch(_){}
+        }, 80);
+      });
+    })();
+
     // Theme toggle
     (function(){
       const saved = localStorage.getItem('tl_theme') || 'light';
@@ -545,7 +710,7 @@ body.dark .rp-btn{background:#16a34a}
         const cur = document.body.getAttribute('data-theme')==='dark'?'light':'dark';
         document.body.setAttribute('data-theme', cur);
         localStorage.setItem('tl_theme', cur);
-        $('#themeBtn').textContent = cur==='dark'?'🌚':'🌞';
+        $('#themeBtn').textContent = cur==='dark'?'ðŸŒš':'ðŸŒž';
       });
     })();
 
@@ -819,7 +984,7 @@ body.dark .rp-btn{background:#16a34a}
     function distMeters(a,b){ return haversine(a,b); }
     const fmt = m => state.unit==='yd' ? Math.round(m*1.09361) : Math.round(m);
     function pinAlt(pin){ if(!pin) return null; return (pin.alt ?? pin.ele ?? pin.elev ?? pin.elevation ?? pin.height ?? null); }
-    function fmtElev(deltaM){ if(deltaM===null||!Number.isFinite(deltaM)) return ''; const sign = deltaM>0? '▲' : (deltaM<0? '▼' : '•'); return `${sign}${Math.round(Math.abs(deltaM))}m`; }
+    function fmtElev(deltaM){ if(deltaM===null||!Number.isFinite(deltaM)) return ''; const sign = deltaM>0? 'â–²' : (deltaM<0? 'â–¼' : 'â€¢'); return `${sign}${Math.round(Math.abs(deltaM))}m`; }
     function fromCart(){ if(state.cartMarker){ const ll=state.cartMarker.getLatLng(); return {lat:ll.lat,lng:ll.lng}; } return null; }
     function midPoint(a,b){ return { lat:(a.lat+b.lat)/2, lng:(a.lng+b.lng)/2 }; }
     function labelAt(ll, text){
@@ -833,7 +998,7 @@ body.dark .rp-btn{background:#16a34a}
     }
     function updateChips(pins){
       const f=$('#dFront'), m=$('#dMid'), b=$('#dBack');
-      f.textContent=m.textContent=b.textContent='–';
+      f.textContent=m.textContent=b.textContent='â€“';
       const from = fromPoint(pins, 'CART') || fromPoint(pins,'TEE');
       if(!from) return;
       if(pins.FRONT) f.textContent=fmt(haversine(from, pins.FRONT));
@@ -1045,7 +1210,7 @@ function updateBearingForHole(){
 }
 
 
-    // --- Flyover (TEE → anchors → GREEN) ---
+    // --- Flyover (TEE â†’ anchors â†’ GREEN) ---
     let flyoverActive = false;
     let flyoverAbort = null;
 
@@ -1083,7 +1248,7 @@ function updateBearingForHole(){
           }
         });
       } else {
-        // Backwards-compatible: generate 3 anchors along TEE→BACK
+        // Backwards-compatible: generate 3 anchors along TEEâ†’BACK
         if (p.TEE && p.BACK){
           const a = L.latLng(p.TEE.lat, p.TEE.lng);
           const b = L.latLng(p.BACK.lat, p.BACK.lng);
@@ -1525,15 +1690,15 @@ html += '<tr><th style="text-align:left;padding-left:12px;">Par</th>';
 front9.forEach(n => html += `<td>${holes[n]?.par ?? ''}</td>`);
 html += `<td>${parOut}</td>`;
 back9.forEach(n => html += `<td>${holes[n]?.par ?? ''}</td>`);
-html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
+html += `<td>${parIn}</td><td>${parTot}</td><td>â€“</td><td>â€“</td></tr>`;
 
 
       // Stroke on scorecard
       html += '<tr><th style="text-align:left;padding-left:12px;">Stroke</th>';
       front9.forEach(n => html += `<td>${holes[n]?.stroke ?? ''}</td>`);
-      html += `<td>–</td>`;
+      html += `<td>â€“</td>`;
       back9.forEach(n => html += `<td>${holes[n]?.stroke ?? ''}</td>`);
-      html += `<td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
+      html += `<td>â€“</td><td>â€“</td><td>â€“</td><td>â€“</td></tr>`;
 
 
       players.forEach((p, idx)=>{
@@ -1580,7 +1745,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
         const par = Number(holes[holeNo]?.par);
         const strokeIdx = Number(holes[holeNo]?.stroke);
         const recv = useHcaps ? strokesReceived(players[playerIdx].hcap, Number.isFinite(strokeIdx) ? strokeIdx : 18) : 0;
-        // Update compact mini text under each score: ± vs par and Stableford points (if handicaps in use)
+        // Update compact mini text under each score: Â± vs par and Stableford points (if handicaps in use)
         (function(){
           const mini = document.querySelector(`.mini[data-player="${playerIdx}"][data-hole="${holeNo}"]`);
           if (!mini) return;
@@ -1589,7 +1754,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
           const sgn  = (diff===0) ? 'E' : (diff>0 ? `+${diff}` : `${diff}`);
           if (useHcaps && diffOk){
             const pts = stablefordPoints(par, v, recv);
-            mini.textContent = `${sgn} · ${pts}pt${pts===1?'':'s'}`;
+            mini.textContent = `${sgn} Â· ${pts}pt${pts===1?'':'s'}`;
           } else {
             mini.textContent = diffOk ? sgn : '';
           }
@@ -1660,7 +1825,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
     }
 
     function openScore(){
-      $('#scoreTitle').textContent = `Scorecard — ${state.course?.course?.name || 'Course'}`;
+      $('#scoreTitle').textContent = `Scorecard â€” ${state.course?.course?.name || 'Course'}`;
       const saved = loadScoreState();
       if (saved && saved.active){
         // jump straight into the active scorecard
@@ -2004,61 +2169,61 @@ const RULES = {
   water: {
     title: "Water (Penalty Area)",
     body: [
-      "• Play as it lies, or take 1-stroke relief:",
-      "– Stroke-and-distance (replay previous shot).",
-      "– Back-on-the-line: keep the entry point between you and the flag."
+      "â€¢ Play as it lies, or take 1-stroke relief:",
+      "â€“ Stroke-and-distance (replay previous shot).",
+      "â€“ Back-on-the-line: keep the entry point between you and the flag."
     ]
   },
   red: {
     title: "Red Stakes (Lateral Penalty)",
     body: [
-      "• 1-stroke relief options:",
-      "– Stroke-and-distance.",
-      "– Back-on-the-line.",
-      "– Lateral: within 2 club-lengths of entry point, no nearer the hole."
+      "â€¢ 1-stroke relief options:",
+      "â€“ Stroke-and-distance.",
+      "â€“ Back-on-the-line.",
+      "â€“ Lateral: within 2 club-lengths of entry point, no nearer the hole."
     ]
   },
   yellow: {
     title: "Yellow Stakes (Penalty Area)",
     body: [
-      "• 1-stroke relief options:",
-      "– Stroke-and-distance.",
-      "– Back-on-the-line only (no lateral unless local rule)."
+      "â€¢ 1-stroke relief options:",
+      "â€“ Stroke-and-distance.",
+      "â€“ Back-on-the-line only (no lateral unless local rule)."
     ]
   },
   white: {
     title: "White Stakes (Out of Bounds)",
     body: [
-      "• Stroke-and-distance only (replay previous shot, +1).",
-      "• If local rule E-5 applies, a 2-stroke alternative may be available."
+      "â€¢ Stroke-and-distance only (replay previous shot, +1).",
+      "â€¢ If local rule E-5 applies, a 2-stroke alternative may be available."
     ]
   },
   bunker: {
     title: "Bunker",
     body: [
-      "• Play as it lies (don’t improve conditions).",
-      "• Unplayable: 1-stroke relief inside bunker, or 2-stroke back-on-the-line outside (if allowed)."
+      "â€¢ Play as it lies (donâ€™t improve conditions).",
+      "â€¢ Unplayable: 1-stroke relief inside bunker, or 2-stroke back-on-the-line outside (if allowed)."
     ]
   },
   gur: {
     title: "G.U.R. (Abnormal Course Condition)",
     body: [
-      "• Free relief: nearest point of complete relief within 1 club-length, not nearer the hole.",
-      "• Relief covers stance & swing; line-of-sight only if a local rule states."
+      "â€¢ Free relief: nearest point of complete relief within 1 club-length, not nearer the hole.",
+      "â€¢ Relief covers stance & swing; line-of-sight only if a local rule states."
     ]
   },
   cartpath: {
     title: "Cart Path (Immovable Obstruction)",
     body: [
-      "• Free relief: nearest point of complete relief within 1 club-length.",
-      "• Or play it as it lies."
+      "â€¢ Free relief: nearest point of complete relief within 1 club-length.",
+      "â€¢ Or play it as it lies."
     ]
   },
   rocks: {
     title: "Rocks / Roots",
     body: [
-      "• If Committee allows, take free relief (safety).",
-      "• Otherwise: play as it lies or take unplayable (1 stroke)."
+      "â€¢ If Committee allows, take free relief (safety).",
+      "â€¢ Otherwise: play as it lies or take unplayable (1 stroke)."
     ]
   }
 };
@@ -2077,8 +2242,8 @@ const RULES = {
     const r = RULES[key]; if (!r) return;
     title.textContent = r.title;
     body.innerHTML = r.body.map(line=>{
-      if (line.startsWith("•")) return `<p>• ${line.slice(1).trim()}</p>`;
-      if (line.startsWith("–")) return `<p style="margin-left:14px">– ${line.slice(1).trim()}</p>`;
+      if (line.startsWith("â€¢")) return `<p>â€¢ ${line.slice(1).trim()}</p>`;
+      if (line.startsWith("â€“")) return `<p style="margin-left:14px">â€“ ${line.slice(1).trim()}</p>`;
       return `<p>${line}</p>`;
     }).join("");
     pop.classList.add('show'); dim.classList.add('show');
