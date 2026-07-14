@@ -442,6 +442,53 @@ body[data-large-text="on"] .layupLabel {
     /* Hidden for now; functionality remains in code for future use */
     #flyoverBtn, #penBtnMini { display:none !important; }
 
+
+/* === No-go zone warning === */
+.noGoWarningBack {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: none;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0,0,0,0.55);
+}
+.noGoWarningBack.show { display: grid; }
+.noGoWarningBox {
+  width: min(88vw, 560px);
+  background: var(--panel);
+  color: var(--text);
+  border: 3px solid var(--danger);
+  border-radius: 20px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+}
+.noGoWarningIcon {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.noGoWarningText {
+  font-size: 26px;
+  line-height: 1.25;
+  font-weight: 900;
+  margin: 0 0 20px;
+}
+.noGoWarningBtn {
+  min-width: 140px;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 22px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+body[data-large-text="on"] .noGoWarningText { font-size: 36px; }
+body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px; }
+
 </style>
 
 <style id="adsStyle">
@@ -644,6 +691,17 @@ body[data-large-text="on"] .layupLabel {
         <button class="btn" id="closeHist">Close</button>
         <button class="btn" id="clearHist">Clear History</button>
       </div>
+    </div>
+  </div>
+
+
+
+  <!-- No-go zone warning -->
+  <div class="noGoWarningBack" id="noGoWarningBack" role="dialog" aria-modal="true" aria-labelledby="noGoWarningText">
+    <div class="noGoWarningBox">
+      <div class="noGoWarningIcon" aria-hidden="true">⚠</div>
+      <p class="noGoWarningText" id="noGoWarningText">Please stay clear of greens with your cart.</p>
+      <button class="noGoWarningBtn" id="noGoWarningOk">OK</button>
     </div>
   </div>
 
@@ -1342,9 +1400,115 @@ function ensureInitialFraming(){
       doCartView(false);
     }
 
+
+
+    // No-go zones around greens/bunkers
+    let activeNoGoZones = [];
+    let wasInsideNoGoZone = false;
+    let noGoAudioContext = null;
+
+    function normalizeNoGoZones(hole){
+      const pins = hole?.pins || {};
+      const raw = [pins.NO_GO, pins.NOGO, pins.NO_GO_ZONES];
+      const zones = [];
+
+      function collect(value){
+        if (!Array.isArray(value) || !value.length) return;
+        if (value[0] && Number.isFinite(Number(value[0].lat)) && Number.isFinite(Number(value[0].lng))){
+          const zone = value
+            .map(p => ({ lat:Number(p.lat), lng:Number(p.lng) }))
+            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+          if (zone.length >= 3) zones.push(zone);
+          return;
+        }
+        value.forEach(collect);
+      }
+
+      raw.forEach(collect);
+      return zones;
+    }
+
+    function loadNoGoZonesForHole(hole){
+      activeNoGoZones = normalizeNoGoZones(hole);
+      wasInsideNoGoZone = false;
+    }
+
+    function pointInsidePolygon(point, polygon){
+      const x = point.lng;
+      const y = point.lat;
+      let inside = false;
+
+      for (let i=0, j=polygon.length-1; i<polygon.length; j=i++){
+        const xi = polygon[i].lng;
+        const yi = polygon[i].lat;
+        const xj = polygon[j].lng;
+        const yj = polygon[j].lat;
+        const crosses = ((yi > y) !== (yj > y)) &&
+          (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi);
+        if (crosses) inside = !inside;
+      }
+      return inside;
+    }
+
+    function isCartInsideNoGoZone(){
+      const cart = state.cartLatLng || (state.cartMarker ? (()=>{
+        const ll = state.cartMarker.getLatLng();
+        return { lat:ll.lat, lng:ll.lng };
+      })() : null);
+      if (!cart || !activeNoGoZones.length) return false;
+      return activeNoGoZones.some(zone => pointInsidePolygon(cart, zone));
+    }
+
+    async function playNoGoAlarm(){
+      try{
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!noGoAudioContext || noGoAudioContext.state === 'closed') noGoAudioContext = new AudioCtx();
+        if (noGoAudioContext.state === 'suspended') await noGoAudioContext.resume();
+
+        const now = noGoAudioContext.currentTime;
+        [0, 0.28, 0.56].forEach((offset, index)=>{
+          const oscillator = noGoAudioContext.createOscillator();
+          const gain = noGoAudioContext.createGain();
+          oscillator.type = 'square';
+          oscillator.frequency.setValueAtTime(index === 1 ? 980 : 820, now + offset);
+          gain.gain.setValueAtTime(0.0001, now + offset);
+          gain.gain.exponentialRampToValueAtTime(0.22, now + offset + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.20);
+          oscillator.connect(gain);
+          gain.connect(noGoAudioContext.destination);
+          oscillator.start(now + offset);
+          oscillator.stop(now + offset + 0.22);
+        });
+      }catch(_){ }
+    }
+
+    function showNoGoWarning(){
+      const back = $('#noGoWarningBack');
+      if (back) back.classList.add('show');
+      playNoGoAlarm();
+    }
+
+    function hideNoGoWarning(){
+      $('#noGoWarningBack')?.classList.remove('show');
+    }
+
+    $('#noGoWarningOk')?.addEventListener('click', hideNoGoWarning);
+
+    function checkNoGoZoneEntry(){
+      const inside = isCartInsideNoGoZone();
+      if (inside && !wasInsideNoGoZone){
+        wasInsideNoGoZone = true;
+        showNoGoWarning();
+      } else if (!inside){
+        wasInsideNoGoZone = false;
+      }
+    }
+
     function renderHole(){
       clearMarkers();
       const h = state.course.holes[String(state.hole)];
+      loadNoGoZonesForHole(h);
       updateBearingForHole();
       $('#holeNo').textContent = state.hole;
       $('#par').textContent = h?.par ?? '-';
@@ -1412,6 +1576,7 @@ function ensureInitialFraming(){
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
       updateLayupUI();
+      checkNoGoZoneEntry();
     }
     if (navigator.geolocation){
       
@@ -2083,67 +2248,6 @@ window.__patchBlock = true;
           });
         }
         setPen(localStorage.getItem(key) === '1'); // apply current state
-      }catch(e){}
-    };
-  }
-
-  // No-go zone detection (supports pins.NOGO/NO_GO/NO_GO_ZONES)
-  function pointInPoly(pt, poly){
-    let x=pt.lat, y=pt.lng, inside=false;
-    for (let i=0,j=poly.length-1; i<poly.length; j=i++){
-      let xi=poly[i].lat, yi=poly[i].lng, xj=poly[j].lat, yj=poly[j].lng;
-      let intersect=((yi>y)!=(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12) + xi);
-      if (intersect) inside=!inside;
-    }
-    return inside;
-  }
-  window.__nogoZones = [];
-  function loadNoGoForHole(h){
-    window.__nogoZones = [];
-    const pins = (h && h.pins) || {};
-    const cand = [].concat(pins.NOGO||[], pins.NO_GO||[], pins.NO_GO_ZONES||[]);
-    cand.forEach(zone => {
-      if (Array.isArray(zone) && zone.length && zone[0].lat!==undefined) window.__nogoZones.push(zone);
-      else if (Array.isArray(zone)) zone.forEach(z=> Array.isArray(z) && z.length && z[0].lat!==undefined && window.__nogoZones.push(z));
-    });
-  }
-  if (!window.__patchedRenderHoleNoGo && typeof window.renderHole === 'function'){
-    window.__patchedRenderHoleNoGo = true;
-    const orig2 = window.renderHole;
-    window.renderHole = function(){
-      orig2();
-      try{
-        const h = window.state && window.state.course && window.state.course.holes
-                  ? window.state.course.holes[String(window.state.hole)] : null;
-        loadNoGoForHole(h||{});
-      }catch(e){}
-    };
-  }
-  if (!window.__patchedUpdateCart && typeof window.updateCartAndChips === 'function'){
-    window.__patchedUpdateCart = true;
-    const orig3 = window.updateCartAndChips;
-    window.__wasInNoGo = false;
-    window.updateCartAndChips = function(){
-      orig3();
-      try{
-        const cm = window.state && window.state.cartMarker;
-        if (!cm) return;
-        const ll = cm.getLatLng();
-        const pt = {lat: ll.lat, lng: ll.lng};
-        let inside = false;
-        for (const poly of (window.__nogoZones||[])){ if (pointInPoly(pt, poly)) { inside = true; break; } }
-        if (inside && !window.__wasInNoGo){
-          window.__wasInNoGo = true;
-          try{
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const o = ctx.createOscillator(); const g = ctx.createGain();
-            o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
-            o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 350);
-          }catch(e){}
-          const t = document.getElementById('toast');
-          if (t){ t.textContent='Please stay clear of greens / no-go zones.'; t.style.display='block'; setTimeout(()=> t.style.display='none', 2500); }
-        }
-        if (!inside) window.__wasInNoGo = false;
       }catch(e){}
     };
   }
