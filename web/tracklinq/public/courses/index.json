@@ -65,10 +65,10 @@
     }
     ,
     {
-      "id": "Home",
-      "name": "Home",
-      "short_code": "HOME",
-      "pin": "HOME123456",
+      "id": "test-course",
+      "name": "Test Course",
+      "short_code": "TEST",
+      "pin": "TEST123456",
       "active": true
     }
     
