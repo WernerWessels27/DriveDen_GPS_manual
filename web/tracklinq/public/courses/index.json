@@ -15,6 +15,14 @@
       "pin": "EOA1234567",
       "active": true
     }
+    ,
+       {
+      "id": "orkney-golf-club",
+      "name": "Orkney Golf Club",
+      "short_code": "OGC",
+      "pin": "OGC1234567",
+      "active": true
+    }
 ,
         {
       "id": "reading-country-club",
