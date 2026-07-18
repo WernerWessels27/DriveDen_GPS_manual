@@ -10,7 +10,18 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const ADS_DIR = process.env.ADS_DIR || path.join(PUBLIC_DIR, 'ads');
 const COURSES_DIR = path.join(PUBLIC_DIR, 'courses');
 
-app.use(express.static(PUBLIC_DIR));
+app.use(express.static(PUBLIC_DIR, {
+  setHeaders: (res, filePath) => {
+    // Course list/course files must refresh immediately when a client is online.
+    // Offline support is still handled by the service worker cache.
+    if (filePath.startsWith(COURSES_DIR) && path.extname(filePath).toLowerCase() === '.json') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
+  }
+}));
 
 function safeId(id){
   return String(id || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
