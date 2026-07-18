@@ -46,6 +46,7 @@
 
     <hr class="divider" />
     <button id="guestBtn" type="button" class="ghost">Continue as Guest</button>
+    <div id="msg" class="muted"></div>
 
   </div>
 
@@ -53,12 +54,30 @@
     // Try /courses first, then /course (to match your gps.html helper)
     async function fetchIndexJson() {
       const paths = ['/courses/index.json', '/course/index.json'];
+      const ts = Date.now();
+
       for (const p of paths) {
         try {
-          const r = await fetch(p, { cache: 'no-store' });
+          const sep = p.includes('?') ? '&' : '?';
+          const r = await fetch(`${p}${sep}ts=${ts}`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
           if (r.ok) return await r.json();
         } catch {}
       }
+
+      // Offline fallback only: let the service worker/browser cache answer the original URL.
+      for (const p of paths) {
+        try {
+          const r = await fetch(p, { cache: 'force-cache' });
+          if (r.ok) return await r.json();
+        } catch {}
+      }
+
       throw new Error('index.json not found in /courses or /course');
     }
 
@@ -120,49 +139,40 @@
 
 
 
+
+
+  
+
+  
+
+
+
+  
 <script>
 if ('serviceWorker' in navigator) {
-  (async () => {
+  window.addEventListener('load', async () => {
     try {
       // Register the service worker at the site root so it covers /, /gps.html, /courses/*, etc.
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 
-      // If a new worker finishes installing while the page is open, refresh to activate it
+      // Ask the browser to check for the newest service worker immediately.
+      // This helps new course-cache rules take effect without repeated app restarts.
+      try { await reg.update(); } catch {}
+
       reg.addEventListener('updatefound', () => {
         const sw = reg.installing;
         if (!sw) return;
         sw.addEventListener('statechange', () => {
           if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-            // optional: show a toast instead of reloading immediately
-            location.reload();
+            sw.postMessage('SKIP_WAITING');
           }
         });
-      });
-
-      // When the active controller changes (new SW took over), reload once
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        location.reload();
       });
     } catch (err) {
       console.log('SW register failed:', err);
     }
-  })();
-}
-</script>
-
-  
-
-  
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .catch(console.error);
   });
 }
 </script>
-
-
-  
 </body>
 </html>
