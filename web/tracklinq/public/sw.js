@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -149,14 +149,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2) Course JSON: network-first when online, cached fallback when offline
+  // 2) Course JSON: always try a truly fresh network copy first, cached fallback when offline
   // This keeps /courses/index.json fresh so newly uploaded courses appear in the PWA/browser automatically.
   if (isCourseJson) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
 
       try {
-        const net = await fetch(req);
+        const freshUrl = new URL(req.url);
+        freshUrl.searchParams.set('_swts', Date.now().toString());
+
+        const freshReq = new Request(freshUrl.toString(), {
+          method: 'GET',
+          headers: req.headers,
+          cache: 'no-store',
+          credentials: 'same-origin',
+          redirect: 'follow'
+        });
+
+        const net = await fetch(freshReq);
         if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
