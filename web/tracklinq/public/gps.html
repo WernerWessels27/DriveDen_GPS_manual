@@ -720,6 +720,52 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function q(name){ return new URL(location.href).searchParams.get(name); }
     function toast(msg, ms=1600){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', ms); }
 
+    // Resume current GPS session if the PWA is reopened after switching apps
+    const GPS_RESUME_KEY = 'tl_gps_resume_state';
+    const GPS_RESUME_TTL_MS = 12 * 60 * 60 * 1000; // one golf day
+
+    function readGpsResumeState(){
+      try{
+        const raw = localStorage.getItem(GPS_RESUME_KEY);
+        if(!raw) return null;
+        const obj = JSON.parse(raw);
+        if(!obj || !obj.courseId || !obj.ts) return null;
+        if(Date.now() - Number(obj.ts) > GPS_RESUME_TTL_MS){
+          localStorage.removeItem(GPS_RESUME_KEY);
+          return null;
+        }
+        return obj;
+      }catch(_){
+        return null;
+      }
+    }
+
+    function clearGpsResumeState(){
+      try{ localStorage.removeItem(GPS_RESUME_KEY); }catch(_){}
+    }
+
+    function saveGpsResumeState(){
+      try{
+        if(!state || !state.meta || !state.course) return;
+
+        const courseId = state.meta?.id || state.course?.course?.id || q('course') || localStorage.getItem('tl_course_id');
+        if(!courseId) return;
+
+        const mode = localStorage.getItem(`mode_${courseId}`) || localStorage.getItem('tl_mode') || (isGuestMode() ? 'guest' : 'club');
+        const viewMode = state.viewMode || (state.followCart ? 'cart' : 'hole');
+
+        localStorage.setItem(GPS_RESUME_KEY, JSON.stringify({
+          active: true,
+          courseId,
+          hole: state.hole || 1,
+          viewMode,
+          mode,
+          ts: Date.now()
+        }));
+      }catch(_){}
+    }
+
+
 
     // Large text accessibility toggle
     (function(){
@@ -938,18 +984,26 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       return res.json();
     }
     async function pickCourseFromIndex(idx){
-      const want=(q('course')||'').trim();
+      const savedResume = readGpsResumeState();
+      const resumeCourse = savedResume?.courseId || '';
+      const want=(q('course') || resumeCourse || '').trim();
+
       if(want){
-        const c=(idx.courses||[]).find(x=>x.id.toUpperCase()===want.toUpperCase());
+        const c=(idx.courses||[]).find(x=>String(x.id || '').toUpperCase()===want.toUpperCase());
         if(c) return c;
       }
+
       return (idx.courses||[])[0]||null;
     }
 
     // PIN/guest
     function isGuestMode(){
       const g = (q('guest')||'').trim();
-      return g === '1';
+      if(g === '1') return true;
+
+      const savedResume = readGpsResumeState();
+      const isResumeLaunch = q('resume') === '1' || !q('course');
+      return !!(isResumeLaunch && savedResume && savedResume.mode === 'guest');
     }
 
     async function validatePinFlow(courseId, courseJson){
@@ -994,7 +1048,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
     // State
     const state = {
-      meta:null, course:null, hole:1, markers:[], cartMarker:null,
+      meta:null, course:null, hole:1, viewMode:'cart', markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
       initialFramed:false,
@@ -1397,7 +1451,14 @@ function updateBearingForHole(){
 function ensureInitialFraming(){
       if (state.initialFramed) return;
       state.initialFramed = true;
-      doCartView(false);
+
+      if (state.viewMode === 'hole'){
+        state.followCart = false;
+        doHoleView();
+      } else {
+        state.followCart = true;
+        doCartView(false);
+      }
     }
 
 
@@ -1531,6 +1592,7 @@ function ensureInitialFraming(){
       updateChips(p);
       ensureInitialFraming();
       updateLayupUI();
+      saveGpsResumeState();
       setTimeout(updateFocusMask, 150);
       setTimeout(updateFocusMask, 650);
     }
@@ -1546,19 +1608,19 @@ function ensureInitialFraming(){
         }
       });
     }
-    $('#holeViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=false; doHoleView(); });
+    $('#holeViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=false; state.viewMode='hole'; doHoleView(); saveGpsResumeState(); });
     const __flyBtn = $('#flyoverBtn'); if(__flyBtn) __flyBtn.addEventListener('click', ()=>{ startFlyover(); });
-    $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; doCartView(false); });
+    $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; state.viewMode='cart'; doCartView(false); saveGpsResumeState(); });
 
     // Hole nav
     $('#prevHole').addEventListener('click', ()=>{
       cancelFlyover();
-      const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole();
+      const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole(); saveGpsResumeState();
     });
     $('#nextHole').addEventListener('click', ()=>{
       const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
       cancelFlyover();
-      state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole();
+      state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole(); saveGpsResumeState();
     });
 
     // Units
@@ -1569,7 +1631,7 @@ function ensureInitialFraming(){
     });
 
     // Exit -> back to login
-    $('#exitBtn').addEventListener('click', ()=>{ location.href = '/index.html'; });
+    $('#exitBtn').addEventListener('click', ()=>{ clearGpsResumeState(); location.href = '/?logout=1'; });
 
     // Geolocation (watch for live CART updates)
     function updateCartAndChips(){
@@ -2142,12 +2204,30 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
         if (hb) hb.style.display = 'none';
       }
 
-      const startHole = parseInt(q('hole') || '1', 10);
-      state.hole = startHole;
+      const savedResume = readGpsResumeState();
+      const sameResumeCourse = savedResume && String(savedResume.courseId || '').toUpperCase() === String(meta.id || '').toUpperCase();
+
+      const startHole = parseInt(q('hole') || (sameResumeCourse ? savedResume.hole : '1') || '1', 10);
+      state.hole = Number.isFinite(startHole) && startHole > 0 ? startHole : 1;
+
+      if (sameResumeCourse && (savedResume.viewMode === 'hole' || savedResume.viewMode === 'cart')) {
+        state.viewMode = savedResume.viewMode;
+        state.followCart = savedResume.viewMode === 'cart';
+      } else {
+        state.viewMode = 'cart';
+        state.followCart = true;
+      }
 
       renderHole();
+      saveGpsResumeState();
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
+
+    // Save course/hole/view if the app is backgrounded, killed, or the user opens another app.
+    window.addEventListener('pagehide', saveGpsResumeState);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') saveGpsResumeState();
+    });
   </script>
 
 <script>
