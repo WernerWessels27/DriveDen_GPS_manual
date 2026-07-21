@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "vaal-de-grace-golf-estate",
+      "name": "Vaal De Grace Golf Estate",
+      "short_code": "WDG",
+      "pin": "WDGGE12345",
+      "active": true
+    }
+    ,
+           {
       "id": "middelburg-country-club",
       "name": "Middelburg Country Club",
       "short_code": "MCC",
