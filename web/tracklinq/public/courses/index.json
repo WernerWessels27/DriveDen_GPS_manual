@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "parys-golf-and-country-estate",
+      "name": "Parys Golf & Country Estate",
+      "short_code": "PGC",
+      "pin": "PGACE12345",
+      "active": true
+    }
+    ,
+           {
       "id": "vaal-de-grace-golf-estate",
       "name": "Vaal De Grace Golf Estate",
       "short_code": "WDG",
