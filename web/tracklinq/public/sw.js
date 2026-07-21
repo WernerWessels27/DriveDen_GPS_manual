@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v10: network-first course JSON + forced refresh for hole outline updates
+// v13: quick service-worker install; runtime caching kept for offline use
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -61,10 +61,9 @@ function normalizeUrlForCache(input) {
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    await safePrecache(cache, APP_SHELL);
-  })());
+  // Keep install fast. Runtime fetch handling still caches GPS/course/asset files as users open them.
+  // This avoids Android/PWA install hanging while waiting for optional files or slow network requests.
+  event.waitUntil(caches.open(CACHE_NAME));
   self.skipWaiting();
 });
 
@@ -143,31 +142,20 @@ self.addEventListener('fetch', (event) => {
         if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
-        return (await cacheMatchNormalized(cache, req)) || (await cache.match(withScope('gps.html')));
+        return (await cacheMatchNormalized(cache, req)) || (await cache.match(withScope('index.html'))) || (await cache.match(withScope('gps.html')));
       }
     })());
     return;
   }
 
-  // 2) Course JSON: always try a truly fresh network copy first, cached fallback when offline
+  // 2) Course JSON: network-first when online, cached fallback when offline
   // This keeps /courses/index.json fresh so newly uploaded courses appear in the PWA/browser automatically.
   if (isCourseJson) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
 
       try {
-        const freshUrl = new URL(req.url);
-        freshUrl.searchParams.set('_swts', Date.now().toString());
-
-        const freshReq = new Request(freshUrl.toString(), {
-          method: 'GET',
-          headers: req.headers,
-          cache: 'no-store',
-          credentials: 'same-origin',
-          redirect: 'follow'
-        });
-
-        const net = await fetch(freshReq);
+        const net = await fetch(req);
         if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
