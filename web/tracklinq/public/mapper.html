@@ -46,15 +46,6 @@
     .nogobar.show { display:flex; flex-wrap:wrap; }
 
     .status { margin-top:8px; font-size:12px; color:var(--muted); }
-
-    /* Precise mapping cursor: avoids the large Leaflet hand cursor when placing points */
-    #map,
-    .leaflet-container,
-    .leaflet-grab,
-    .leaflet-dragging,
-    .leaflet-dragging .leaflet-grab {
-      cursor: crosshair !important;
-    }
   </style>
 </head>
 <body>
@@ -169,10 +160,7 @@
     const map = L.map('map', { zoomControl:true, attributionControl:false }).setView([-25.746, 28.229], 17);
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {
-        maxZoom: 20,
-        maxNativeZoom: 19
-      }
+      { maxZoom: 20 }
     ).addTo(map);
 
     document.getElementById('jumpToCoords').addEventListener('click', ()=>{
