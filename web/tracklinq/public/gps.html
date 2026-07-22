@@ -914,12 +914,56 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       LAYUP: dotIcon('#111111', 12)
     };
 
-    // Map (Esri; no visible Leaflet controls)
+    // Map (Esri live by default; course JSON may override to a selected Esri Wayback version)
     const map = L.map('map', { zoomControl:false, attributionControl:false, rotate:true, bearing:0 }).setView([-25.746, 28.229], 17);
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19 }
-    ).addTo(map);
+
+    const LIVE_ESRI_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const WAYBACK_REST_TILE_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/{id}/{z}/{y}/{x}';
+
+    let baseLayer = null;
+
+    function normalizeWaybackTemplate(template){
+      return String(template || '')
+        .replace(/\{TileMatrixSet\}/gi, 'default028mm')
+        .replace(/\{Style\}/gi, 'default')
+        .replace(/\{TileMatrix\}/gi, '{z}')
+        .replace(/\{TileRow\}/gi, '{y}')
+        .replace(/\{TileCol\}/gi, '{x}');
+    }
+
+    function createLiveEsriLayer(){
+      return L.tileLayer(LIVE_ESRI_TILE_URL, { maxZoom:19 });
+    }
+
+    function createWaybackLayer(info){
+      const id = String(info?.id || info?.layer || '').trim();
+      let template = normalizeWaybackTemplate(info?.urlTemplate || '');
+      if (!template && id) {
+        template = WAYBACK_REST_TILE_URL.replace('{id}', encodeURIComponent(id));
+      }
+      if (!template) return createLiveEsriLayer();
+      return L.tileLayer(template, { maxZoom:19 });
+    }
+
+    function setBaseLayer(layer){
+      if (baseLayer) {
+        try { map.removeLayer(baseLayer); } catch(_) {}
+      }
+      baseLayer = layer;
+      baseLayer.addTo(map);
+      try { baseLayer.bringToBack(); } catch(_) {}
+    }
+
+    function applyCourseImagery(courseJson){
+      const img = courseJson?.imagery || courseJson?.course?.imagery;
+      if (img && img.type === 'esri-wayback') {
+        setBaseLayer(createWaybackLayer(img));
+      } else {
+        setBaseLayer(createLiveEsriLayer());
+      }
+    }
+
+    setBaseLayer(createLiveEsriLayer());
 
     map.createPane('cartPane');
     map.getPane('cartPane').style.zIndex = '1040';
@@ -2195,6 +2239,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
       if (!ok) return;
 
       state.meta = meta; state.course = course;
+      applyCourseImagery(course);
       $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
 
       // Hide history for clubs
