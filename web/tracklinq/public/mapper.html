@@ -89,6 +89,31 @@
       <button id="jumpToCoords">Go To Course</button>
     </div>
 
+
+    <h3>Imagery</h3>
+    <div class="muted">
+      Default is live Esri imagery. Load historic Wayback imagery, preview versions visually, then save the best-looking version into this course JSON.
+    </div>
+    <div class="saveRow">
+      <button id="liveImagery">Preview Live Esri</button>
+      <button id="loadWayback">Load Historic Images</button>
+    </div>
+    <div class="row">
+      <button id="waybackOlder">Older</button>
+      <button id="waybackNewer">Newer</button>
+    </div>
+    <div class="group">
+      <label class="muted">Historic imagery version</label>
+      <select id="waybackSelect">
+        <option value="">Load historic images first</option>
+      </select>
+    </div>
+    <div class="saveRow">
+      <button id="useWaybackForCourse">Use Previewed Imagery For Course</button>
+      <button id="clearCourseImagery">Use Live Imagery For Course</button>
+    </div>
+    <div id="imageryStatus" class="status">Imagery: Live Esri</div>
+
     <div class="row">
       <div>
         <label class="muted">10-digit PIN</label>
@@ -167,10 +192,223 @@
   <script>
     // --- Map & Tiles ---
     const map = L.map('map', { zoomControl:true, attributionControl:false }).setView([-25.746, 28.229], 17);
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 20 }
-    ).addTo(map);
+
+    const LIVE_ESRI_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const WAYBACK_CAPABILITIES_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/WMTS/1.0.0/WMTSCapabilities.xml';
+    const WAYBACK_REST_TILE_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/{id}/{z}/{y}/{x}';
+
+    let baseLayer = null;
+    let waybackLayers = [];
+    let currentWaybackIndex = -1;
+    let currentImagery = { type:'esri-live', label:'Live Esri' };
+
+    function imageryStatus(msg){
+      const el = document.getElementById('imageryStatus');
+      if (el) el.textContent = msg || '';
+    }
+
+    function normalizeWaybackTemplate(template){
+      return String(template || '')
+        .replace(/\{TileMatrixSet\}/gi, 'default028mm')
+        .replace(/\{Style\}/gi, 'default')
+        .replace(/\{TileMatrix\}/gi, '{z}')
+        .replace(/\{TileRow\}/gi, '{y}')
+        .replace(/\{TileCol\}/gi, '{x}');
+    }
+
+    function createLiveEsriLayer(){
+      return L.tileLayer(LIVE_ESRI_TILE_URL, { maxZoom:20 });
+    }
+
+    function createWaybackLayer(info){
+      const id = String(info?.id || '').trim();
+      let template = normalizeWaybackTemplate(info?.urlTemplate || '');
+      if (!template && id) {
+        template = WAYBACK_REST_TILE_URL.replace('{id}', encodeURIComponent(id));
+      }
+      if (!template) return createLiveEsriLayer();
+      return L.tileLayer(template, { maxZoom:20 });
+    }
+
+    function setBaseLayer(layer){
+      if (baseLayer) {
+        try { map.removeLayer(baseLayer); } catch(_) {}
+      }
+      baseLayer = layer;
+      baseLayer.addTo(map);
+      try { baseLayer.bringToBack(); } catch(_) {}
+    }
+
+    function previewLiveImagery(){
+      currentImagery = { type:'esri-live', label:'Live Esri' };
+      setBaseLayer(createLiveEsriLayer());
+      imageryStatus('Imagery preview: Live Esri');
+    }
+
+    function previewWayback(index){
+      if (!waybackLayers.length) {
+        imageryStatus('Load historic imagery first.');
+        return;
+      }
+
+      currentWaybackIndex = Math.max(0, Math.min(index, waybackLayers.length - 1));
+      const info = waybackLayers[currentWaybackIndex];
+      currentImagery = {
+        type:'esri-wayback',
+        id:info.id,
+        label:info.label,
+        title:info.title,
+        urlTemplate:info.urlTemplate
+      };
+
+      const sel = document.getElementById('waybackSelect');
+      if (sel) sel.value = String(currentWaybackIndex);
+
+      setBaseLayer(createWaybackLayer(info));
+      imageryStatus(`Imagery preview: Wayback ${info.label}`);
+    }
+
+    function updateWaybackSelect(){
+      const sel = document.getElementById('waybackSelect');
+      if (!sel) return;
+      sel.innerHTML = '';
+      if (!waybackLayers.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No Wayback layers loaded';
+        sel.appendChild(opt);
+        return;
+      }
+      waybackLayers.forEach((info, i)=>{
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = info.label;
+        sel.appendChild(opt);
+      });
+      sel.value = String(currentWaybackIndex >= 0 ? currentWaybackIndex : 0);
+    }
+
+    async function loadWaybackLayers(){
+      imageryStatus('Loading historic imagery versions...');
+      const res = await fetch(WAYBACK_CAPABILITIES_URL, { cache:'no-store' });
+      if (!res.ok) throw new Error('Could not load Wayback capabilities');
+      const xmlText = await res.text();
+      const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
+      const layers = Array.from(xml.getElementsByTagName('*')).filter(el => el.localName === 'Layer');
+
+      const parsed = [];
+      layers.forEach(layerEl => {
+        const children = Array.from(layerEl.getElementsByTagName('*'));
+        const id = (children.find(el => el.localName === 'Identifier')?.textContent || '').trim();
+        const title = (children.find(el => el.localName === 'Title')?.textContent || '').trim();
+
+        if (!id || !title) return;
+        if (/metadata/i.test(title)) return;
+
+        const dateMatch = title.match(/(20\d{2}|19\d{2})[-_](\d{2})[-_](\d{2})/);
+        if (!dateMatch) return;
+
+        const label = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+        const resourceEl = children.find(el => el.localName === 'ResourceURL' && String(el.getAttribute('resourceType') || '').toLowerCase() === 'tile');
+        let urlTemplate = resourceEl ? resourceEl.getAttribute('template') : '';
+        urlTemplate = normalizeWaybackTemplate(urlTemplate);
+
+        if (!urlTemplate) {
+          urlTemplate = WAYBACK_REST_TILE_URL.replace('{id}', encodeURIComponent(id));
+        }
+
+        parsed.push({ id, label, title, urlTemplate });
+      });
+
+      parsed.sort((a,b)=> b.label.localeCompare(a.label));
+
+      // Deduplicate by id
+      const seen = new Set();
+      waybackLayers = parsed.filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+
+      if (!waybackLayers.length) throw new Error('No Wayback imagery layers found');
+
+      currentWaybackIndex = 0;
+      updateWaybackSelect();
+      previewWayback(0);
+    }
+
+    function applySavedCourseImagery(){
+      const img = state.course?.imagery;
+      if (img && img.type === 'esri-wayback') {
+        currentImagery = {
+          type:'esri-wayback',
+          id:img.id || img.layer || '',
+          label:img.label || img.date || 'Selected Wayback',
+          title:img.title || '',
+          urlTemplate:img.urlTemplate || ''
+        };
+        setBaseLayer(createWaybackLayer(currentImagery));
+        imageryStatus(`Course imagery: Wayback ${currentImagery.label}`);
+      } else {
+        previewLiveImagery();
+        imageryStatus('Course imagery: Live Esri');
+      }
+    }
+
+    previewLiveImagery();
+
+    document.getElementById('liveImagery').addEventListener('click', previewLiveImagery);
+
+    document.getElementById('loadWayback').addEventListener('click', async ()=>{
+      try {
+        await loadWaybackLayers();
+      } catch (err) {
+        console.error(err);
+        imageryStatus('Could not load historic imagery. Check internet connection and try again.');
+        alert('Could not load historic imagery.');
+      }
+    });
+
+    document.getElementById('waybackOlder').addEventListener('click', ()=>{
+      if (!waybackLayers.length) return imageryStatus('Load historic imagery first.');
+      previewWayback(currentWaybackIndex + 1);
+    });
+
+    document.getElementById('waybackNewer').addEventListener('click', ()=>{
+      if (!waybackLayers.length) return imageryStatus('Load historic imagery first.');
+      previewWayback(currentWaybackIndex - 1);
+    });
+
+    document.getElementById('waybackSelect').addEventListener('change', (e)=>{
+      const idx = parseInt(e.target.value, 10);
+      if (Number.isFinite(idx)) previewWayback(idx);
+    });
+
+    document.getElementById('useWaybackForCourse').addEventListener('click', ()=>{
+      if (!currentImagery || currentImagery.type !== 'esri-wayback') {
+        alert('Preview a historic Wayback image first.');
+        return;
+      }
+
+      state.course.imagery = {
+        type:'esri-wayback',
+        id:currentImagery.id,
+        label:currentImagery.label,
+        title:currentImagery.title || '',
+        urlTemplate:currentImagery.urlTemplate || ''
+      };
+
+      imageryStatus(`Saved for course JSON: Wayback ${currentImagery.label}`);
+      status(`Course imagery set to Wayback ${currentImagery.label}`);
+    });
+
+    document.getElementById('clearCourseImagery').addEventListener('click', ()=>{
+      delete state.course.imagery;
+      previewLiveImagery();
+      imageryStatus('Saved for course JSON: Live Esri');
+      status('Course imagery set to Live Esri');
+    });
+
 
     document.getElementById('jumpToCoords').addEventListener('click', ()=>{
       const lat = parseFloat(document.getElementById('jumpLat').value);
@@ -617,6 +855,7 @@
         return;
       }
       state.course = obj;
+      applySavedCourseImagery();
       $('#courseId').value = obj.course?.id || '';
       $('#courseName').value = obj.course?.name || '';
       $('#coursePin').value = obj.course?.pin || '';
@@ -696,6 +935,7 @@
         if (!raw) return alert('No local save found');
         const obj = JSON.parse(raw);
         state.course = obj;
+        applySavedCourseImagery();
         $('#courseId').value = obj.course?.id || '';
         $('#courseName').value = obj.course?.name || '';
         $('#coursePin').value = obj.course?.pin || '';
