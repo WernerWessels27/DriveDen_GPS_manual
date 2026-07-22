@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "modderfontein-golf-club",
+      "name": "Modderfontein Golf Club",
+      "short_code": "MGC",
+      "pin": "MODGC12345",
+      "active": true
+    }
+    ,
+           {
       "id": "parys-golf-and-country-estate",
       "name": "Parys Golf & Country Estate",
       "short_code": "PGC",
