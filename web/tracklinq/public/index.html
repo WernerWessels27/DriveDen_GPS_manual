@@ -227,6 +227,53 @@
   </div>
 
   <script>
+    // Resume current GPS session if the PWA returns here after switching apps
+    const GPS_RESUME_KEY = "tl_gps_resume_state";
+    const GPS_RESUME_TTL_MS = 12 * 60 * 60 * 1000; // one golf day
+
+    function clearGpsResumeState() {
+      try {
+        localStorage.removeItem(GPS_RESUME_KEY);
+      } catch (_) {}
+    }
+
+    function maybeResumeGpsSession() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+
+        // If the user pressed Exit in GPS, stay on this login page.
+        if (params.get("logout") === "1") {
+          clearGpsResumeState();
+          return;
+        }
+
+        const raw = localStorage.getItem(GPS_RESUME_KEY);
+        if (!raw) return;
+
+        const saved = JSON.parse(raw);
+        if (!saved || !saved.active || !saved.courseId || !saved.ts) return;
+
+        if (Date.now() - Number(saved.ts) > GPS_RESUME_TTL_MS) {
+          clearGpsResumeState();
+          return;
+        }
+
+        const url = new URL("/gps.html", window.location.origin);
+        url.searchParams.set("course", saved.courseId);
+        url.searchParams.set("hole", saved.hole || "1");
+        url.searchParams.set("resume", "1");
+        url.searchParams.set("t", Date.now().toString());
+
+        if (saved.mode === "guest") {
+          url.searchParams.set("guest", "1");
+        }
+
+        window.location.replace(url.toString());
+      } catch (_) {}
+    }
+
+    maybeResumeGpsSession();
+
     // SW register
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
@@ -477,6 +524,7 @@
         return;
       }
 
+      clearGpsResumeState();
       localStorage.setItem(`pin_${course.id}`, raw);
       location.href = `/gps.html?course=${encodeURIComponent(course.id)}&pin=${encodeURIComponent(raw)}`;
     });
@@ -491,6 +539,7 @@
         alert("Search and select a course first.");
         return;
       }
+      clearGpsResumeState();
       location.href = `/gps.html?course=${encodeURIComponent(selectedCourse)}&guest=1`;
     });
   </script>
