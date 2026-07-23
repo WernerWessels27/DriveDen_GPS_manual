@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "pearl-valley-golf-estate",
+      "name": "Pearl Valley Golf Estate",
+      "short_code": "PVG",
+      "pin": "PVAL123456",
+      "active": true
+    }
+    ,
+           {
       "id": "potchefstroom-country-club",
       "name": "Potchefstroom Country Club",
       "short_code": "POC",
