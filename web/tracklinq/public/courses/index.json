@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "potchefstroom-country-club",
+      "name": "Potchefstroom Country Club",
+      "short_code": "POC",
+      "pin": "POTCH12345",
+      "active": true
+    }
+    ,
+           {
       "id": "modderfontein-golf-club",
       "name": "Modderfontein Golf Club",
       "short_code": "MGC",
