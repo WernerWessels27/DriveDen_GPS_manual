@@ -440,7 +440,7 @@ body[data-large-text="on"] .layupLabel {
 }
 
     /* Hidden for now; functionality remains in code for future use */
-    #flyoverBtn, #penBtnMini { display:none !important; }
+    #flyoverBtn { display:none !important; }
 
 
 /* === No-go zone warning === */
@@ -526,7 +526,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
   <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
     <button class="btnMini" id="largeTextBtn" title="Large text" aria-pressed="false" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);"><span>Enlarge Text</span></button>
     <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
-    <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
+    <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
       <span>Penalties</span>
       <div class="penSwitch" id="penSwitch" style="position:relative;width:44px;height:24px;border-radius:999px;background:#ddd;border:1px solid #cfcfcf;flex:0 0 auto;">
         <div style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;transition:all .2s;" data-role="knob"></div>
@@ -1078,6 +1078,60 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       }
       return ok;
     }
+    function isClubModeForCourse(courseId){
+      return !isGuestMode() && (localStorage.getItem(`mode_${courseId}`) === 'club');
+    }
+
+    function applyLoginModeUi(courseId){
+      const isClub = isClubModeForCourse(courseId);
+
+      // History remains guest-only.
+      const historyBtn = document.getElementById('historyBtn');
+      if (historyBtn) historyBtn.style.display = isClub ? 'none' : '';
+
+      // Penalties are visible only for club PIN login.
+      const penBtn = document.getElementById('penBtnMini');
+      if (penBtn) penBtn.style.display = isClub ? 'flex' : 'none';
+
+      // Club carts should remain logged in; hide normal Exit button.
+      const exitBtn = document.getElementById('exitBtn');
+      if (exitBtn) exitBtn.style.display = isClub ? 'none' : '';
+    }
+
+    function setupClubHiddenExit(courseId){
+      const title = document.getElementById('courseTitle');
+      if (!title || title.dataset.clubExitReady === '1') return;
+
+      title.dataset.clubExitReady = '1';
+
+      let taps = 0;
+      let timer = null;
+
+      title.addEventListener('click', () => {
+        if (!isClubModeForCourse(courseId)) return;
+
+        taps += 1;
+        clearTimeout(timer);
+        timer = setTimeout(() => { taps = 0; }, 3000);
+
+        if (taps < 7) return;
+
+        taps = 0;
+        clearTimeout(timer);
+
+        const pin = (prompt('Enter admin PIN to exit:') || '').trim();
+        if (pin !== '02004') {
+          alert('Incorrect PIN.');
+          return;
+        }
+
+        if (confirm('Exit to login page?')) {
+          clearGpsResumeState();
+          location.href = '/?logout=1';
+        }
+      });
+    }
+
     async function isPinValid(courseId, courseJson, candidate){
       if(!candidate||candidate.length!==10) return false;
       try{
@@ -2242,12 +2296,9 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
       applyCourseImagery(course);
       $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
 
-      // Hide history for clubs
-      const mode = localStorage.getItem(`mode_${meta.id}`) || (isGuestMode() ? 'guest' : 'club');
-      if (mode !== 'guest') {
-        const hb = document.getElementById('historyBtn');
-        if (hb) hb.style.display = 'none';
-      }
+      // Apply club/guest UI rules after login mode has been resolved.
+      applyLoginModeUi(meta.id);
+      setupClubHiddenExit(meta.id);
 
       const savedResume = readGpsResumeState();
       const sameResumeCourse = savedResume && String(savedResume.courseId || '').toUpperCase() === String(meta.id || '').toUpperCase();
