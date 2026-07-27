@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v13: quick service-worker install; runtime caching kept for offline use
+// v14: fast install plus guaranteed offline shell for installed PWA
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v13';
+const CACHE_VERSION = 'v14';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -17,6 +17,11 @@ const withScope = (path) => new URL(path.replace(/^\//, ''), SCOPE_URL).toString
 
 // App shell + local vendor libs (add more local assets here if needed)
 const APP_SHELL = [
+  '/manifest.webmanifest',
+  '/offline.html',
+  '/gps.html',
+  '/index.html',
+  '/',
   'gps.html',
   'mapper.html',
   'ad-manager.html',
@@ -61,9 +66,30 @@ function normalizeUrlForCache(input) {
 }
 
 self.addEventListener('install', (event) => {
-  // Keep install fast. Runtime fetch handling still caches GPS/course/asset files as users open them.
-  // This avoids Android/PWA install hanging while waiting for optional files or slow network requests.
-  event.waitUntil(caches.open(CACHE_NAME));
+  // Cache the essential same-origin app shell so installed devices can open while offline.
+  // Use allSettled so a single slow/missing optional file never aborts PWA installation.
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+
+    const essentialShell = [
+      withScope(''),
+      withScope('index.html'),
+      withScope('gps.html'),
+      withScope('offline.html'),
+      withScope('manifest.webmanifest')
+    ];
+
+    await Promise.allSettled(
+      essentialShell.map(url =>
+        fetch(url, { cache:'reload' })
+          .then(res => {
+            if (res && res.ok) return cache.put(url, res.clone());
+          })
+          .catch(() => {})
+      )
+    );
+  })());
+
   self.skipWaiting();
 });
 
@@ -142,7 +168,7 @@ self.addEventListener('fetch', (event) => {
         if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
-        return (await cacheMatchNormalized(cache, req)) || (await cache.match(withScope('index.html'))) || (await cache.match(withScope('gps.html')));
+        return (await cacheMatchNormalized(cache, req)) || (await cache.match(withScope('index.html'))) || (await cache.match(withScope('gps.html'))) || (await cache.match(withScope('offline.html')));
       }
     })());
     return;
