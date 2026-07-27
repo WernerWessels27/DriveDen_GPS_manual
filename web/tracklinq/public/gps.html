@@ -741,7 +741,10 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function clearGpsResumeState(){
-      try{ localStorage.removeItem(GPS_RESUME_KEY); }catch(_){}
+      try{
+        localStorage.removeItem(GPS_RESUME_KEY);
+        sessionStorage.removeItem('tl_resume_attempting');
+      }catch(_){}
     }
 
     function saveGpsResumeState(){
@@ -2316,6 +2319,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
 
       renderHole();
       saveGpsResumeState();
+      try { sessionStorage.removeItem('tl_resume_attempting'); } catch(_) {}
       toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
 
