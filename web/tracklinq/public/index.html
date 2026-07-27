@@ -227,23 +227,53 @@
   </div>
 
   <script>
-    // Resume current GPS session if the PWA returns here after switching apps
+    // Resume current GPS session if the PWA returns here after switching apps.
+    // This is guarded so an offline failed restore does not trap the user on the login page.
     const GPS_RESUME_KEY = "tl_gps_resume_state";
     const GPS_RESUME_TTL_MS = 12 * 60 * 60 * 1000; // one golf day
+    const RESUME_ATTEMPT_KEY = "tl_resume_attempting";
 
     function clearGpsResumeState() {
       try {
         localStorage.removeItem(GPS_RESUME_KEY);
+        sessionStorage.removeItem(RESUME_ATTEMPT_KEY);
       } catch (_) {}
     }
 
-    function maybeResumeGpsSession() {
+    async function cachedUrlExists(url) {
+      try {
+        if (!("caches" in window)) return false;
+        return !!(await caches.match(url));
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function canResumeOffline(saved) {
+      if (navigator.onLine) return true;
+      if (!saved || !saved.courseId) return false;
+
+      const gpsReady = await cachedUrlExists("/gps.html");
+      const indexReady = await cachedUrlExists("/courses/index.json") || !!localStorage.getItem("course_index_snapshot");
+      const courseReady = await cachedUrlExists(`/courses/${saved.courseId}.json`);
+
+      return gpsReady && indexReady && courseReady;
+    }
+
+    async function maybeResumeGpsSession() {
       try {
         const params = new URLSearchParams(window.location.search);
 
         // If the user pressed Exit in GPS, stay on this login page.
         if (params.get("logout") === "1") {
           clearGpsResumeState();
+          return;
+        }
+
+        // If a previous auto-resume attempt failed and landed back here,
+        // do not keep trying in a loop. Leave the page usable for PIN/guest login.
+        if (sessionStorage.getItem(RESUME_ATTEMPT_KEY) === "1") {
+          sessionStorage.removeItem(RESUME_ATTEMPT_KEY);
           return;
         }
 
@@ -258,6 +288,12 @@
           return;
         }
 
+        const canResume = await canResumeOffline(saved);
+        if (!canResume) {
+          // Offline files for this course are not ready. Do not block the login page.
+          return;
+        }
+
         const url = new URL("/gps.html", window.location.origin);
         url.searchParams.set("course", saved.courseId);
         url.searchParams.set("hole", saved.hole || "1");
@@ -268,6 +304,7 @@
           url.searchParams.set("guest", "1");
         }
 
+        sessionStorage.setItem(RESUME_ATTEMPT_KEY, "1");
         window.location.replace(url.toString());
       } catch (_) {}
     }
