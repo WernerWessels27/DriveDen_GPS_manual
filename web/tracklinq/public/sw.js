@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v14: fast install plus guaranteed offline shell for installed PWA
+// v15: offline shell plus offline course index/course JSON restore
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -65,6 +65,34 @@ function normalizeUrlForCache(input) {
   return u.toString();
 }
 
+
+async function cacheOfflineCourseData(cache) {
+  try {
+    const indexUrl = withScope('courses/index.json');
+    const indexRes = await fetch(`${indexUrl}?swts=${Date.now()}`, { cache:'no-store' });
+    if (!indexRes || !indexRes.ok) return;
+
+    await cache.put(indexUrl, indexRes.clone());
+
+    const idx = await indexRes.clone().json();
+    const courses = Array.isArray(idx?.courses) ? idx.courses : [];
+
+    await Promise.allSettled(
+      courses
+        .map(c => String(c?.id || '').trim())
+        .filter(Boolean)
+        .map(id => {
+          const courseUrl = withScope(`courses/${encodeURIComponent(id)}.json`);
+          return fetch(`${courseUrl}?swts=${Date.now()}`, { cache:'no-store' })
+            .then(res => {
+              if (res && res.ok) return cache.put(courseUrl, res.clone());
+            })
+            .catch(() => {});
+        })
+    );
+  } catch (_) {}
+}
+
 self.addEventListener('install', (event) => {
   // Cache the essential same-origin app shell so installed devices can open while offline.
   // Use allSettled so a single slow/missing optional file never aborts PWA installation.
@@ -88,6 +116,10 @@ self.addEventListener('install', (event) => {
           .catch(() => {})
       )
     );
+
+    // Also cache the course list and available course JSON files for offline login/guest course selection.
+    // This runs during install/update while online, but it is protected so it will not abort installation.
+    await cacheOfflineCourseData(cache);
   })());
 
   self.skipWaiting();
