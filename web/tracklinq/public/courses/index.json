@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "magalies-park-golf-club",
+      "name": "Magalies Park Golf Club",
+      "short_code": "MPG",
+      "pin": "MAGAL57231",
+      "active": true
+    }
+    ,
+           {
       "id": "pearl-valley-golf-estate",
       "name": "Pearl Valley Golf Estate",
       "short_code": "PVG",
