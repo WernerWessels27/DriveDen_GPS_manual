@@ -1780,9 +1780,15 @@ function maybeAutoAdvanceByGps(){
 
       state.lastGpsAdvanceTs = now;
       state.lastGpsAdvanceFrom = currHoleNum;
+
+      // Auto-advance should always open the new hole in HOLE view, not CART view.
       state.hole = nextHoleNum;
+      state.followCart = false;
+      state.viewMode = 'hole';
       state.initialFramed = false;
+      cancelFlyover();
       renderHole();
+      saveGpsResumeState();
     }
   }catch(_){ }
 }
@@ -2143,9 +2149,14 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
       setTimeout(()=>{
         const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
         if (hNo < max){
+          // Scorecard auto-advance should also open the new hole in HOLE view.
           state.hole = hNo + 1;
+          state.followCart = false;
+          state.viewMode = 'hole';
           state.initialFramed=false;
+          cancelFlyover();
           renderHole();
+          saveGpsResumeState();
         }
       }, 100);
     }
@@ -2562,6 +2573,7 @@ const RULES = {
   let idleTimer = null;
   let refreshTimer = null;
   let startedForKey = null;
+  let activeAdsKey = null;
   let metaSnapshot = null;
   let coursesIndexCache = null;
 
@@ -2684,6 +2696,30 @@ const RULES = {
     }
   }
 
+  function adIndexStorageKey(key){
+    return `ads_next_idx_${safeId(key || 'default')}`;
+  }
+
+  function restoreNextAdIndex(key, length){
+    try{
+      if (!length) return 0;
+      const raw = localStorage.getItem(adIndexStorageKey(key));
+      const n = parseInt(raw, 10);
+      if (!Number.isFinite(n)) return 0;
+      return ((n % length) + length) % length;
+    }catch(_){
+      return 0;
+    }
+  }
+
+  function persistNextAdIndex(key, currentIndex){
+    try{
+      if (!key || !urls.length) return;
+      const nextIndex = (Number(currentIndex || 0) + 1) % urls.length;
+      localStorage.setItem(adIndexStorageKey(key), String(nextIndex));
+    }catch(_){}
+  }
+
   function prefetchImages(list){
     (list || []).forEach((u)=>{
       try{
@@ -2710,9 +2746,12 @@ const RULES = {
       n = (n + 1) % urls.length;
       idx = n;
       img.src = urls[n];
+      persistNextAdIndex(activeAdsKey || startedForKey, n);
     };
 
+    idx = n;
     img.src = urls[n];
+    persistNextAdIndex(activeAdsKey || startedForKey, n);
     return true;
   }
 
@@ -2790,13 +2829,20 @@ const RULES = {
 
     const nextUrls = (latest || []).filter(Boolean);
     const changed = JSON.stringify(nextUrls) !== JSON.stringify(urls);
+    const previousAdsKey = activeAdsKey;
+    activeAdsKey = persistKey;
     urls = nextUrls;
     enabled = urls.length > 0;
 
     if (enabled){
       persistUrls(persistKey, urls);
       prefetchImages(urls);
-      if (idx >= urls.length) idx = 0;
+
+      // Continue from the next stored slide for this club/guest instead of restarting at ad 1.
+      if (previousAdsKey !== activeAdsKey || idx >= urls.length || idx < 0) {
+        idx = restoreNextAdIndex(activeAdsKey, urls.length);
+      }
+
       if (changed){
         const ov = document.getElementById('adsOverlay');
         if (ov && ov.style.display !== 'none'){
@@ -2858,6 +2904,8 @@ const RULES = {
       urlsCount: urls.length,
       urls: urls.slice(),
       currentIndex: idx,
+      activeAdsKey,
+      nextStoredIndex: restoreNextAdIndex(activeAdsKey || startedForKey, urls.length || 1),
       hasSlideTimer: !!slideTimer,
       meta: metaSnapshot,
       courseIdFromUrl: getCourseIdFromUrl()
