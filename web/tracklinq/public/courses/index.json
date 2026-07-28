@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "randpark-firethorn",
+      "name": "Randpark - Firethorn",
+      "short_code": "RPF",
+      "pin": "RPF1234567",
+      "active": true
+    }
+    ,
+           {
       "id": "magalies-park-golf-club",
       "name": "Magalies Park Golf Club",
       "short_code": "MPG",
