@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v15: offline shell plus offline course index/course JSON restore
+// v16: offline course shell, course JSON, and Esri/Wayback tile cache support
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,12 +8,28 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v15';
+const CACHE_VERSION = 'v16';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
 const SCOPE_URL = new URL(self.registration.scope);
 const withScope = (path) => new URL(path.replace(/^\//, ''), SCOPE_URL).toString();
+const COURSE_TILE_CACHE = 'driveden-course-tiles-v1';
+
+function isCourseTileUrl(url) {
+  const host = String(url.hostname || '').toLowerCase();
+  const path = String(url.pathname || '').toLowerCase();
+
+  return (
+    (host === 'server.arcgisonline.com' && path.includes('/world_imagery/mapserver/tile/')) ||
+    (host === 'wayback.maptiles.arcgis.com' && path.includes('/world_imagery/') && path.includes('/tile/'))
+  );
+}
+
+async function matchAnyTileCache(req) {
+  const tileCache = await caches.open(COURSE_TILE_CACHE);
+  return (await tileCache.match(req)) || (await tileCache.match(req.url));
+}
 
 // App shell + local vendor libs (add more local assets here if needed)
 const APP_SHELL = [
@@ -159,6 +175,30 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  // Esri / Wayback satellite tiles: cache-first, including cross-origin tile requests.
+  // This allows the GPS page to deliberately prepare a course for offline use.
+  if (isCourseTileUrl(url)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(COURSE_TILE_CACHE);
+      const cached = await cache.match(req) || await cache.match(req.url);
+      if (cached) return cached;
+
+      try {
+        const net = await fetch(req);
+        if (net && (net.ok || net.type === 'opaque')) {
+          try { await cache.put(req, net.clone()); } catch (_) {
+            try { await cache.put(req.url, net.clone()); } catch (_) {}
+          }
+        }
+        return net;
+      } catch {
+        return cached || new Response('', { status: 504 });
+      }
+    })());
+    return;
+  }
+
   const isSameOrigin = url.origin === self.location.origin;
   if (!isSameOrigin) return;
 
