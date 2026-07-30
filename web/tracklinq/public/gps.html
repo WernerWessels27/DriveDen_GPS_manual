@@ -214,7 +214,8 @@
 /* === Rules & Penalties theme integration (override inline light styles) === */
 #rulesBtnMini,
 #penBtnMini,
-#largeTextBtn {
+#largeTextBtn,
+#downloadCourseBtn {
   background: var(--panel) !important;
   color: var(--text) !important;
   border: 1px solid var(--chip-border) !important;
@@ -250,6 +251,10 @@
   background: var(--panel) !important;
   color: var(--text) !important;
   border: 1px solid var(--chip-border) !important;
+}
+
+#downloadCourseDot {
+  flex:0 0 auto;
 }
 
 
@@ -524,6 +529,10 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
   <!-- Rules & Penalties (top-right) -->
   <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
+    <button class="btnMini" id="downloadCourseBtn" title="Download course for offline use" aria-pressed="false" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;gap:8px;min-width:160px;">
+      <span id="downloadCourseDot" style="width:10px;height:10px;border-radius:50%;display:inline-block;background:#9ca3af;"></span>
+      <span id="downloadCourseLabel">Download Course</span>
+    </button>
     <button class="btnMini" id="largeTextBtn" title="Large text" aria-pressed="false" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);"><span>Enlarge Text</span></button>
     <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
     <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
@@ -924,6 +933,17 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     const WAYBACK_REST_TILE_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/{id}/{z}/{y}/{x}';
 
     let baseLayer = null;
+    let activeTileTemplate = LIVE_ESRI_TILE_URL;
+    let activeImageryKey = 'esri-live';
+
+    function tileLayerOptions(){
+      return {
+        maxZoom:19,
+        keepBuffer:6,
+        updateWhenIdle:true,
+        updateWhenZooming:false
+      };
+    }
 
     function normalizeWaybackTemplate(template){
       return String(template || '')
@@ -935,17 +955,20 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function createLiveEsriLayer(){
-      return L.tileLayer(LIVE_ESRI_TILE_URL, { maxZoom:19 });
+      return L.tileLayer(LIVE_ESRI_TILE_URL, tileLayerOptions());
     }
 
-    function createWaybackLayer(info){
+    function getWaybackTileTemplate(info){
       const id = String(info?.id || info?.layer || '').trim();
       let template = normalizeWaybackTemplate(info?.urlTemplate || '');
       if (!template && id) {
         template = WAYBACK_REST_TILE_URL.replace('{id}', encodeURIComponent(id));
       }
-      if (!template) return createLiveEsriLayer();
-      return L.tileLayer(template, { maxZoom:19 });
+      return template || LIVE_ESRI_TILE_URL;
+    }
+
+    function createWaybackLayer(info){
+      return L.tileLayer(getWaybackTileTemplate(info), tileLayerOptions());
     }
 
     function setBaseLayer(layer){
@@ -960,10 +983,15 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function applyCourseImagery(courseJson){
       const img = courseJson?.imagery || courseJson?.course?.imagery;
       if (img && img.type === 'esri-wayback') {
-        setBaseLayer(createWaybackLayer(img));
+        activeTileTemplate = getWaybackTileTemplate(img);
+        activeImageryKey = `wayback-${String(img.id || img.layer || img.label || 'selected')}`;
+        setBaseLayer(L.tileLayer(activeTileTemplate, tileLayerOptions()));
       } else {
+        activeTileTemplate = LIVE_ESRI_TILE_URL;
+        activeImageryKey = 'esri-live';
         setBaseLayer(createLiveEsriLayer());
       }
+      setTimeout(updateOfflineCourseButton, 100);
     }
 
     setBaseLayer(createLiveEsriLayer());
@@ -1165,6 +1193,285 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       lastGpsAdvanceFrom:null,
       focusRaf:null
     };
+
+
+    // --- Offline course tile download ---
+    const COURSE_TILE_CACHE = 'driveden-course-tiles-v1';
+    const OFFLINE_TILE_ZOOMS = [16, 17, 18, 19];
+    const MAX_OFFLINE_TILES_BEFORE_CONFIRM = 3200;
+    let offlineDownloadBusy = false;
+    let offlinePrewarmTimer = null;
+
+    function offlineSafeId(v){
+      return String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+
+    function getOfflineCourseId(){
+      return String(state.course?.course?.id || state.meta?.id || q('course') || 'course').trim();
+    }
+
+    function getOfflineCourseKey(){
+      return `offline_course_${offlineSafeId(getOfflineCourseId())}_${offlineSafeId(activeImageryKey || 'esri-live')}`;
+    }
+
+    function getOfflineManifest(){
+      try{
+        const raw = localStorage.getItem(getOfflineCourseKey());
+        return raw ? JSON.parse(raw) : null;
+      }catch(_){
+        return null;
+      }
+    }
+
+    function setOfflineCourseButton(mode, label){
+      const btn = $('#downloadCourseBtn');
+      const dot = $('#downloadCourseDot');
+      const text = $('#downloadCourseLabel');
+      if (!btn || !dot || !text) return;
+
+      text.textContent = label || 'Download Course';
+      btn.disabled = mode === 'downloading';
+      btn.style.opacity = btn.disabled ? '0.75' : '1';
+
+      if (mode === 'ready'){
+        dot.style.background = '#16a34a';
+        btn.setAttribute('aria-pressed', 'true');
+      } else if (mode === 'downloading'){
+        dot.style.background = '#f59e0b';
+        btn.setAttribute('aria-pressed', 'false');
+      } else {
+        dot.style.background = '#9ca3af';
+        btn.setAttribute('aria-pressed', 'false');
+      }
+    }
+
+    function updateOfflineCourseButton(){
+      const manifest = getOfflineManifest();
+      if (manifest && manifest.courseId && manifest.imageryKey){
+        setOfflineCourseButton('ready', 'Available Offline');
+      } else {
+        setOfflineCourseButton('idle', 'Download Course');
+      }
+    }
+
+    function latLngToTileXY(lat, lng, z){
+      const latRad = lat * Math.PI / 180;
+      const n = Math.pow(2, z);
+      const x = Math.floor((lng + 180) / 360 * n);
+      const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+      return {
+        x: Math.max(0, Math.min(n - 1, x)),
+        y: Math.max(0, Math.min(n - 1, y))
+      };
+    }
+
+    function buildTileUrl(template, z, x, y){
+      return String(template || LIVE_ESRI_TILE_URL)
+        .replace(/\{z\}/gi, String(z))
+        .replace(/\{x\}/gi, String(x))
+        .replace(/\{y\}/gi, String(y));
+    }
+
+    function addOfflinePoint(list, pt){
+      if (!pt || typeof pt !== 'object') return;
+      const lat = Number(pt.lat);
+      const lng = Number(pt.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) list.push({ lat, lng });
+    }
+
+    function getHoleOfflinePoints(hole){
+      const pts = [];
+      if (!hole) return pts;
+
+      if (Array.isArray(hole.outline)) hole.outline.forEach(pt => addOfflinePoint(pts, pt));
+
+      const pins = hole.pins || {};
+      Object.keys(pins).forEach(key => {
+        const v = pins[key];
+        if (Array.isArray(v)){
+          v.forEach(item => {
+            if (Array.isArray(item)) item.forEach(pt => addOfflinePoint(pts, pt));
+            else addOfflinePoint(pts, item);
+          });
+        } else {
+          addOfflinePoint(pts, v);
+        }
+      });
+
+      return pts;
+    }
+
+    function tileUrlsForPoints(points, zooms=OFFLINE_TILE_ZOOMS, padExtra=0){
+      const urls = [];
+      if (!points || !points.length) return urls;
+
+      zooms.forEach(z => {
+        const coords = points.map(p => latLngToTileXY(p.lat, p.lng, z));
+        const n = Math.pow(2, z);
+        const pad = (z >= 18 ? 2 : 1) + padExtra;
+
+        let minX = Math.min(...coords.map(c => c.x)) - pad;
+        let maxX = Math.max(...coords.map(c => c.x)) + pad;
+        let minY = Math.min(...coords.map(c => c.y)) - pad;
+        let maxY = Math.max(...coords.map(c => c.y)) + pad;
+
+        minX = Math.max(0, minX); maxX = Math.min(n - 1, maxX);
+        minY = Math.max(0, minY); maxY = Math.min(n - 1, maxY);
+
+        for (let x = minX; x <= maxX; x++){
+          for (let y = minY; y <= maxY; y++){
+            urls.push(buildTileUrl(activeTileTemplate, z, x, y));
+          }
+        }
+      });
+
+      return urls;
+    }
+
+    function getOfflineTileUrlsForCourse(){
+      const set = new Set();
+      const holes = state.course?.holes || {};
+
+      Object.keys(holes).forEach(hNo => {
+        const pts = getHoleOfflinePoints(holes[hNo]);
+        tileUrlsForPoints(pts).forEach(u => set.add(u));
+      });
+
+      return Array.from(set);
+    }
+
+    function getOfflineTileUrlsForHole(hNo){
+      const hole = state.course?.holes?.[String(hNo)];
+      const pts = getHoleOfflinePoints(hole);
+      return tileUrlsForPoints(pts, [17, 18, 19], 0);
+    }
+
+    async function fetchAndCacheTile(cache, url){
+      const req = new Request(url, { mode:'no-cors', cache:'reload' });
+      const cached = await cache.match(url);
+      if (cached) return true;
+
+      try{
+        const res = await fetch(req);
+        if (res) {
+          await cache.put(url, res.clone());
+          return true;
+        }
+      }catch(_){}
+
+      return false;
+    }
+
+    async function runOfflineQueue(urls, onProgress){
+      const cache = await caches.open(COURSE_TILE_CACHE);
+      let done = 0;
+      let ok = 0;
+      let cursor = 0;
+      const workers = Math.min(6, urls.length);
+
+      async function worker(){
+        while (cursor < urls.length){
+          const i = cursor++;
+          const success = await fetchAndCacheTile(cache, urls[i]);
+          if (success) ok++;
+          done++;
+          if (onProgress) onProgress(done, urls.length, ok);
+        }
+      }
+
+      await Promise.all(Array.from({ length: workers }, worker));
+      return { done, ok, total: urls.length };
+    }
+
+    async function downloadCourseForOffline(){
+      if (offlineDownloadBusy) return;
+      if (!state.course){
+        alert('Course is not loaded yet.');
+        return;
+      }
+      if (!navigator.onLine){
+        alert('Go online first to download this course for offline use.');
+        return;
+      }
+      if (!('caches' in window)){
+        alert('Offline download is not supported on this device/browser.');
+        return;
+      }
+
+      const urls = getOfflineTileUrlsForCourse();
+      if (!urls.length){
+        alert('No map tiles found for this course. Check that the course has pins or hole outlines.');
+        return;
+      }
+
+      if (urls.length > MAX_OFFLINE_TILES_BEFORE_CONFIRM){
+        const yes = confirm(`This will download about ${urls.length} map tiles for offline use. Continue?`);
+        if (!yes) return;
+      }
+
+      offlineDownloadBusy = true;
+      setOfflineCourseButton('downloading', `Downloading 0%`);
+
+      try{
+        const result = await runOfflineQueue(urls, (done, total)=>{
+          const pct = Math.max(1, Math.round((done / total) * 100));
+          if (done === total || done % 12 === 0) {
+            setOfflineCourseButton('downloading', `Downloading ${pct}%`);
+          }
+        });
+
+        localStorage.setItem(getOfflineCourseKey(), JSON.stringify({
+          courseId:getOfflineCourseId(),
+          imageryKey:activeImageryKey || 'esri-live',
+          tileCount:urls.length,
+          ok:result.ok,
+          zooms:OFFLINE_TILE_ZOOMS,
+          ts:Date.now()
+        }));
+
+        setOfflineCourseButton('ready', 'Available Offline');
+        scheduleOfflineTilePrewarm();
+        toast('Course available offline', 2200);
+      }catch(err){
+        console.error(err);
+        setOfflineCourseButton('idle', 'Download Course');
+        alert('Offline download failed. Please check internet connection and try again.');
+      }finally{
+        offlineDownloadBusy = false;
+      }
+    }
+
+    function prewarmTileUrls(urls, max=180){
+      if (!urls || !urls.length) return;
+      urls.slice(0, max).forEach(url => {
+        try{
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = url;
+        }catch(_){}
+      });
+    }
+
+    function scheduleOfflineTilePrewarm(){
+      clearTimeout(offlinePrewarmTimer);
+      offlinePrewarmTimer = setTimeout(()=>{
+        const manifest = getOfflineManifest();
+        if (!manifest) return;
+
+        const set = new Set();
+        getOfflineTileUrlsForHole(state.hole).forEach(u => set.add(u));
+        getOfflineTileUrlsForHole(Number(state.hole) + 1).forEach(u => set.add(u));
+
+        prewarmTileUrls(Array.from(set));
+      }, 450);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('downloadCourseBtn');
+      if (btn) btn.addEventListener('click', downloadCourseForOffline);
+      updateOfflineCourseButton();
+    });
+
 
     function updateCartAboveFocusOverlay(){
       try{
@@ -1696,6 +2003,7 @@ function ensureInitialFraming(){
       saveGpsResumeState();
       setTimeout(updateFocusMask, 150);
       setTimeout(updateFocusMask, 650);
+      scheduleOfflineTilePrewarm();
     }
 
     
@@ -1788,6 +2096,8 @@ function maybeAutoAdvanceByGps(){
       state.initialFramed = false;
       cancelFlyover();
       renderHole();
+      updateOfflineCourseButton();
+      scheduleOfflineTilePrewarm();
       saveGpsResumeState();
     }
   }catch(_){ }
