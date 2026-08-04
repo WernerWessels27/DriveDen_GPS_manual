@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "oppenheimer-park-golf-club",
+      "name": "Oppenheimer Park Golf Club",
+      "short_code": "OPG",
+      "pin": "OPGC123456",
+      "active": true
+    }
+    ,
+           {
       "id": "randpark-firethorn",
       "name": "Randpark - Firethorn",
       "short_code": "RPF",
