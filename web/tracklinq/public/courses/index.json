@@ -15,6 +15,13 @@
       "pin": "EOA1234567",
       "active": true
     }
+    ,       {
+      "id": "pebble-rock-golf-club",
+      "name": "Pebble Rock Golf Club",
+      "short_code": "PRG",
+      "pin": "PRGC123456",
+      "active": true
+    }
     ,
            {
       "id": "oppenheimer-park-golf-club",
