@@ -31,6 +31,14 @@
       "active": true
     }
     ,
+               {
+      "id": "sishen-golf-club",
+      "name": "Sishen Golf Club",
+      "short_code": "SGC",
+      "pin": "SISH123456",
+      "active": true
+    }
+    ,
            {
       "id": "randpark-firethorn",
       "name": "Randpark - Firethorn",
