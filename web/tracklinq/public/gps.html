@@ -29,6 +29,7 @@
     crossorigin=""
   ></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate.js"></script>
+  <script src="/config.js"></script>
 
 
   <style>
@@ -930,6 +931,8 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     const map = L.map('map', { zoomControl:false, attributionControl:false, rotate:true, bearing:0 }).setView([-25.746, 28.229], 17);
 
     const LIVE_ESRI_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const MAPBOX_ACCESS_TOKEN = (window.DRIVEDEN_CONFIG && window.DRIVEDEN_CONFIG.MAPBOX_ACCESS_TOKEN) || '';
+    const MAPBOX_SATELLITE_TILE_URL = `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.jpg90?access_token=${MAPBOX_ACCESS_TOKEN}`;
     const WAYBACK_REST_TILE_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/{id}/{z}/{y}/{x}';
 
     let baseLayer = null;
@@ -956,6 +959,14 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
     function createLiveEsriLayer(){
       return L.tileLayer(LIVE_ESRI_TILE_URL, tileLayerOptions());
+    }
+
+    function createMapboxSatelliteLayer(){
+      if (!MAPBOX_ACCESS_TOKEN) return createLiveEsriLayer();
+      return L.tileLayer(MAPBOX_SATELLITE_TILE_URL, {
+        ...tileLayerOptions(),
+        attribution:'© Mapbox © OpenStreetMap'
+      });
     }
 
     function getWaybackTileTemplate(info){
@@ -986,6 +997,10 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         activeTileTemplate = getWaybackTileTemplate(img);
         activeImageryKey = `wayback-${String(img.id || img.layer || img.label || 'selected')}`;
         setBaseLayer(L.tileLayer(activeTileTemplate, tileLayerOptions()));
+      } else if (img && img.type === 'mapbox-satellite' && MAPBOX_ACCESS_TOKEN) {
+        activeTileTemplate = MAPBOX_SATELLITE_TILE_URL;
+        activeImageryKey = 'mapbox-satellite';
+        setBaseLayer(createMapboxSatelliteLayer());
       } else {
         activeTileTemplate = LIVE_ESRI_TILE_URL;
         activeImageryKey = 'esri-live';
