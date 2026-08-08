@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v16: offline course shell, course JSON, and Esri/Wayback tile cache support
+// v18: Mapbox token moved to server config; offline config cached
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v16';
+const CACHE_VERSION = 'v18';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -22,7 +22,8 @@ function isCourseTileUrl(url) {
 
   return (
     (host === 'server.arcgisonline.com' && path.includes('/world_imagery/mapserver/tile/')) ||
-    (host === 'wayback.maptiles.arcgis.com' && path.includes('/world_imagery/') && path.includes('/tile/'))
+    (host === 'wayback.maptiles.arcgis.com' && path.includes('/world_imagery/') && path.includes('/tile/')) ||
+    (host === 'api.mapbox.com' && path.includes('/v4/mapbox.satellite/'))
   );
 }
 
@@ -35,6 +36,7 @@ async function matchAnyTileCache(req) {
 const APP_SHELL = [
   '/manifest.webmanifest',
   '/offline.html',
+  '/config.js',
   '/gps.html',
   '/index.html',
   '/',
@@ -176,7 +178,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
-  // Esri / Wayback satellite tiles: cache-first, including cross-origin tile requests.
+  // Esri / Wayback / Mapbox satellite tiles: cache-first, including cross-origin tile requests.
   // This allows the GPS page to deliberately prepare a course for offline use.
   if (isCourseTileUrl(url)) {
     event.respondWith((async () => {
@@ -205,6 +207,7 @@ self.addEventListener('fetch', (event) => {
   const pathname = url.pathname.toLowerCase();
   const isManifest = pathname.endsWith('.webmanifest');
   const isHtmlNav = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
+  const isConfigJs = pathname.endsWith('/config.js');
 
   const isApiAds = pathname.startsWith('/api/ads/');
   const isAdsJson = pathname.startsWith('/ads/') && pathname.endsWith('/ads.json');
@@ -215,6 +218,23 @@ self.addEventListener('fetch', (event) => {
   const isJson = pathname.endsWith('.json');
   const isImage = req.destination === 'image' || /\.(png|jpg|jpeg|gif|webp|svg|ico)$/.test(pathname);
   const isStatic = req.destination === 'style' || req.destination === 'script' || /\.(css|js|mjs|woff2?|ttf|otf)$/.test(pathname);
+
+  // 0a) Runtime config: network-first with cached fallback so Mapbox works offline after first online load.
+  if (isConfigJs) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const net = await fetch(new Request(req, { cache: 'reload' }));
+        if (net && net.ok) await cachePutNormalized(cache, req, net);
+        return net;
+      } catch {
+        return (await cacheMatchNormalized(cache, req)) || new Response('window.DRIVEDEN_CONFIG = window.DRIVEDEN_CONFIG || {};', {
+          headers: { 'Content-Type': 'application/javascript; charset=utf-8' }
+        });
+      }
+    })());
+    return;
+  }
 
   // 0) Manifest: network-first so PWA start_url/shortcuts update quickly
   if (isManifest) {
