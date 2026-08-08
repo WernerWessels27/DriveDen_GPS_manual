@@ -8,6 +8,7 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/config.js"></script>
 
   <style>
     :root{
@@ -96,6 +97,7 @@
     </div>
     <div class="saveRow">
       <button id="liveImagery">Preview Live Esri</button>
+      <button id="previewMapbox">Preview Mapbox Satellite</button>
       <button id="loadWayback">Load Historic Images</button>
     </div>
     <div class="row">
@@ -194,6 +196,8 @@
     const map = L.map('map', { zoomControl:true, attributionControl:false }).setView([-25.746, 28.229], 17);
 
     const LIVE_ESRI_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const MAPBOX_ACCESS_TOKEN = (window.DRIVEDEN_CONFIG && window.DRIVEDEN_CONFIG.MAPBOX_ACCESS_TOKEN) || '';
+    const MAPBOX_SATELLITE_TILE_URL = `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.jpg90?access_token=${MAPBOX_ACCESS_TOKEN}`;
     const WAYBACK_CAPABILITIES_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/WMTS/1.0.0/WMTSCapabilities.xml';
     const WAYBACK_REST_TILE_URL = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/{id}/{z}/{y}/{x}';
 
@@ -220,6 +224,13 @@
       return L.tileLayer(LIVE_ESRI_TILE_URL, { maxZoom:20 });
     }
 
+    function createMapboxSatelliteLayer(){
+      return L.tileLayer(MAPBOX_SATELLITE_TILE_URL, {
+        maxZoom:20,
+        attribution:'© Mapbox © OpenStreetMap'
+      });
+    }
+
     function createWaybackLayer(info){
       const id = String(info?.id || '').trim();
       let template = normalizeWaybackTemplate(info?.urlTemplate || '');
@@ -243,6 +254,16 @@
       currentImagery = { type:'esri-live', label:'Live Esri' };
       setBaseLayer(createLiveEsriLayer());
       imageryStatus('Imagery preview: Live Esri');
+    }
+
+    function previewMapboxSatellite(){
+      if (!MAPBOX_ACCESS_TOKEN) {
+        alert('Mapbox token is not configured on the server.');
+        return;
+      }
+      currentImagery = { type:'mapbox-satellite', label:'Mapbox Satellite' };
+      setBaseLayer(createMapboxSatelliteLayer());
+      imageryStatus('Imagery preview: Mapbox Satellite');
     }
 
     function previewWayback(index){
@@ -349,6 +370,10 @@
         };
         setBaseLayer(createWaybackLayer(currentImagery));
         imageryStatus(`Course imagery: Wayback ${currentImagery.label}`);
+      } else if (img && img.type === 'mapbox-satellite') {
+        currentImagery = { type:'mapbox-satellite', label:'Mapbox Satellite' };
+        setBaseLayer(createMapboxSatelliteLayer());
+        imageryStatus('Course imagery: Mapbox Satellite');
       } else {
         previewLiveImagery();
         imageryStatus('Course imagery: Live Esri');
@@ -358,6 +383,7 @@
     previewLiveImagery();
 
     document.getElementById('liveImagery').addEventListener('click', previewLiveImagery);
+    document.getElementById('previewMapbox').addEventListener('click', previewMapboxSatellite);
 
     document.getElementById('loadWayback').addEventListener('click', async ()=>{
       try {
@@ -385,8 +411,18 @@
     });
 
     document.getElementById('useWaybackForCourse').addEventListener('click', ()=>{
-      if (!currentImagery || currentImagery.type !== 'esri-wayback') {
-        alert('Preview a historic Wayback image first.');
+      if (!currentImagery || currentImagery.type === 'esri-live') {
+        alert('Preview a historic Wayback image or Mapbox Satellite first.');
+        return;
+      }
+
+      if (currentImagery.type === 'mapbox-satellite') {
+        state.course.imagery = {
+          type:'mapbox-satellite',
+          label:'Mapbox Satellite'
+        };
+        imageryStatus('Saved for course JSON: Mapbox Satellite');
+        status('Course imagery set to Mapbox Satellite');
         return;
       }
 
