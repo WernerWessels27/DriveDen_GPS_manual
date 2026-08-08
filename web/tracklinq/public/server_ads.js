@@ -10,6 +10,16 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const ADS_DIR = process.env.ADS_DIR || path.join(PUBLIC_DIR, 'ads');
 const COURSES_DIR = path.join(PUBLIC_DIR, 'courses');
 
+app.get('/config.js', (req, res) => {
+  const config = {
+    MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN || ''
+  };
+
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(`window.DRIVEDEN_CONFIG = Object.assign({}, window.DRIVEDEN_CONFIG || {}, ${JSON.stringify(config)});`);
+});
+
 app.use(express.static(PUBLIC_DIR, {
   setHeaders: (res, filePath) => {
     // Course list/course files must refresh immediately when a client is online.
