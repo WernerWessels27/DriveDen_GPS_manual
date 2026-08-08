@@ -24,6 +24,21 @@ app.use(morgan("tiny"));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "..", "public");
+// ----- Runtime config for frontend -----
+// Served before static files so gps.html / mapper.html can read environment variables
+// without committing tokens to GitHub.
+app.get("/config.js", (_req, res) => {
+  const config = {
+    MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN || ""
+  };
+
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(
+    `window.DRIVEDEN_CONFIG = Object.assign({}, window.DRIVEDEN_CONFIG || {}, ${JSON.stringify(config)});`
+  );
+});
+
 app.use(express.static(publicDir));
 
 // ----- Health -----
