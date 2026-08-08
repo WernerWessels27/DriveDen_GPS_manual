@@ -15,7 +15,8 @@
       "pin": "EOA1234567",
       "active": true
     }
-    ,       {
+    ,       
+    {
       "id": "pebble-rock-golf-club",
       "name": "Pebble Rock Golf Club",
       "short_code": "PRG",
@@ -28,6 +29,14 @@
       "name": "Oppenheimer Park Golf Club",
       "short_code": "OPG",
       "pin": "OPGC123456",
+      "active": true
+    }
+    ,
+               {
+      "id": "kambaku-golf-club",
+      "name": "Kambaku Golf Club",
+      "short_code": "KAG",
+      "pin": "KAMGC12345",
       "active": true
     }
     ,
