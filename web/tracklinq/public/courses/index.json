@@ -33,6 +33,14 @@
     }
     ,
                {
+      "id": "irene-country-club",
+      "name": "Irene Country Club",
+      "short_code": "OPG",
+      "pin": "ICC1234567",
+      "active": true
+    }
+    ,
+               {
       "id": "kambaku-golf-club",
       "name": "Kambaku Golf Club",
       "short_code": "KAG",
