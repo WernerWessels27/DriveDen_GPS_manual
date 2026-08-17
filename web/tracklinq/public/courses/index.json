@@ -24,6 +24,14 @@
       "active": true
     }
     ,
+        {
+      "id": "serengeti-golf-estate-signature",
+      "name": "Serengeti Golf Estate - Signature Course",
+      "short_code": "SGE",
+      "pin": "SGES123456",
+      "active": true
+    }
+    ,
            {
       "id": "oppenheimer-park-golf-club",
       "name": "Oppenheimer Park Golf Club",
