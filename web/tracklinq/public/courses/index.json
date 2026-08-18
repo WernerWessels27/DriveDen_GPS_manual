@@ -40,6 +40,14 @@
       "active": true
     }
     ,
+                {
+      "id": "krugersdorp-golf-club",
+      "name": "Krugersdorp Golf Club",
+      "short_code": "KDG",
+      "pin": "KDGC12345",
+      "active": true
+    }
+    ,
            {
       "id": "oppenheimer-park-golf-club",
       "name": "Oppenheimer Park Golf Club",
