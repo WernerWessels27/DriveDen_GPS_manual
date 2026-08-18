@@ -32,6 +32,14 @@
       "active": true
     }
     ,
+            {
+      "id": "serengeti-golf-estate-whistling-thorn",
+      "name": "Serengeti Golf Estate - Whistling Thorn",
+      "short_code": "WGW",
+      "pin": "SGEWT12345",
+      "active": true
+    }
+    ,
            {
       "id": "oppenheimer-park-golf-club",
       "name": "Oppenheimer Park Golf Club",
