@@ -24,6 +24,13 @@
       "active": true
     }
     ,
+          "id": "highland-gate",
+      "name": "Highland Gate Golf and Trout Estate",
+      "short_code": "HGG",
+      "pin": "HGGATE1234",
+      "active": true
+    }
+    ,
         {
       "id": "serengeti-golf-estate-signature",
       "name": "Serengeti Golf Estate - Signature Course",
