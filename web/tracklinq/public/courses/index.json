@@ -40,6 +40,13 @@
       "active": true
     }
     ,
+              "id": "copperleaf-golf-estate",
+      "name": "Copperleaf Golf Estate",
+      "short_code": "CGE",
+      "pin": "CLGE123456",
+      "active": true
+    }
+    ,
         {
       "id": "serengeti-golf-estate-signature",
       "name": "Serengeti Golf Estate - Signature Course",
