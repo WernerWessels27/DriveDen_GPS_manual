@@ -23,6 +23,14 @@
       "pin": "PRGC123456",
       "active": true
     }
+        ,       
+    {
+      "id": "southdowns-country-club",
+      "name": "Southdowns Country Club",
+      "short_code": "SDC",
+      "pin": "SDCC123456",
+      "active": true
+    }
     ,
     {
           "id": "highland-gate",
