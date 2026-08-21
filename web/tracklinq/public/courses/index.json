@@ -104,6 +104,14 @@
       "active": true
     }
     ,
+               {
+      "id": "randpark-bushwillow",
+      "name": "Randpark - Bushwillow",
+      "short_code": "RPF",
+      "pin": "RB12345678",
+      "active": true
+    }
+    ,
            {
       "id": "magalies-park-golf-club",
       "name": "Magalies Park Golf Club",
