@@ -1139,8 +1139,34 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     let baseLayer = null;
     let activeTileTemplate = LIVE_ESRI_TILE_URL;
     let activeImageryKey = 'esri-live';
+    let activeTileMaxZoom = 19;
 
-    function tileLayerOptions(){
+    function normalizeEsriTileMaxZoom(value){
+      const z = Number(value);
+      return z >= 20 ? 20 : 19;
+    }
+
+    function getCourseEsriTileMaxZoom(courseJson){
+      const img = courseJson?.imagery || courseJson?.course?.imagery || {};
+      return normalizeEsriTileMaxZoom(
+        img.tileMaxZoom ??
+        img.maxZoom ??
+        courseJson?.esriTileMaxZoom ??
+        courseJson?.course?.esriTileMaxZoom ??
+        19
+      );
+    }
+
+    function getTileLayerOptions(maxZoom = activeTileMaxZoom){
+      return {
+        maxZoom:normalizeEsriTileMaxZoom(maxZoom),
+        keepBuffer:6,
+        updateWhenIdle:true,
+        updateWhenZooming:false
+      };
+    }
+
+    function getMapboxTileLayerOptions(){
       return {
         maxZoom:19,
         keepBuffer:6,
@@ -1159,13 +1185,13 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function createLiveEsriLayer(){
-      return L.tileLayer(LIVE_ESRI_TILE_URL, tileLayerOptions());
+      return L.tileLayer(LIVE_ESRI_TILE_URL, getTileLayerOptions(activeTileMaxZoom));
     }
 
     function createMapboxSatelliteLayer(){
       if (!MAPBOX_ACCESS_TOKEN) return createLiveEsriLayer();
       return L.tileLayer(MAPBOX_SATELLITE_TILE_URL, {
-        ...tileLayerOptions(),
+        ...getMapboxTileLayerOptions(),
         attribution:'© Mapbox © OpenStreetMap'
       });
     }
@@ -1180,7 +1206,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function createWaybackLayer(info){
-      return L.tileLayer(getWaybackTileTemplate(info), tileLayerOptions());
+      return L.tileLayer(getWaybackTileTemplate(info), getTileLayerOptions(activeTileMaxZoom));
     }
 
     function setBaseLayer(layer){
@@ -1194,17 +1220,20 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
     function applyCourseImagery(courseJson){
       const img = courseJson?.imagery || courseJson?.course?.imagery;
+      activeTileMaxZoom = getCourseEsriTileMaxZoom(courseJson);
+      const zoomKey = `z${activeTileMaxZoom}`;
+
       if (img && img.type === 'esri-wayback') {
         activeTileTemplate = getWaybackTileTemplate(img);
-        activeImageryKey = `wayback-${String(img.id || img.layer || img.label || 'selected')}`;
-        setBaseLayer(L.tileLayer(activeTileTemplate, tileLayerOptions()));
+        activeImageryKey = `wayback-${String(img.id || img.layer || img.label || 'selected')}-${zoomKey}`;
+        setBaseLayer(L.tileLayer(activeTileTemplate, getTileLayerOptions(activeTileMaxZoom)));
       } else if (img && img.type === 'mapbox-satellite' && MAPBOX_ACCESS_TOKEN) {
         activeTileTemplate = MAPBOX_SATELLITE_TILE_URL;
         activeImageryKey = 'mapbox-satellite';
         setBaseLayer(createMapboxSatelliteLayer());
       } else {
         activeTileTemplate = LIVE_ESRI_TILE_URL;
-        activeImageryKey = 'esri-live';
+        activeImageryKey = `esri-live-${zoomKey}`;
         setBaseLayer(createLiveEsriLayer());
       }
       setTimeout(updateOfflineCourseButton, 100);
@@ -1413,7 +1442,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
     // --- Offline course tile download ---
     const COURSE_TILE_CACHE = 'driveden-course-tiles-v1';
-    const OFFLINE_TILE_ZOOMS = [16, 17, 18, 19];
+    const BASE_OFFLINE_TILE_ZOOMS = [16, 17, 18, 19];
     const MAX_OFFLINE_TILES_BEFORE_CONFIRM = 3200;
     let offlineDownloadBusy = false;
     let offlinePrewarmTimer = null;
@@ -1488,6 +1517,12 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         .replace(/\{y\}/gi, String(y));
     }
 
+    function getOfflineTileZooms(){
+      const zooms = BASE_OFFLINE_TILE_ZOOMS.slice();
+      if (normalizeEsriTileMaxZoom(activeTileMaxZoom) >= 20 && !zooms.includes(20)) zooms.push(20);
+      return zooms;
+    }
+
     function addOfflinePoint(list, pt){
       if (!pt || typeof pt !== 'object') return;
       const lat = Number(pt.lat);
@@ -1517,7 +1552,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       return pts;
     }
 
-    function tileUrlsForPoints(points, zooms=OFFLINE_TILE_ZOOMS, padExtra=0){
+    function tileUrlsForPoints(points, zooms=getOfflineTileZooms(), padExtra=0){
       const urls = [];
       if (!points || !points.length) return urls;
 
@@ -1559,7 +1594,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function getOfflineTileUrlsForHole(hNo){
       const hole = state.course?.holes?.[String(hNo)];
       const pts = getHoleOfflinePoints(hole);
-      return tileUrlsForPoints(pts, [17, 18, 19], 0);
+      return tileUrlsForPoints(pts, getOfflineTileZooms().filter(z => z >= 17), 0);
     }
 
     async function fetchAndCacheTile(cache, url){
@@ -1640,8 +1675,9 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
           courseId:getOfflineCourseId(),
           imageryKey:activeImageryKey || 'esri-live',
           tileCount:urls.length,
+          tileMaxZoom:activeTileMaxZoom,
           ok:result.ok,
-          zooms:OFFLINE_TILE_ZOOMS,
+          zooms:getOfflineTileZooms(),
           ts:Date.now()
         }));
 
