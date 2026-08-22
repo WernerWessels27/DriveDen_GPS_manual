@@ -15,6 +15,14 @@
       "pin": "EOA1234567",
       "active": true
     }
+    ,      
+           {
+      "id": "centurion-golf-course",
+      "name": "Centurion Golf Estate",
+      "short_code": "CGE",
+      "pin": "CGC1234567",
+      "active": true
+    }
     ,       
     {
       "id": "pebble-rock-golf-club",
