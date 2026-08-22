@@ -84,6 +84,10 @@
     }
     body.player-gl-active #playerMap { display: block; }
     body.player-gl-active #map { visibility: hidden; }
+    body.player-gl-active #playerMap,
+    body.player-gl-active #playerMap .maplibregl-canvas {
+      touch-action: none;
+    }
     .playerGlMarker {
       display: inline-flex; align-items: center; gap: 5px;
       color: #fff; font-weight: 900; font-size: 12px; line-height: 1;
@@ -2069,9 +2073,22 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         zoom: playerGlZoomForDistance(dist),
         bearing: brg,
         pitch: 64,
-        interactive: false,
+        // Player View is a preview map, so allow users to pan/zoom around the hole.
+        // Keep rotation/pitch gestures disabled so the view does not get accidentally twisted.
+        interactive: true,
+        dragPan: true,
+        scrollZoom: true,
+        boxZoom: false,
+        dragRotate: false,
+        keyboard: false,
+        doubleClickZoom: true,
+        touchZoomRotate: true,
+        touchPitch: false,
         attributionControl: false
       });
+
+      try{ state.playerGlMap.dragRotate.disable(); }catch(_){}
+      try{ state.playerGlMap.touchZoomRotate.disableRotation(); }catch(_){}
 
       state.playerGlMap.on('load', ()=>{
         state.playerGlLoaded = true;
