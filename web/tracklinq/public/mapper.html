@@ -110,6 +110,14 @@
         <option value="">Load historic images first</option>
       </select>
     </div>
+    <div class="group">
+      <label class="muted">GPS Esri detail level</label>
+      <select id="esriTileMaxZoom">
+        <option value="19" selected>Standard GPS tiles (z19 / current)</option>
+        <option value="20">Sharpest GPS tiles (z20 / mapper-style)</option>
+      </select>
+      <div class="muted">Use Sharpest when the deepest Esri zoom looks better for this course. Use Standard if the deepest tiles are missing or worse.</div>
+    </div>
     <div class="saveRow">
       <button id="useWaybackForCourse">Use Previewed Imagery For Course</button>
       <button id="clearCourseImagery">Use Live Imagery For Course</button>
@@ -206,6 +214,29 @@
     let currentWaybackIndex = -1;
     let currentImagery = { type:'esri-live', label:'Live Esri' };
 
+    function normalizeEsriTileMaxZoom(value){
+      const z = Number(value);
+      return z >= 20 ? 20 : 19;
+    }
+
+    function getEsriTileMaxZoom(){
+      const sel = document.getElementById('esriTileMaxZoom');
+      return normalizeEsriTileMaxZoom(sel ? sel.value : 19);
+    }
+
+    function setEsriTileMaxZoom(value){
+      const sel = document.getElementById('esriTileMaxZoom');
+      if (sel) sel.value = String(normalizeEsriTileMaxZoom(value));
+    }
+
+    function esriTileMaxZoomLabel(){
+      return getEsriTileMaxZoom() >= 20 ? 'Sharpest z20' : 'Standard z19';
+    }
+
+    function getEsriTileLayerOptions(){
+      return { maxZoom:getEsriTileMaxZoom() };
+    }
+
     function imageryStatus(msg){
       const el = document.getElementById('imageryStatus');
       if (el) el.textContent = msg || '';
@@ -221,7 +252,7 @@
     }
 
     function createLiveEsriLayer(){
-      return L.tileLayer(LIVE_ESRI_TILE_URL, { maxZoom:20 });
+      return L.tileLayer(LIVE_ESRI_TILE_URL, getEsriTileLayerOptions());
     }
 
     function createMapboxSatelliteLayer(){
@@ -238,7 +269,7 @@
         template = WAYBACK_REST_TILE_URL.replace('{id}', encodeURIComponent(id));
       }
       if (!template) return createLiveEsriLayer();
-      return L.tileLayer(template, { maxZoom:20 });
+      return L.tileLayer(template, getEsriTileLayerOptions());
     }
 
     function setBaseLayer(layer){
@@ -251,9 +282,9 @@
     }
 
     function previewLiveImagery(){
-      currentImagery = { type:'esri-live', label:'Live Esri' };
+      currentImagery = { type:'esri-live', label:'Live Esri', tileMaxZoom:getEsriTileMaxZoom() };
       setBaseLayer(createLiveEsriLayer());
-      imageryStatus('Imagery preview: Live Esri');
+      imageryStatus(`Imagery preview: Live Esri (${esriTileMaxZoomLabel()})`);
     }
 
     function previewMapboxSatellite(){
@@ -279,14 +310,15 @@
         id:info.id,
         label:info.label,
         title:info.title,
-        urlTemplate:info.urlTemplate
+        urlTemplate:info.urlTemplate,
+        tileMaxZoom:getEsriTileMaxZoom()
       };
 
       const sel = document.getElementById('waybackSelect');
       if (sel) sel.value = String(currentWaybackIndex);
 
       setBaseLayer(createWaybackLayer(info));
-      imageryStatus(`Imagery preview: Wayback ${info.label}`);
+      imageryStatus(`Imagery preview: Wayback ${info.label} (${esriTileMaxZoomLabel()})`);
     }
 
     function updateWaybackSelect(){
@@ -360,23 +392,26 @@
 
     function applySavedCourseImagery(){
       const img = state.course?.imagery;
+      setEsriTileMaxZoom(img?.tileMaxZoom ?? img?.maxZoom ?? state.course?.esriTileMaxZoom ?? state.course?.course?.esriTileMaxZoom ?? 19);
+
       if (img && img.type === 'esri-wayback') {
         currentImagery = {
           type:'esri-wayback',
           id:img.id || img.layer || '',
           label:img.label || img.date || 'Selected Wayback',
           title:img.title || '',
-          urlTemplate:img.urlTemplate || ''
+          urlTemplate:img.urlTemplate || '',
+          tileMaxZoom:getEsriTileMaxZoom()
         };
         setBaseLayer(createWaybackLayer(currentImagery));
-        imageryStatus(`Course imagery: Wayback ${currentImagery.label}`);
+        imageryStatus(`Course imagery: Wayback ${currentImagery.label} (${esriTileMaxZoomLabel()})`);
       } else if (img && img.type === 'mapbox-satellite') {
         currentImagery = { type:'mapbox-satellite', label:'Mapbox Satellite' };
         setBaseLayer(createMapboxSatelliteLayer());
         imageryStatus('Course imagery: Mapbox Satellite');
       } else {
         previewLiveImagery();
-        imageryStatus('Course imagery: Live Esri');
+        imageryStatus(`Course imagery: Live Esri (${esriTileMaxZoomLabel()})`);
       }
     }
 
@@ -384,6 +419,19 @@
 
     document.getElementById('liveImagery').addEventListener('click', previewLiveImagery);
     document.getElementById('previewMapbox').addEventListener('click', previewMapboxSatellite);
+    document.getElementById('esriTileMaxZoom').addEventListener('change', ()=>{
+      if (state.course) state.course.esriTileMaxZoom = getEsriTileMaxZoom();
+
+      if (currentImagery?.type === 'esri-wayback') {
+        currentImagery.tileMaxZoom = getEsriTileMaxZoom();
+        setBaseLayer(createWaybackLayer(currentImagery));
+        imageryStatus(`Imagery preview: Wayback ${currentImagery.label} (${esriTileMaxZoomLabel()})`);
+      } else if (currentImagery?.type === 'mapbox-satellite') {
+        imageryStatus(`Mapbox preview active. Esri GPS detail saved as ${esriTileMaxZoomLabel()} for Esri courses.`);
+      } else {
+        previewLiveImagery();
+      }
+    });
 
     document.getElementById('loadWayback').addEventListener('click', async ()=>{
       try {
@@ -416,6 +464,8 @@
         return;
       }
 
+      state.course.esriTileMaxZoom = getEsriTileMaxZoom();
+
       if (currentImagery.type === 'mapbox-satellite') {
         state.course.imagery = {
           type:'mapbox-satellite',
@@ -431,18 +481,20 @@
         id:currentImagery.id,
         label:currentImagery.label,
         title:currentImagery.title || '',
-        urlTemplate:currentImagery.urlTemplate || ''
+        urlTemplate:currentImagery.urlTemplate || '',
+        tileMaxZoom:getEsriTileMaxZoom()
       };
 
-      imageryStatus(`Saved for course JSON: Wayback ${currentImagery.label}`);
-      status(`Course imagery set to Wayback ${currentImagery.label}`);
+      imageryStatus(`Saved for course JSON: Wayback ${currentImagery.label} (${esriTileMaxZoomLabel()})`);
+      status(`Course imagery set to Wayback ${currentImagery.label} (${esriTileMaxZoomLabel()})`);
     });
 
     document.getElementById('clearCourseImagery').addEventListener('click', ()=>{
       delete state.course.imagery;
+      state.course.esriTileMaxZoom = getEsriTileMaxZoom();
       previewLiveImagery();
-      imageryStatus('Saved for course JSON: Live Esri');
-      status('Course imagery set to Live Esri');
+      imageryStatus(`Saved for course JSON: Live Esri (${esriTileMaxZoomLabel()})`);
+      status(`Course imagery set to Live Esri (${esriTileMaxZoomLabel()})`);
     });
 
 
@@ -930,6 +982,10 @@
       state.course.course.id = ($('#courseId').value || '').trim();
       state.course.course.name = ($('#courseName').value || '').trim();
       state.course.course.pin = ($('#coursePin').value || '').trim().toUpperCase();
+      state.course.esriTileMaxZoom = getEsriTileMaxZoom();
+      if (state.course.imagery && state.course.imagery.type === 'esri-wayback') {
+        state.course.imagery.tileMaxZoom = getEsriTileMaxZoom();
+      }
       return state.course;
     }
 
