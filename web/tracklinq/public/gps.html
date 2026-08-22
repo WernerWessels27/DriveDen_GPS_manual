@@ -1158,12 +1158,34 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function getTileLayerOptions(maxZoom = activeTileMaxZoom){
+      const z = normalizeEsriTileMaxZoom(maxZoom);
+
+      // When a course is set to Sharpest GPS tiles (z20), use the z20
+      // imagery one visual zoom earlier as well. This keeps the whole hole
+      // framed on screen, but shows the sharper mapper-style tiles instead
+      // of waiting until the user manually zooms in.
+      if (z >= 20) {
+        return {
+          maxZoom:20,
+          maxNativeZoom:19,
+          tileSize:128,
+          zoomOffset:1,
+          keepBuffer:6,
+          updateWhenIdle:true,
+          updateWhenZooming:false
+        };
+      }
+
       return {
-        maxZoom:normalizeEsriTileMaxZoom(maxZoom),
+        maxZoom:19,
         keepBuffer:6,
         updateWhenIdle:true,
         updateWhenZooming:false
       };
+    }
+
+    function getHoleFitMaxZoom(){
+      return normalizeEsriTileMaxZoom(activeTileMaxZoom);
     }
 
     function getMapboxTileLayerOptions(){
@@ -1807,14 +1829,14 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
     function fitBetween(a,b, opts={}){
       const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
-      map.fitBounds(bounds,{ padding: opts.padding || [60,60], paddingTopLeft: opts.paddingTopLeft, paddingBottomRight: opts.paddingBottomRight, maxZoom: opts.maxZoom ?? 19, animate: opts.animate ?? true });
+      map.fitBounds(bounds,{ padding: opts.padding || [60,60], paddingTopLeft: opts.paddingTopLeft, paddingBottomRight: opts.paddingBottomRight, maxZoom: opts.maxZoom ?? getHoleFitMaxZoom(), animate: opts.animate ?? true });
       updateFocusMask();
     }
     function fitBetweenPercent(a,b, pctX=0.15, pctY=0.18){
       const bounds=L.latLngBounds(L.latLng(a[0],a[1]),L.latLng(b[0],b[1]));
       const sz = map.getSize();
       const pad = [Math.round(sz.x*pctX), Math.round(sz.y*pctY)];
-      map.fitBounds(bounds,{ paddingTopLeft: pad, paddingBottomRight: pad, maxZoom: 19, animate:true });
+      map.fitBounds(bounds,{ paddingTopLeft: pad, paddingBottomRight: pad, maxZoom: getHoleFitMaxZoom(), animate:true });
       updateFocusMask();
     }
     function tightenHoleZoom(a,b){
@@ -1826,7 +1848,8 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
           const p1 = map.latLngToContainerPoint(L.latLng(a[0],a[1]));
           const p2 = map.latLngToContainerPoint(L.latLng(b[0],b[1]));
           const screenRatio = Math.abs(p2.x - p1.x) / Math.max(1, map.getSize().x);
-          const maxZoom = (typeof map.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : 19;
+          const mapMaxZoom = (typeof map.getMaxZoom === 'function' && Number.isFinite(map.getMaxZoom())) ? map.getMaxZoom() : getHoleFitMaxZoom();
+          const maxZoom = Math.min(mapMaxZoom, getHoleFitMaxZoom());
           if (screenRatio > 0 && screenRatio < 0.5 && map.getZoom() < maxZoom){
             map.zoomIn(1, { animate:true });
           }
