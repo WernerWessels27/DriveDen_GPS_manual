@@ -1160,16 +1160,21 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function getTileLayerOptions(maxZoom = activeTileMaxZoom){
       const z = normalizeEsriTileMaxZoom(maxZoom);
 
-      // When a course is set to Sharpest GPS tiles (z20), use the z20
-      // imagery one visual zoom earlier as well. This keeps the whole hole
-      // framed on screen, but shows the sharper mapper-style tiles instead
-      // of waiting until the user manually zooms in.
+      // When a course is set to Sharpest GPS tiles (z20), force Leaflet to
+      // request the deeper z20 source tiles while the map itself can stay
+      // zoomed out enough to keep TEE and GREEN/MID in view.
+      //
+      // tileSize:64 + zoomOffset:2 means the visible map can sit one/two
+      // zoom levels out, but the imagery still comes from the sharper
+      // mapper-style Esri tiles. maxNativeZoom keeps that high-detail tile
+      // grid from trying to request non-existent z21/z22 tiles when the user
+      // manually zooms in.
       if (z >= 20) {
         return {
           maxZoom:20,
-          maxNativeZoom:19,
-          tileSize:128,
-          zoomOffset:1,
+          maxNativeZoom:18,
+          tileSize:64,
+          zoomOffset:2,
           keepBuffer:6,
           updateWhenIdle:true,
           updateWhenZooming:false
