@@ -30,6 +30,10 @@
   ></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.7/dist/leaflet-rotate.js"></script>
   <script src="/config.js"></script>
+  <!-- MapLibre GL is used only for the optional online Player View.
+       Normal HOLE/CART views remain Leaflet/Esri/offline as-is. -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
 
   <style>
@@ -69,7 +73,38 @@
     }
 
     html, body { height: 100%; margin: 0; background: var(--bg); color:var(--text); font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
-    #map { width: 100%; height: 100%; }
+    #map { width: 100%; height: 100%; position: relative; z-index: 1; }
+    #playerMap {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      z-index: 2; display: none; background: #000;
+    }
+    #playerMap::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+      background: linear-gradient(to top, rgba(0,0,0,.20) 0%, rgba(0,0,0,.05) 34%, rgba(255,255,255,.08) 100%);
+    }
+    body.player-gl-active #playerMap { display: block; }
+    body.player-gl-active #map { visibility: hidden; }
+    .playerGlMarker {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: #fff; font-weight: 900; font-size: 12px; line-height: 1;
+      text-shadow: 0 2px 4px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.75);
+      pointer-events: none; white-space: nowrap;
+    }
+    .playerGlMarker .pin {
+      width: 13px; height: 13px; border-radius: 50%; display: inline-block;
+      border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.65);
+    }
+    .playerGlMarker.player .pin { width: 18px; height: 18px; background: #38b6ff; }
+    .playerGlMarker .tag {
+      background: rgba(0,0,0,.58); border: 1px solid rgba(255,255,255,.55);
+      border-radius: 999px; padding: 4px 7px;
+    }
+    .playerGlNotice {
+      position: absolute; left: 50%; top: 130px; transform: translateX(-50%);
+      z-index: 1200; background: rgba(0,0,0,.78); color: #fff;
+      border: 1px solid rgba(255,255,255,.25); border-radius: 999px;
+      padding: 8px 12px; font-weight: 900; font-size: 12px; box-shadow: var(--shadow);
+    }
 
     /* Top full-width course banner */
     .banner {
@@ -731,6 +766,8 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 </head>
 <body data-theme="light">
   <div id="map"></div>
+  <div id="playerMap" aria-hidden="true"></div>
+  <div id="playerGlNotice" class="playerGlNotice" hidden></div>
 
   <!-- Rules & Penalties (top-right) -->
   <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
@@ -1268,6 +1305,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         activeImageryKey = `esri-live-${zoomKey}`;
         setBaseLayer(createLiveEsriLayer());
       }
+      resetPlayerGlMap();
       setTimeout(updateOfflineCourseButton, 100);
     }
 
@@ -1302,8 +1340,14 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     $('#map').appendChild(cartAboveFocusOverlay);
 
     // Custom zoom buttons
-    $('#zoomInBtn')?.addEventListener('click', ()=>map.zoomIn());
-    $('#zoomOutBtn')?.addEventListener('click', ()=>map.zoomOut());
+    $('#zoomInBtn')?.addEventListener('click', ()=>{
+      if (state.viewMode === 'player' && state.playerGlMap){ try{ state.playerGlMap.zoomIn(); return; }catch(_){} }
+      map.zoomIn();
+    });
+    $('#zoomOutBtn')?.addEventListener('click', ()=>{
+      if (state.viewMode === 'player' && state.playerGlMap){ try{ state.playerGlMap.zoomOut(); return; }catch(_){} }
+      map.zoomOut();
+    });
 
     // Data (network-first for courses, cached fallback for offline)
     async function getIndex(){
@@ -1458,6 +1502,10 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       unit:'m', // 'm' or 'yd'
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
       playerAimLine:null,
+      playerGlMap:null,
+      playerGlMarkers:[],
+      playerGlImageryKey:null,
+      playerGlLoaded:false,
       initialFramed:false,
       followCart:false,
       cartAlt:null,
@@ -1861,6 +1909,248 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       }
     }
 
+    function clearPlayerGlMarkers(){
+      (state.playerGlMarkers || []).forEach(m=>{ try{ m.remove(); }catch(_){} });
+      state.playerGlMarkers = [];
+    }
+
+    function hidePlayerGlView(){
+      document.body.classList.remove('player-gl-active');
+      const el = $('#playerMap');
+      if (el) el.setAttribute('aria-hidden', 'true');
+      const notice = $('#playerGlNotice');
+      if (notice) notice.hidden = true;
+    }
+
+    function resetPlayerGlMap(){
+      try{
+        clearPlayerGlMarkers();
+        if (state?.playerGlMap){
+          try{ state.playerGlMap.remove(); }catch(_){}
+        }
+        if (state){
+          state.playerGlMap = null;
+          state.playerGlImageryKey = null;
+          state.playerGlLoaded = false;
+        }
+      }catch(_){}
+      hidePlayerGlView();
+    }
+
+    function showPlayerGlNotice(message){
+      const notice = $('#playerGlNotice');
+      if (!notice) { toast(message); return; }
+      notice.textContent = message;
+      notice.hidden = false;
+      clearTimeout(showPlayerGlNotice._t);
+      showPlayerGlNotice._t = setTimeout(()=>{ notice.hidden = true; }, 2800);
+    }
+
+    function playerGlCanRun(){
+      return !!(navigator.onLine && window.maplibregl && $('#playerMap'));
+    }
+
+    function isActiveMapboxImagery(){
+      return String(activeImageryKey || '').toLowerCase().includes('mapbox');
+    }
+
+    function getPlayerGlTileMaxZoom(){
+      if (isActiveMapboxImagery()) return 19;
+      return normalizeEsriTileMaxZoom(activeTileMaxZoom);
+    }
+
+    function getPlayerGlTileSize(){
+      // Esri is the main DriveDen imagery. For Sharpest z20 Esri/Wayback courses,
+      // use a smaller tile size so the pitched view requests sharper source tiles
+      // while still showing the hole from a lower forward camera angle.
+      if (!isActiveMapboxImagery() && normalizeEsriTileMaxZoom(activeTileMaxZoom) >= 20) return 128;
+      return 256;
+    }
+
+    function getPlayerGlImageryKey(){
+      return `${activeImageryKey || 'esri-live'}|z${getPlayerGlTileMaxZoom()}|ts${getPlayerGlTileSize()}`;
+    }
+
+    function getPlayerGlStyle(){
+      return {
+        version: 8,
+        sources: {
+          drivedenSatellite: {
+            type: 'raster',
+            tiles: [String(activeTileTemplate || LIVE_ESRI_TILE_URL)],
+            tileSize: getPlayerGlTileSize(),
+            minzoom: 0,
+            maxzoom: getPlayerGlTileMaxZoom()
+          },
+          playerRoute: {
+            type: 'geojson',
+            data: { type:'FeatureCollection', features:[] }
+          }
+        },
+        layers: [
+          {
+            id: 'drivedenSatellite',
+            type: 'raster',
+            source: 'drivedenSatellite',
+            paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' }
+          },
+          {
+            id: 'playerRouteLine',
+            type: 'line',
+            source: 'playerRoute',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#38b6ff',
+              'line-width': 4,
+              'line-opacity': 0.92,
+              'line-dasharray': [1.4, 1.2]
+            }
+          }
+        ]
+      };
+    }
+
+    function bearingDegrees(from, to){
+      const lat1 = toRad(from.lat), lat2 = toRad(to.lat);
+      const dLng = toRad(to.lng - from.lng);
+      const y = Math.sin(dLng) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    function pointAlong(a,b,t){
+      return {
+        lat: a.lat + (b.lat - a.lat) * t,
+        lng: a.lng + (b.lng - a.lng) * t
+      };
+    }
+
+    function playerGlZoomForDistance(distanceM){
+      const maxZ = getPlayerGlTileMaxZoom();
+      const d = Math.max(1, Number(distanceM) || 1);
+      let z;
+      if (d > 650) z = 18.0;
+      else if (d > 500) z = 18.35;
+      else if (d > 380) z = 18.75;
+      else if (d > 260) z = 19.10;
+      else if (d > 170) z = 19.45;
+      else z = 19.75;
+      return Math.max(16.6, Math.min(maxZ, z));
+    }
+
+    function ensurePlayerGlMap(source, target){
+      const key = getPlayerGlImageryKey();
+      const el = $('#playerMap');
+      if (!el) return null;
+
+      document.body.classList.add('player-gl-active');
+      el.setAttribute('aria-hidden', 'false');
+
+      if (state.playerGlMap && state.playerGlImageryKey === key){
+        try{ state.playerGlMap.resize(); }catch(_){}
+        return state.playerGlMap;
+      }
+
+      clearPlayerGlMarkers();
+      if (state.playerGlMap){
+        try{ state.playerGlMap.remove(); }catch(_){}
+      }
+
+      state.playerGlLoaded = false;
+      state.playerGlImageryKey = key;
+
+      const dist = distMeters(source, target);
+      const cameraCenter = pointAlong(source, target, 0.34);
+      const brg = bearingDegrees(source, target);
+
+      state.playerGlMap = new maplibregl.Map({
+        container: el,
+        style: getPlayerGlStyle(),
+        center: [cameraCenter.lng, cameraCenter.lat],
+        zoom: playerGlZoomForDistance(dist),
+        bearing: brg,
+        pitch: 64,
+        interactive: false,
+        attributionControl: false
+      });
+
+      state.playerGlMap.on('load', ()=>{
+        state.playerGlLoaded = true;
+        updatePlayerGlView(true);
+      });
+
+      state.playerGlMap.on('error', (e)=>{
+        console.warn('Player View map error', e?.error || e);
+      });
+
+      return state.playerGlMap;
+    }
+
+    function makePlayerGlMarker(label, lngLat, color, kind='target'){
+      const el = document.createElement('div');
+      el.className = `playerGlMarker ${kind === 'player' ? 'player' : ''}`;
+      el.innerHTML = `<span class="pin" style="background:${color}"></span><span class="tag">${label}</span>`;
+      const marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat([lngLat.lng, lngLat.lat]).addTo(state.playerGlMap);
+      state.playerGlMarkers.push(marker);
+    }
+
+    function updatePlayerGlMarkersAndRoute(source, target, pins){
+      if (!state.playerGlMap || !state.playerGlLoaded) return;
+
+      const route = {
+        type:'FeatureCollection',
+        features:[{
+          type:'Feature',
+          geometry:{ type:'LineString', coordinates:[[source.lng, source.lat],[target.lng, target.lat]] },
+          properties:{}
+        }]
+      };
+
+      try{
+        const src = state.playerGlMap.getSource('playerRoute');
+        if (src) src.setData(route);
+      }catch(_){}
+
+      clearPlayerGlMarkers();
+      const isCart = !!fromCart();
+      makePlayerGlMarker(isCart ? 'CART' : 'TEE', source, '#38b6ff', 'player');
+      if (pins?.FRONT) makePlayerGlMarker('FRONT', pins.FRONT, '#ffffff');
+      if (pins?.MID)   makePlayerGlMarker('MID',   pins.MID,   '#fbbf24');
+      if (pins?.BACK)  makePlayerGlMarker('BACK',  pins.BACK,  '#ef4444');
+    }
+
+    function updatePlayerGlView(silent=false){
+      if (state.viewMode !== 'player') return;
+      const p = state.course?.holes?.[String(state.hole)]?.pins || {};
+      const source = getPlayerViewSourcePoint(p);
+      const target = getPlayerViewTargetPin(p);
+      if (!(source && target)) return;
+
+      const gl = ensurePlayerGlMap(source, target);
+      if (!gl) return;
+      if (!state.playerGlLoaded) return;
+
+      const dist = distMeters(source, target);
+      const brg = bearingDegrees(source, target);
+      const cameraCenter = pointAlong(source, target, 0.34);
+      const camera = {
+        center: [cameraCenter.lng, cameraCenter.lat],
+        zoom: playerGlZoomForDistance(dist),
+        bearing: brg,
+        pitch: 64,
+        duration: silent ? 0 : 650,
+        essential: true
+      };
+
+      try{
+        if (silent) gl.jumpTo(camera);
+        else gl.easeTo(camera);
+        gl.resize();
+      }catch(_){}
+
+      updatePlayerGlMarkersAndRoute(source, target, p);
+    }
+
     function setBearingBetweenPoints(source, target, mode='horizontal'){
       if (!map.setBearing || !source || !target) return;
       const z = map.getZoom();
@@ -2033,6 +2323,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function doHoleView(){
+      hidePlayerGlView();
       clearPlayerViewGraphics();
       updateViewButtonStates();
       const p = state.course.holes[String(state.hole)]?.pins || {};
@@ -2049,41 +2340,36 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       const source = getPlayerViewSourcePoint(p);
       const target = getPlayerViewTargetPin(p);
       if (!(source && target)){
+        state.viewMode = 'hole';
         doHoleView();
         return;
       }
 
       clearPlayerViewGraphics();
       updateViewButtonStates();
-      setBearingBetweenPoints(source, target, 'vertical');
 
-      const size = map.getSize();
-      const leftPad = Math.max(62, Math.round(size.x * 0.16));
-      const rightPad = Math.max(62, Math.round(size.x * 0.16));
-      const topPad = Math.max(132, Math.round(size.y * 0.25));
-      const bottomPad = Math.max(54, Math.round(size.y * 0.10));
+      if (!playerGlCanRun()){
+        const msg = navigator.onLine
+          ? 'Player View needs the online GL map library.'
+          : 'Player View is online-only. Normal GPS still works offline.';
+        hidePlayerGlView();
+        state.viewMode = 'hole';
+        state.followCart = false;
+        doHoleView();
+        showPlayerGlNotice(msg);
+        toast(msg);
+        return;
+      }
 
-      fitBetween(
-        [source.lat, source.lng],
-        [target.lat, target.lng],
-        {
-          paddingTopLeft:[leftPad, topPad],
-          paddingBottomRight:[rightPad, bottomPad],
-          maxZoom:getHoleFitMaxZoom(),
-          animate: silent ? false : true
-        }
-      );
-
-      state.playerAimLine = L.polyline(
-        [[source.lat, source.lng], [target.lat, target.lng]],
-        { color:'#38b6ff', weight:4, opacity:0.92, dashArray:'10,10', interactive:false }
-      ).addTo(map);
-
-      setTimeout(updateFocusMask, 120);
-      setTimeout(updateFocusMask, 520);
+      document.body.classList.add('player-gl-active');
+      const el = $('#playerMap');
+      if (el) el.setAttribute('aria-hidden', 'false');
+      ensurePlayerGlMap(source, target);
+      updatePlayerGlView(silent);
     }
 
     function doCartView(silent){
+      hidePlayerGlView();
       clearPlayerViewGraphics();
       updateViewButtonStates();
       const p = state.course.holes[String(state.hole)]?.pins || {};
@@ -2100,10 +2386,7 @@ function updateBearingForHole(){
   const p = state.course?.holes?.[String(state.hole)]?.pins || {};
 
   if (state.viewMode === 'player'){
-    const source = getPlayerViewSourcePoint(p);
-    const target = getPlayerViewTargetPin(p);
-    if (!(source && target)) { if (map.setBearing) map.setBearing(0); return; }
-    setBearingBetweenPoints(source, target, 'vertical');
+    // Player View uses a separate pitched GL map. Leave the hidden Leaflet map alone.
     return;
   }
 
