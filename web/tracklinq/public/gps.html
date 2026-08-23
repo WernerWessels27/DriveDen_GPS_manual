@@ -1963,15 +1963,25 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function getPlayerGlTileSize(){
-      // Esri is the main DriveDen imagery. For Sharpest z20 Esri/Wayback courses,
-      // use a smaller tile size so the pitched view requests sharper source tiles
-      // while still showing the hole from a lower forward camera angle.
-      if (!isActiveMapboxImagery() && normalizeEsriTileMaxZoom(activeTileMaxZoom) >= 20) return 128;
+      // Use the normal raster tile size so Player View uses the exact active course
+      // imagery template and behaves more like the top-down hole view.
       return 256;
     }
 
+    function getPlayerGlPitch(){
+      // Slightly lower pitch keeps the view more natural and reduces blur/stretching
+      // on courses where Esri already looks good in the normal top-down view.
+      return isActiveMapboxImagery() ? 60 : 56;
+    }
+
+    function getPlayerGlRasterResampling(){
+      // Esri/Wayback courses generally look sharper with nearest resampling here,
+      // while Mapbox satellite is better left on linear.
+      return isActiveMapboxImagery() ? 'linear' : 'nearest';
+    }
+
     function getPlayerGlImageryKey(){
-      return `${activeImageryKey || 'esri-live'}|z${getPlayerGlTileMaxZoom()}|ts${getPlayerGlTileSize()}`;
+      return `${activeImageryKey || 'esri-live'}|z${getPlayerGlTileMaxZoom()}`;
     }
 
     function getPlayerGlStyle(){
@@ -1995,7 +2005,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
             id: 'drivedenSatellite',
             type: 'raster',
             source: 'drivedenSatellite',
-            paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' }
+            paint: { 'raster-fade-duration': 0, 'raster-resampling': getPlayerGlRasterResampling() }
           },
           {
             id: 'playerRouteLine',
@@ -2032,13 +2042,20 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       const maxZ = getPlayerGlTileMaxZoom();
       const d = Math.max(1, Number(distanceM) || 1);
       let z;
-      if (d > 650) z = 18.0;
-      else if (d > 500) z = 18.35;
-      else if (d > 380) z = 18.75;
-      else if (d > 260) z = 19.10;
-      else if (d > 170) z = 19.45;
-      else z = 19.75;
-      return Math.max(16.6, Math.min(maxZ, z));
+      if (d > 650) z = 18.35;
+      else if (d > 500) z = 18.80;
+      else if (d > 380) z = 19.10;
+      else if (d > 260) z = 19.45;
+      else if (d > 170) z = 19.75;
+      else z = 19.95;
+
+      // Courses marked as Sharpest GPS tiles (z20) should actually request those
+      // deeper Esri tiles by default in Player View, without needing one extra zoom.
+      if (!isActiveMapboxImagery() && maxZ >= 20) z += 0.55;
+      else if (isActiveMapboxImagery()) z += 0.10;
+      else z += 0.20;
+
+      return Math.max(17.2, Math.min(maxZ, z));
     }
 
     function ensurePlayerGlMap(source, target){
@@ -2063,7 +2080,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       state.playerGlImageryKey = key;
 
       const dist = distMeters(source, target);
-      const cameraCenter = pointAlong(source, target, 0.34);
+      const cameraCenter = pointAlong(source, target, 0.40);
       const brg = bearingDegrees(source, target);
 
       state.playerGlMap = new maplibregl.Map({
@@ -2072,7 +2089,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         center: [cameraCenter.lng, cameraCenter.lat],
         zoom: playerGlZoomForDistance(dist),
         bearing: brg,
-        pitch: 64,
+        pitch: getPlayerGlPitch(),
         // Player View is a preview map, so allow users to pan/zoom around the hole.
         // Keep rotation/pitch gestures disabled so the view does not get accidentally twisted.
         interactive: true,
@@ -2147,12 +2164,12 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
       const dist = distMeters(source, target);
       const brg = bearingDegrees(source, target);
-      const cameraCenter = pointAlong(source, target, 0.34);
+      const cameraCenter = pointAlong(source, target, 0.40);
       const camera = {
         center: [cameraCenter.lng, cameraCenter.lat],
         zoom: playerGlZoomForDistance(dist),
         bearing: brg,
-        pitch: 64,
+        pitch: getPlayerGlPitch(),
         duration: silent ? 0 : 650,
         essential: true
       };
