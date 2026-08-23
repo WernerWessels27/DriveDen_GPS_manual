@@ -136,6 +136,16 @@
     .holeMeta .par, .holeMeta .stroke { font-size: 12px; color: var(--muted); }
     .holeMeta .holeNo { font-size: 20px; font-weight: 900; }
 
+    .clubSuggestion {
+      position:absolute; top:104px; left:50%; transform:translateX(-50%);
+      z-index:1050; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      padding:7px 12px; border-radius:999px; background:var(--panel);
+      border:1px solid var(--chip-border); color:var(--text); box-shadow:var(--shadow);
+      font-size:13px; font-weight:900; white-space:nowrap;
+    }
+    .clubSuggestion[hidden] { display:none !important; }
+    .clubSuggestion .label { color:var(--muted); font-weight:800; }
+
     /* Distances (top-left) stacked vertical, MID larger; unit toggle here */
     .distStack {
       position: absolute; top: 112px; left: 12px; z-index: 1050;
@@ -220,6 +230,28 @@
     }
     .modalActions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 
+    .bagToggle {
+      display:flex; align-items:center; gap:8px; font-weight:900;
+      padding:10px 12px; border:1px solid var(--chip-border); border-radius:12px;
+      background:var(--chip); margin-bottom:10px;
+    }
+    .bagHelp { margin:0 0 10px; color:var(--muted); font-weight:700; font-size:13px; }
+    .bagGrid {
+      display:grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:8px;
+    }
+    .bagClubRow {
+      display:grid; grid-template-columns: 1fr 86px; gap:8px; align-items:center;
+      padding:9px 10px; border:1px solid var(--chip-border); border-radius:12px;
+      background:var(--chip);
+    }
+    .bagClubRow label { font-weight:900; font-size:13px; }
+    .bagClubRow input {
+      width:100%; box-sizing:border-box; padding:8px 6px; border-radius:10px;
+      border:1px solid var(--border); background:var(--panel); color:var(--text);
+      text-align:center; font-weight:900;
+    }
+
     /* Hide Leaflet UI */
     .leaflet-control-container { display: none !important; }
     .leaflet-bottom.leaflet-right { display: none !important; }
@@ -256,7 +288,7 @@
     }
   
 /* === Rules & Penalties theme integration (override inline light styles) === */
-#rulesBtnMini,
+#bagBtn,
 #penBtnMini,
 #largeTextBtn,
 #downloadCourseBtn {
@@ -593,8 +625,17 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     font-size: 14px;
   }
 
+  .clubSuggestion {
+    top: 83px;
+    max-width: calc(100vw - 96px);
+    padding: 5px 9px;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .distStack {
-    top: 92px;
+    top: 116px;
     left: 50%;
     transform: translateX(-50%);
     width: min(96vw, 430px);
@@ -655,9 +696,16 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     z-index: 1110 !important;
   }
 
-  #largeTextBtn,
-  #rulesBtnMini {
+  #largeTextBtn {
     display: none !important;
+  }
+
+  #bagBtn {
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+    border-radius: 12px !important;
+    min-width: 0 !important;
+    white-space: nowrap;
   }
 
   #downloadCourseBtn {
@@ -732,6 +780,10 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     font-size: 12px;
   }
 
+  .bagGrid {
+    grid-template-columns: 1fr;
+  }
+
   .clearLayupFloating {
     bottom: 58px;
   }
@@ -781,7 +833,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       <span id="downloadCourseLabel">Download Course</span>
     </button>
     <button class="btnMini" id="largeTextBtn" title="Large text" aria-pressed="false" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);"><span>Enlarge Text</span></button>
-    <button class="btnMini" id="rulesBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Rules</button>
+    <button class="btnMini" id="bagBtn" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);">Build Bag</button>
     <button class="btnMini" id="penBtnMini" style="border:1px solid #e5e7eb;background:#ffffffee;color:#111827;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none;align-items:center;justify-content:space-between;gap:10px;min-width:160px;">
       <span>Penalties</span>
       <div class="penSwitch" id="penSwitch" style="position:relative;width:44px;height:24px;border-radius:999px;background:#ddd;border:1px solid #cfcfcf;flex:0 0 auto;">
@@ -856,6 +908,11 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     <button class="btn" id="nextHole"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 5 15.5 12l-7 7V5z"/></svg></button>
   </div>
 
+  <div class="clubSuggestion" id="clubSuggestion" hidden>
+    <span class="label">Club:</span>
+    <span id="clubSuggestionText">–</span>
+  </div>
+
   <!-- Distances stack -->
   <div class="distStack">
     <div class="chipV">
@@ -900,6 +957,25 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
   <div class="bottomBubbles">
     <button class="bubbleBtn" id="scoreBtn">Scorecard</button>
     <button class="bubbleBtn" id="historyBtn">History</button>
+  </div>
+
+  <!-- Build Bag modal -->
+  <div class="modalBack" id="bagModal">
+    <div class="modal">
+      <h2>Build Your Bag</h2>
+      <label class="bagToggle">
+        <input type="checkbox" id="bagEnabled"/>
+        <span>Use Build Your Bag club suggestions</span>
+      </label>
+      <p class="bagHelp">
+        Enter your average carry distance for each club. Distances below are in <strong id="bagUnitLabel">m</strong>.
+      </p>
+      <div class="bagGrid" id="bagClubRows"></div>
+      <div class="modalActions">
+        <button class="btn" id="saveBag">Save Bag</button>
+        <button class="btn" id="closeBag">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Scorecard modal -->
@@ -1854,6 +1930,166 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       if(pref==='TEE' && pins.TEE) return { lat:pins.TEE.lat, lng:pins.TEE.lng };
       return fromCart();
     }
+
+    const BUILD_BAG_STORAGE_KEY = 'tl_build_your_bag_v1';
+    const BUILD_BAG_CLUBS = [
+      ['driver', 'Driver'],
+      ['3wood', '3 Wood'],
+      ['5wood', '5 Wood'],
+      ['hybrid', 'Hybrid'],
+      ['3i', '3i'],
+      ['4i', '4i'],
+      ['5i', '5i'],
+      ['6i', '6i'],
+      ['7i', '7i'],
+      ['8i', '8i'],
+      ['9i', '9i'],
+      ['pw', 'PW'],
+      ['gapwedge', 'Gap Wedge'],
+      ['sandwedge', 'Sand Wedge'],
+      ['lobwedge', 'Lob Wedge']
+    ];
+
+    function defaultBuildBag(){
+      return { enabled:false, clubs:{} };
+    }
+
+    function loadBuildBag(){
+      try{
+        const raw = localStorage.getItem(BUILD_BAG_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        const bag = defaultBuildBag();
+        bag.enabled = parsed?.enabled === true;
+        const clubs = parsed?.clubs || {};
+        BUILD_BAG_CLUBS.forEach(([id])=>{
+          const n = Number(clubs[id]);
+          if (Number.isFinite(n) && n > 0) bag.clubs[id] = n;
+        });
+        return bag;
+      }catch(_){
+        return defaultBuildBag();
+      }
+    }
+
+    function saveBuildBag(){
+      try{ localStorage.setItem(BUILD_BAG_STORAGE_KEY, JSON.stringify(buildBag)); }catch(_){}
+    }
+
+    let buildBag = loadBuildBag();
+
+    function displayDistanceFromMeters(m){
+      if(!Number.isFinite(Number(m))) return '';
+      return state.unit === 'yd' ? Math.round(Number(m) * 1.09361) : Math.round(Number(m));
+    }
+
+    function metersFromDisplayDistance(value){
+      const n = Number(value);
+      if(!Number.isFinite(n) || n <= 0) return null;
+      return state.unit === 'yd' ? n / 1.09361 : n;
+    }
+
+    function getBuildBagMidDistance(pins){
+      const from = fromPoint(pins, 'CART') || fromPoint(pins, 'TEE');
+      if(!from || !pins?.MID) return null;
+      return haversine(from, pins.MID);
+    }
+
+    function getBuildBagSuggestion(pins){
+      if(!buildBag.enabled) return { show:false, text:'' };
+
+      const midDistanceM = getBuildBagMidDistance(pins);
+      if(!Number.isFinite(midDistanceM)) return { show:true, text:'No Club Suggestion' };
+
+      const entries = BUILD_BAG_CLUBS
+        .map(([id, label])=>({ id, label, distanceM:Number(buildBag.clubs[id]) }))
+        .filter(x=>Number.isFinite(x.distanceM) && x.distanceM > 0);
+
+      if(!entries.length) return { show:true, text:'Add club distances' };
+
+      const driverM = Number(buildBag.clubs.driver);
+      const maxEntered = entries.reduce((best, cur)=>cur.distanceM > best.distanceM ? cur : best, entries[0]);
+
+      if(Number.isFinite(driverM) && driverM > 0){
+        if(midDistanceM > driverM + 0.5) return { show:true, text:'No Club Suggestion' };
+      } else if(maxEntered && midDistanceM > maxEntered.distanceM + 0.5){
+        return { show:true, text:'No Club Suggestion' };
+      }
+
+      const best = entries.reduce((best, cur)=>{
+        const bestDiff = Math.abs(best.distanceM - midDistanceM);
+        const curDiff = Math.abs(cur.distanceM - midDistanceM);
+        return curDiff < bestDiff ? cur : best;
+      }, entries[0]);
+
+      return { show:true, text:`${best.label} • ${displayDistanceFromMeters(midDistanceM)}${state.unit} to MID` };
+    }
+
+    function updateBuildBagSuggestion(pins){
+      const box = $('#clubSuggestion');
+      const txt = $('#clubSuggestionText');
+      if(!box || !txt) return;
+
+      const result = getBuildBagSuggestion(pins || {});
+      if(!result.show){
+        box.hidden = true;
+        txt.textContent = '–';
+        return;
+      }
+
+      txt.textContent = result.text || 'No Club Suggestion';
+      box.hidden = false;
+    }
+
+    function renderBuildBagModal(){
+      buildBag = loadBuildBag();
+      const enabled = $('#bagEnabled');
+      const rows = $('#bagClubRows');
+      const unitLabel = $('#bagUnitLabel');
+
+      if(enabled) enabled.checked = buildBag.enabled === true;
+      if(unitLabel) unitLabel.textContent = state.unit;
+      if(!rows) return;
+
+      rows.innerHTML = BUILD_BAG_CLUBS.map(([id, label])=>{
+        const storedM = Number(buildBag.clubs[id]);
+        const value = Number.isFinite(storedM) && storedM > 0 ? displayDistanceFromMeters(storedM) : '';
+        return `<div class="bagClubRow">
+          <label for="bag_${id}">${label}</label>
+          <input id="bag_${id}" data-club-id="${id}" type="number" inputmode="decimal" min="1" step="1" value="${value}" placeholder="${state.unit}">
+        </div>`;
+      }).join('');
+    }
+
+    function openBuildBagModal(){
+      renderBuildBagModal();
+      const modal = $('#bagModal');
+      if(modal) modal.style.display = 'grid';
+    }
+
+    function closeBuildBagModal(){
+      const modal = $('#bagModal');
+      if(modal) modal.style.display = 'none';
+    }
+
+    function saveBuildBagFromModal(){
+      const next = defaultBuildBag();
+      next.enabled = $('#bagEnabled')?.checked === true;
+
+      $$('#bagClubRows input[data-club-id]').forEach(inp=>{
+        const id = inp.getAttribute('data-club-id');
+        const meters = metersFromDisplayDistance(inp.value);
+        if(id && meters) next.clubs[id] = meters;
+      });
+
+      buildBag = next;
+      saveBuildBag();
+
+      const pins = state.course?.holes?.[String(state.hole)]?.pins || {};
+      updateBuildBagSuggestion(pins);
+      closeBuildBagModal();
+      toast(buildBag.enabled ? 'Build Your Bag saved' : 'Build Your Bag off');
+    }
+
     function updateChips(pins){
       const f=$('#dFront'), m=$('#dMid'), b=$('#dBack');
       f.textContent=m.textContent=b.textContent='–';
@@ -1875,6 +2111,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       }
 
       $('#unitChip').textContent = state.unit;
+      updateBuildBagSuggestion(pins);
       updateLayupUI(); // keep layup distances/labels in sync
     }
 
@@ -2759,6 +2996,14 @@ function ensureInitialFraming(){
       state.unit = state.unit==='m' ? 'yd' : 'm';
       const p = state.course.holes[String(state.hole)]?.pins || {};
       updateChips(p);
+    });
+
+    // Build Your Bag
+    $('#bagBtn')?.addEventListener('click', openBuildBagModal);
+    $('#closeBag')?.addEventListener('click', closeBuildBagModal);
+    $('#saveBag')?.addEventListener('click', saveBuildBagFromModal);
+    $('#bagModal')?.addEventListener('click', (e)=>{
+      if(e.target === $('#bagModal')) closeBuildBagModal();
     });
 
     // Exit -> back to login
