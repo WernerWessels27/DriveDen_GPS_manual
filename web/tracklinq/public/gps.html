@@ -2015,13 +2015,18 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         return { show:true, text:'No Club Suggestion' };
       }
 
-      const best = entries.reduce((best, cur)=>{
-        const bestDiff = Math.abs(best.distanceM - midDistanceM);
-        const curDiff = Math.abs(cur.distanceM - midDistanceM);
-        return curDiff < bestDiff ? cur : best;
-      }, entries[0]);
+      // Only suggest clubs that can reach the MID distance.
+      // Example: 140m target, PW 135m, 9i 145m -> suggest 9i at 97%, never PW.
+      const reachable = entries
+        .filter(x=>x.distanceM + 0.5 >= midDistanceM)
+        .sort((a,b)=>a.distanceM - b.distanceM);
 
-      return { show:true, text:`${best.label} • ${displayDistanceFromMeters(midDistanceM)}${state.unit} to MID` };
+      if(!reachable.length) return { show:true, text:'No Club Suggestion' };
+
+      const best = reachable[0];
+      const powerPct = Math.max(1, Math.min(100, Math.round((midDistanceM / best.distanceM) * 100)));
+
+      return { show:true, text:`${best.label} ${powerPct}% • ${displayDistanceFromMeters(midDistanceM)}${state.unit} to MID` };
     }
 
     function updateBuildBagSuggestion(pins){
