@@ -17,6 +17,14 @@
     }
     ,      
            {
+      "id": "eagle-canyon-golf-estate",
+      "name": "Eagle Canyon Golf Estate",
+      "short_code": "EOA",
+      "pin": "ECGE123456",
+      "active": true
+    }
+    ,  
+           {
       "id": "centurion-golf-course",
       "name": "Centurion Golf Estate",
       "short_code": "CGE",
