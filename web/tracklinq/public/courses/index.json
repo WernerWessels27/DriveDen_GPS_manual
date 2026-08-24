@@ -15,7 +15,15 @@
       "pin": "EOA1234567",
       "active": true
     }
-    ,      
+    ,     
+           {
+      "id": "ruimsig-country-club",
+      "name": "Ruimsig Country Club",
+      "short_code": "RCC",
+      "pin": "RCC1234567",
+      "active": true
+    }
+    ,  
            {
       "id": "eagle-canyon-golf-estate",
       "name": "Eagle Canyon Golf Estate",
