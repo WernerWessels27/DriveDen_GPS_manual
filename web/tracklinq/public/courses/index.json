@@ -15,7 +15,15 @@
       "pin": "EOA1234567",
       "active": true
     }
-    ,     
+    ,  
+           {
+      "id": "seasons-golf-club",
+      "name": "Seasons Golf Club",
+      "short_code": "SGC",
+      "pin": "SGC1234567",
+      "active": true
+    }
+    , 
            {
       "id": "ruimsig-country-club",
       "name": "Ruimsig Country Club",
