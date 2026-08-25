@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "fancourt-outeniqua-golf-course",
+      "name": "Fancourt - Outeniqua Golf Course",
+      "short_code": "FOG",
+      "pin": "FCOGC12345",
+      "active": true
+    }
+    ,  
+           {
       "id": "seasons-golf-club",
       "name": "Seasons Golf Club",
       "short_code": "SGC",
