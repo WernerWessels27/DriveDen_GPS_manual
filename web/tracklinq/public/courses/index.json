@@ -24,6 +24,14 @@
       "active": true
     }
     ,  
+               {
+      "id": "fancourt-links-course",
+      "name": "Fancourt - Links Course",
+      "short_code": "FCL",
+      "pin": "FFCLC123456",
+      "active": true
+    }
+    , 
            {
       "id": "seasons-golf-club",
       "name": "Seasons Golf Club",
