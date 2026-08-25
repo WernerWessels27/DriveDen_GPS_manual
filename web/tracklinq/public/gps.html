@@ -2136,8 +2136,9 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     function getPlayerViewTargetPin(p){
-      // Player View looks from the tee box toward the main green target.
-      return p?.MID || p?.BACK || p?.FRONT || null;
+      // Player View frames the full hole preview from TEE to BACK/GREEN.
+      // MID remains a visible marker, but BACK is preferred so TEE and green are both in frame.
+      return p?.BACK || p?.MID || p?.FRONT || null;
     }
 
     function getPlayerViewSourcePoint(p){
@@ -2237,7 +2238,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
             minzoom: 0,
             maxzoom: getPlayerGlTileMaxZoom()
           },
-          playerRoute: {
+          playerHoleOutline: {
             type: 'geojson',
             data: { type:'FeatureCollection', features:[] }
           }
@@ -2250,15 +2251,24 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
             paint: { 'raster-fade-duration': 0, 'raster-resampling': getPlayerGlRasterResampling() }
           },
           {
-            id: 'playerRouteLine',
+            id: 'playerHoleOutlineFill',
+            type: 'fill',
+            source: 'playerHoleOutline',
+            paint: {
+              'fill-color': '#ffffff',
+              'fill-opacity': 0.08
+            }
+          },
+          {
+            id: 'playerHoleOutlineLine',
             type: 'line',
-            source: 'playerRoute',
+            source: 'playerHoleOutline',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#38b6ff',
-              'line-width': 4,
-              'line-opacity': 0.92,
-              'line-dasharray': [1.4, 1.2]
+              'line-color': '#ffffff',
+              'line-width': 3,
+              'line-opacity': 0.95,
+              'line-blur': 0.5
             }
           }
         ]
@@ -2284,20 +2294,81 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       const maxZ = getPlayerGlTileMaxZoom();
       const d = Math.max(1, Number(distanceM) || 1);
       let z;
-      if (d > 650) z = 18.35;
-      else if (d > 500) z = 18.80;
-      else if (d > 380) z = 19.10;
-      else if (d > 260) z = 19.45;
-      else if (d > 170) z = 19.75;
-      else z = 19.95;
+      if (d > 650) z = 18.10;
+      else if (d > 500) z = 18.45;
+      else if (d > 380) z = 18.85;
+      else if (d > 260) z = 19.20;
+      else if (d > 170) z = 19.55;
+      else z = 19.85;
 
-      // Courses marked as Sharpest GPS tiles (z20) should actually request those
-      // deeper Esri tiles by default in Player View, without needing one extra zoom.
-      if (!isActiveMapboxImagery() && maxZ >= 20) z += 0.55;
-      else if (isActiveMapboxImagery()) z += 0.10;
-      else z += 0.20;
+      // Courses marked as Sharpest GPS tiles (z20) should request deeper Esri tiles,
+      // but Player View still needs enough space to keep TEE and BACK/GREEN in frame.
+      if (!isActiveMapboxImagery() && maxZ >= 20) z += 0.25;
+      else if (isActiveMapboxImagery()) z += 0.05;
+      else z += 0.10;
 
-      return Math.max(17.2, Math.min(maxZ, z));
+      return Math.max(17.0, Math.min(maxZ, z));
+    }
+
+    function playerGlPadding(){
+      const mobile = isMobileView();
+      return mobile
+        ? { top: 92, bottom: 156, left: 54, right: 54 }
+        : { top: 118, bottom: 190, left: 95, right: 95 };
+    }
+
+    function fitPlayerGlView(source, target, silent=false){
+      const gl = state.playerGlMap;
+      if(!gl) return;
+      const brg = bearingDegrees(source, target);
+      const dist = distMeters(source, target);
+      const options = {
+        padding: playerGlPadding(),
+        maxZoom: playerGlZoomForDistance(dist),
+        bearing: brg,
+        pitch: getPlayerGlPitch(),
+        duration: silent ? 0 : 650,
+        essential: true
+      };
+
+      try{
+        gl.fitBounds([[source.lng, source.lat], [target.lng, target.lat]], options);
+        try{ gl.setPitch(getPlayerGlPitch()); }catch(_){}
+      }catch(_){
+        const cameraCenter = pointAlong(source, target, 0.50);
+        const fallback = {
+          center: [cameraCenter.lng, cameraCenter.lat],
+          zoom: playerGlZoomForDistance(dist),
+          bearing: brg,
+          pitch: getPlayerGlPitch(),
+          duration: silent ? 0 : 650,
+          essential: true
+        };
+        try{ silent ? gl.jumpTo(fallback) : gl.easeTo(fallback); }catch(__){}
+      }
+    }
+
+    function updatePlayerGlHoleOutline(){
+      if (!state.playerGlMap || !state.playerGlLoaded) return;
+      const outline = getCurrentHoleOutline();
+      const data = { type:'FeatureCollection', features:[] };
+
+      if (outline.length >= 3){
+        const ring = outline.map(p => [p.lng, p.lat]);
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push(first);
+        data.features.push({
+          type:'Feature',
+          geometry:{ type:'Polygon', coordinates:[ring] },
+          properties:{}
+        });
+      }
+
+      try{
+        const src = state.playerGlMap.getSource('playerHoleOutline');
+        if (src) src.setData(data);
+      }catch(_){}
     }
 
     function ensurePlayerGlMap(source, target){
@@ -2322,14 +2393,14 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       state.playerGlImageryKey = key;
 
       const dist = distMeters(source, target);
-      const cameraCenter = pointAlong(source, target, 0.40);
+      const cameraCenter = pointAlong(source, target, 0.50);
       const brg = bearingDegrees(source, target);
 
       state.playerGlMap = new maplibregl.Map({
         container: el,
         style: getPlayerGlStyle(),
         center: [cameraCenter.lng, cameraCenter.lat],
-        zoom: playerGlZoomForDistance(dist),
+        zoom: Math.max(17, playerGlZoomForDistance(dist) - 0.4),
         bearing: brg,
         pitch: getPlayerGlPitch(),
         // Player View is a preview map, so allow users to pan/zoom around the hole.
@@ -2372,19 +2443,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function updatePlayerGlMarkersAndRoute(source, target, pins){
       if (!state.playerGlMap || !state.playerGlLoaded) return;
 
-      const route = {
-        type:'FeatureCollection',
-        features:[{
-          type:'Feature',
-          geometry:{ type:'LineString', coordinates:[[source.lng, source.lat],[target.lng, target.lat]] },
-          properties:{}
-        }]
-      };
-
-      try{
-        const src = state.playerGlMap.getSource('playerRoute');
-        if (src) src.setData(route);
-      }catch(_){}
+      updatePlayerGlHoleOutline();
 
       clearPlayerGlMarkers();
       makePlayerGlMarker('TEE', source, '#38b6ff', 'player');
@@ -2404,21 +2463,8 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       if (!gl) return;
       if (!state.playerGlLoaded) return;
 
-      const dist = distMeters(source, target);
-      const brg = bearingDegrees(source, target);
-      const cameraCenter = pointAlong(source, target, 0.40);
-      const camera = {
-        center: [cameraCenter.lng, cameraCenter.lat],
-        zoom: playerGlZoomForDistance(dist),
-        bearing: brg,
-        pitch: getPlayerGlPitch(),
-        duration: silent ? 0 : 650,
-        essential: true
-      };
-
       try{
-        if (silent) gl.jumpTo(camera);
-        else gl.easeTo(camera);
+        fitPlayerGlView(source, target, silent);
         gl.resize();
       }catch(_){}
 
