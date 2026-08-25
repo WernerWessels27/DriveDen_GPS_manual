@@ -2238,6 +2238,10 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
             minzoom: 0,
             maxzoom: getPlayerGlTileMaxZoom()
           },
+          playerHoleMask: {
+            type: 'geojson',
+            data: { type:'FeatureCollection', features:[] }
+          },
           playerHoleOutline: {
             type: 'geojson',
             data: { type:'FeatureCollection', features:[] }
@@ -2251,12 +2255,12 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
             paint: { 'raster-fade-duration': 0, 'raster-resampling': getPlayerGlRasterResampling() }
           },
           {
-            id: 'playerHoleOutlineFill',
+            id: 'playerHoleFadeMask',
             type: 'fill',
-            source: 'playerHoleOutline',
+            source: 'playerHoleMask',
             paint: {
               'fill-color': '#ffffff',
-              'fill-opacity': 0.08
+              'fill-opacity': ['coalesce', ['get', 'opacity'], 0.18]
             }
           },
           {
@@ -2312,35 +2316,41 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
     function playerGlPadding(){
       const mobile = isMobileView();
+      // Keep BACK/GREEN below the top hole-info/distance bubbles and TEE above bottom buttons.
       return mobile
-        ? { top: 92, bottom: 156, left: 54, right: 54 }
-        : { top: 118, bottom: 190, left: 95, right: 95 };
+        ? { top: 174, bottom: 118, left: 62, right: 62 }
+        : { top: 150, bottom: 126, left: 100, right: 100 };
     }
 
     function fitPlayerGlView(source, target, silent=false){
       const gl = state.playerGlMap;
       if(!gl) return;
       const brg = bearingDegrees(source, target);
+      const pitch = getPlayerGlPitch();
       const dist = distMeters(source, target);
       const options = {
         padding: playerGlPadding(),
         maxZoom: playerGlZoomForDistance(dist),
         bearing: brg,
-        pitch: getPlayerGlPitch(),
+        pitch,
         duration: silent ? 0 : 650,
         essential: true
       };
 
       try{
+        // Bearing first: TEE -> BACK/GREEN points straight up-screen.
+        // fitBounds then keeps both markers in frame with top/bottom UI spacing.
+        if (silent) gl.jumpTo({ bearing: brg, pitch });
+        else gl.easeTo({ bearing: brg, pitch, duration: 220, essential:true });
         gl.fitBounds([[source.lng, source.lat], [target.lng, target.lat]], options);
-        try{ gl.setPitch(getPlayerGlPitch()); }catch(_){}
+        try{ gl.setBearing(brg); gl.setPitch(pitch); }catch(_){}
       }catch(_){
         const cameraCenter = pointAlong(source, target, 0.50);
         const fallback = {
           center: [cameraCenter.lng, cameraCenter.lat],
           zoom: playerGlZoomForDistance(dist),
           bearing: brg,
-          pitch: getPlayerGlPitch(),
+          pitch,
           duration: silent ? 0 : 650,
           essential: true
         };
@@ -2348,26 +2358,76 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       }
     }
 
+    function closeLngLatRing(ring){
+      if (!ring.length) return ring;
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push([first[0], first[1]]);
+      return ring;
+    }
+
+    function scaleOutlineRing(outline, scale=1){
+      const pts = outline
+        .map(p => ({ lat:Number(p.lat), lng:Number(p.lng) }))
+        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+      if (pts.length < 3) return [];
+
+      const c = pts.reduce((a,p)=>({ lat:a.lat+p.lat, lng:a.lng+p.lng }), { lat:0, lng:0 });
+      c.lat /= pts.length;
+      c.lng /= pts.length;
+
+      return closeLngLatRing(pts.map(p => [
+        c.lng + (p.lng - c.lng) * scale,
+        c.lat + (p.lat - c.lat) * scale
+      ]));
+    }
+
+    function makeOutsideHoleMaskFeature(innerRing, opacity){
+      // Large outer polygon with the hole cut out. Multiple scaled cut-outs create
+      // a soft fade outside the mapped hole, similar to the normal HOLE view.
+      const outer = [[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]];
+      return {
+        type:'Feature',
+        geometry:{ type:'Polygon', coordinates:[outer, innerRing] },
+        properties:{ opacity }
+      };
+    }
+
     function updatePlayerGlHoleOutline(){
       if (!state.playerGlMap || !state.playerGlLoaded) return;
       const outline = getCurrentHoleOutline();
-      const data = { type:'FeatureCollection', features:[] };
+
+      const outlineData = { type:'FeatureCollection', features:[] };
+      const maskData = { type:'FeatureCollection', features:[] };
 
       if (outline.length >= 3){
-        const ring = outline.map(p => [p.lng, p.lat]);
-        const first = ring[0];
-        const last = ring[ring.length - 1];
-        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push(first);
-        data.features.push({
+        const lineRing = scaleOutlineRing(outline, 1);
+        outlineData.features.push({
           type:'Feature',
-          geometry:{ type:'Polygon', coordinates:[ring] },
+          geometry:{ type:'Polygon', coordinates:[lineRing] },
           properties:{}
+        });
+
+        [
+          [1.00, 0.20],
+          [1.10, 0.17],
+          [1.24, 0.16],
+          [1.44, 0.15],
+          [1.72, 0.13]
+        ].forEach(([scale, opacity])=>{
+          const ring = scaleOutlineRing(outline, scale);
+          if (ring.length >= 4) maskData.features.push(makeOutsideHoleMaskFeature(ring, opacity));
         });
       }
 
       try{
-        const src = state.playerGlMap.getSource('playerHoleOutline');
-        if (src) src.setData(data);
+        const outlineSrc = state.playerGlMap.getSource('playerHoleOutline');
+        if (outlineSrc) outlineSrc.setData(outlineData);
+      }catch(_){}
+
+      try{
+        const maskSrc = state.playerGlMap.getSource('playerHoleMask');
+        if (maskSrc) maskSrc.setData(maskData);
       }catch(_){}
     }
 
