@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "heidelberg-golf-club",
+      "name": "Heidelberg Golf Club",
+      "short_code": "HBG",
+      "pin": "HBGC123456",
+      "active": true
+    }
+    ,  
+           {
       "id": "kempton-park-golf-club",
       "name": "Kempton Park Golf Club",
       "short_code": "KPG",
