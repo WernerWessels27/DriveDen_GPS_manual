@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "kempton-park-golf-club",
+      "name": "Kempton Park Golf Club",
+      "short_code": "KPG",
+      "pin": "KPGC123456",
+      "active": true
+    }
+    ,
+           {
       "id": "fancourt-outeniqua-golf-course",
       "name": "Fancourt - Outeniqua Golf Course",
       "short_code": "FOG",
