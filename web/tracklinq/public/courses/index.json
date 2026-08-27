@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "goldfields-golf-club",
+      "name": "Goldfields Golf Club",
+      "short_code": "GGC",
+      "pin": "GGC1234567",
+      "active": true
+    }
+    ,
+           {
       "id": "heidelberg-golf-club",
       "name": "Heidelberg Golf Club",
       "short_code": "HBG",
