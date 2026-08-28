@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "midstream-golf-course",
+      "name": "Midstream Golf Course",
+      "short_code": "MSG",
+      "pin": "MSGC123456",
+      "active": true
+    }
+    ,  
+           {
       "id": "goldfields-golf-club",
       "name": "Goldfields Golf Club",
       "short_code": "GGC",
