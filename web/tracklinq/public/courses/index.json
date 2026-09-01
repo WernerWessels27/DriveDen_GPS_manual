@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "blair-athol-golf-estate",
+      "name": "Blair Athol Golf Estate",
+      "short_code": "BAG",
+      "pin": "BAGE123456",
+      "active": true
+    }
+    ,  
+           {
       "id": "midstream-golf-course",
       "name": "Midstream Golf Course",
       "short_code": "MSG",
