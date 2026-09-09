@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v18: Mapbox token moved to server config; offline config cached
+// v19: cold reboot navigation fallback + safer cache lookup across app/runtime caches
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v18';
+const CACHE_VERSION = 'v19';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -145,10 +145,8 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    const names = await caches.keys();
-    await Promise.all(
-      names.map((n) => (n.startsWith(CACHE_PREFIX) && n !== CACHE_NAME) ? caches.delete(n) : Promise.resolve())
-    );
+    // Keep older DriveDen app-shell caches as a safety net for hard-reboot/offline devices.
+    // The fetch handler prefers the current cache, but can fall back across older/runtime caches.
     await self.clients.claim();
   })());
 });
@@ -162,6 +160,49 @@ async function cachePutNormalized(cache, req, res) {
 async function cacheMatchNormalized(cache, req) {
   const key = normalizeUrlForCache(req);
   return cache.match(key);
+}
+
+async function cacheMatchAcrossCaches(req) {
+  const inputUrl = new URL(typeof req === 'string' ? req : req.url);
+  const normalized = normalizeUrlForCache(inputUrl.toString());
+
+  const noSearch = new URL(inputUrl.toString());
+  noSearch.search = '';
+
+  const variants = [
+    normalized,
+    noSearch.toString(),
+    withScope(noSearch.pathname.replace(/^\//, '')),
+    typeof req === 'string' ? req : req.url
+  ];
+
+  for (const v of variants) {
+    try {
+      const res = await caches.match(v);
+      if (res) return res;
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+async function appShellFallback(pathname) {
+  const clean = String(pathname || '/').toLowerCase();
+  const wanted = clean.endsWith('/gps.html') || clean === '/gps.html'
+    ? ['gps.html', 'index.html', 'offline.html']
+    : ['index.html', '', 'gps.html', 'offline.html'];
+
+  for (const p of wanted) {
+    try {
+      const cached = await cacheMatchAcrossCaches(withScope(p));
+      if (cached) return cached;
+    } catch (_) {}
+  }
+
+  return new Response('Offline', {
+    status: 503,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  });
 }
 
 // Strategies:
@@ -251,7 +292,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1) HTML navigations: network-first
+  // 1) HTML navigations: network-first, with cold-reboot fallback.
   if (isHtmlNav) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -260,7 +301,11 @@ self.addEventListener('fetch', (event) => {
         if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
-        return (await cacheMatchNormalized(cache, req)) || (await cache.match(withScope('index.html'))) || (await cache.match(withScope('gps.html'))) || (await cache.match(withScope('offline.html')));
+        return (
+          (await cacheMatchNormalized(cache, req)) ||
+          (await cacheMatchAcrossCaches(req)) ||
+          (await appShellFallback(pathname))
+        );
       }
     })());
     return;
@@ -277,7 +322,7 @@ self.addEventListener('fetch', (event) => {
         if (net && net.ok) await cachePutNormalized(cache, req, net);
         return net;
       } catch {
-        const cached = await cacheMatchNormalized(cache, req);
+        const cached = (await cacheMatchNormalized(cache, req)) || (await cacheMatchAcrossCaches(req));
         return cached || new Response('', { status: 504 });
       }
     })());
