@@ -1429,35 +1429,158 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       map.zoomOut();
     });
 
-    // Data (network-first for courses, cached fallback for offline)
-    async function getIndex(){
-      try{
-        const fresh = await fetch(`/courses/index.json?ts=${Date.now()}`, { cache:'no-store' });
-        if(fresh && fresh.ok) return fresh.json();
-      }catch(_){}
+    // Data (network-first for courses, cached fallback for offline/cold boot)
+    const GPS_OFFLINE_BOOT_FALLBACK_KEY = 'tl_resume_attempting';
+    const GPS_RUNTIME_CACHE = 'driveden-gps-runtime-v1';
 
-      let res = null;
-      try{
-        res = await caches.match('/courses/index.json');
-      }catch(_){}
-
-      if(!res) res = await fetch('/courses/index.json', { cache:'reload' });
-      return res.json();
+    function absoluteAppUrl(path){
+      return new URL(path, window.location.origin).toString();
     }
+
+    async function matchCachedResponse(path){
+      if(!('caches' in window)) return null;
+      const cleanPath = String(path || '').split('?')[0];
+      const variants = [
+        cleanPath,
+        absoluteAppUrl(cleanPath)
+      ];
+
+      for(const v of variants){
+        try{
+          const res = await caches.match(v);
+          if(res) return res;
+        }catch(_){}
+      }
+
+      try{
+        const names = await caches.keys();
+        for(const name of names){
+          const cache = await caches.open(name);
+          for(const v of variants){
+            const res = await cache.match(v);
+            if(res) return res;
+          }
+        }
+      }catch(_){}
+
+      return null;
+    }
+
+    async function parseJsonResponse(res, label){
+      if(!res || !res.ok) throw new Error(`${label || 'JSON'} unavailable`);
+      const txt = await res.clone().text();
+      if(!txt || !txt.trim()) throw new Error(`${label || 'JSON'} empty`);
+      return JSON.parse(txt);
+    }
+
+    async function fetchJsonNetworkFirst(path, label){
+      const cleanPath = String(path || '').split('?')[0];
+
+      try{
+        const fresh = await fetch(`${cleanPath}?ts=${Date.now()}`, {
+          cache:'no-store',
+          headers:{ 'Cache-Control':'no-cache', 'Pragma':'no-cache' }
+        });
+        if(fresh && fresh.ok){
+          const txt = await fresh.clone().text();
+          try{
+            const cache = await caches.open(GPS_RUNTIME_CACHE);
+            await cache.put(absoluteAppUrl(cleanPath), new Response(txt, {
+              headers:{ 'Content-Type':'application/json' }
+            }));
+          }catch(_){}
+          if(cleanPath === '/courses/index.json'){
+            try{ localStorage.setItem('course_index_snapshot', txt); }catch(_){}
+          }
+          return JSON.parse(txt);
+        }
+      }catch(_){}
+
+      const cached = await matchCachedResponse(cleanPath);
+      if(cached) return parseJsonResponse(cached, label);
+
+      if(cleanPath === '/courses/index.json'){
+        try{
+          const snap = localStorage.getItem('course_index_snapshot');
+          if(snap) return JSON.parse(snap);
+        }catch(_){}
+      }
+
+      try{
+        const fallback = await fetch(cleanPath, { cache:'force-cache' });
+        if(fallback && fallback.ok) return parseJsonResponse(fallback, label);
+      }catch(_){}
+
+      throw new Error(`${label || cleanPath} not available offline`);
+    }
+
+    async function getIndex(){
+      return fetchJsonNetworkFirst('/courses/index.json', 'Course index');
+    }
+
     async function loadCourseJson(id){
-      const url=`/courses/${id}.json`;
-      try{
-        const fresh = await fetch(`${url}?ts=${Date.now()}`, { cache:'no-store' });
-        if(fresh && fresh.ok) return fresh.json();
-      }catch(_){}
+      const safeId = encodeURIComponent(String(id || '').trim());
+      if(!safeId) throw new Error('Missing course id');
+      return fetchJsonNetworkFirst(`/courses/${safeId}.json`, `Course ${safeId}`);
+    }
 
-      let res = null;
-      try{
-        res = await caches.match(url);
-      }catch(_){}
+    function goToOfflineLoginFallback(reason){
+      console.warn('GPS offline boot fallback:', reason);
+      try{ sessionStorage.setItem(GPS_OFFLINE_BOOT_FALLBACK_KEY, '1'); }catch(_){}
 
-      if(!res) res = await fetch(url, { cache:'reload' });
-      return res.json();
+      const target = new URL('/index.html', window.location.origin);
+      target.searchParams.set('offlineFallback', '1');
+      target.searchParams.set('t', String(Date.now()));
+
+      try{ window.location.replace(target.toString()); }
+      catch(_){ window.location.href = target.toString(); }
+    }
+
+    function showGpsBootFailure(err){
+      console.error('GPS boot failed:', err);
+      if(!navigator.onLine){
+        goToOfflineLoginFallback(err?.message || err);
+        return;
+      }
+      alert('Could not load this course. Returning to login.');
+      try{ sessionStorage.setItem(GPS_OFFLINE_BOOT_FALLBACK_KEY, '1'); }catch(_){}
+      window.location.href = '/index.html';
+    }
+
+    async function cacheGpsStartupForOffline(courseId){
+      if(!navigator.onLine || !('caches' in window)) return { ok:false, cached:0, total:0 };
+      const safeId = encodeURIComponent(String(courseId || '').trim());
+      const urls = [
+        '/',
+        '/index.html',
+        '/gps.html',
+        '/offline.html',
+        '/manifest.webmanifest',
+        '/config.js',
+        '/courses/index.json',
+        safeId ? `/courses/${safeId}.json` : ''
+      ].filter(Boolean);
+
+      const cache = await caches.open(GPS_RUNTIME_CACHE);
+      let cached = 0;
+
+      await Promise.allSettled(urls.map(async (url)=>{
+        try{
+          const bust = url.includes('?') ? '&' : '?';
+          const res = await fetch(`${url}${bust}offlineStartup=${Date.now()}`, { cache:'no-store' });
+          if(res && res.ok){
+            await cache.put(absoluteAppUrl(url), res.clone());
+            cached++;
+          }
+        }catch(_){
+          const existing = await matchCachedResponse(url);
+          if(existing) cached++;
+        }
+      }));
+
+      const required = ['/index.html', '/gps.html', '/courses/index.json', safeId ? `/courses/${safeId}.json` : ''].filter(Boolean);
+      const okChecks = await Promise.all(required.map(u => matchCachedResponse(u).then(Boolean).catch(()=>false)));
+      return { ok: okChecks.every(Boolean), cached, total: urls.length };
     }
     async function pickCourseFromIndex(idx){
       const savedResume = readGpsResumeState();
@@ -1825,9 +1948,16 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       }
 
       offlineDownloadBusy = true;
-      setOfflineCourseButton('downloading', `Downloading 0%`);
+      setOfflineCourseButton('downloading', `Preparing offline files`);
 
       try{
+        const startup = await cacheGpsStartupForOffline(getOfflineCourseId());
+        if(!startup.ok){
+          console.warn('Offline startup files could not all be confirmed:', startup);
+        }
+
+        setOfflineCourseButton('downloading', `Downloading 0%`);
+
         const result = await runOfflineQueue(urls, (done, total)=>{
           const pct = Math.max(1, Math.round((done / total) * 100));
           if (done === total || done % 12 === 0) {
@@ -1841,6 +1971,9 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
           tileCount:urls.length,
           tileMaxZoom:activeTileMaxZoom,
           ok:result.ok,
+          startupCached:startup.ok,
+          startupCachedFiles:startup.cached,
+          startupTotalFiles:startup.total,
           zooms:getOfflineTileZooms(),
           ts:Date.now()
         }));
@@ -3693,40 +3826,50 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
 
     // Boot
     (async function boot(){
-      const idx = await getIndex();
-      const meta = await pickCourseFromIndex(idx);
-      if (!meta){ alert('No courses in index.json'); return; }
-      const course = await loadCourseJson(meta.id);
+      try{
+        const idx = await getIndex();
+        const meta = await pickCourseFromIndex(idx);
+        if (!meta) throw new Error('No courses in index.json');
 
-      const ok = await validatePinFlow(meta.id, course);
-      if (!ok) return;
+        const course = await loadCourseJson(meta.id);
 
-      state.meta = meta; state.course = course;
-      applyCourseImagery(course);
-      $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
+        const ok = await validatePinFlow(meta.id, course);
+        if (!ok) return;
 
-      // Apply club/guest UI rules after login mode has been resolved.
-      applyLoginModeUi(meta.id);
-      setupClubHiddenExit(meta.id);
+        state.meta = meta; state.course = course;
+        applyCourseImagery(course);
+        $('#courseTitle').textContent = course.course?.name || meta.name || 'Course';
 
-      const savedResume = readGpsResumeState();
-      const sameResumeCourse = savedResume && String(savedResume.courseId || '').toUpperCase() === String(meta.id || '').toUpperCase();
+        // Refresh app shell + current course JSON while online, so a hard cart reboot can resume offline.
+        if(navigator.onLine){
+          cacheGpsStartupForOffline(meta.id).catch(()=>{});
+        }
 
-      const startHole = parseInt(q('hole') || (sameResumeCourse ? savedResume.hole : '1') || '1', 10);
-      state.hole = Number.isFinite(startHole) && startHole > 0 ? startHole : 1;
+        // Apply club/guest UI rules after login mode has been resolved.
+        applyLoginModeUi(meta.id);
+        setupClubHiddenExit(meta.id);
 
-      if (sameResumeCourse && (savedResume.viewMode === 'hole' || savedResume.viewMode === 'cart' || savedResume.viewMode === 'player')) {
-        state.viewMode = savedResume.viewMode;
-        state.followCart = savedResume.viewMode === 'cart';
-      } else {
-        state.viewMode = 'cart';
-        state.followCart = true;
+        const savedResume = readGpsResumeState();
+        const sameResumeCourse = savedResume && String(savedResume.courseId || '').toUpperCase() === String(meta.id || '').toUpperCase();
+
+        const startHole = parseInt(q('hole') || (sameResumeCourse ? savedResume.hole : '1') || '1', 10);
+        state.hole = Number.isFinite(startHole) && startHole > 0 ? startHole : 1;
+
+        if (sameResumeCourse && (savedResume.viewMode === 'hole' || savedResume.viewMode === 'cart' || savedResume.viewMode === 'player')) {
+          state.viewMode = savedResume.viewMode;
+          state.followCart = savedResume.viewMode === 'cart';
+        } else {
+          state.viewMode = 'cart';
+          state.followCart = true;
+        }
+
+        renderHole();
+        saveGpsResumeState();
+        try { sessionStorage.removeItem('tl_resume_attempting'); } catch(_) {}
+        toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
+      }catch(err){
+        showGpsBootFailure(err);
       }
-
-      renderHole();
-      saveGpsResumeState();
-      try { sessionStorage.removeItem('tl_resume_attempting'); } catch(_) {}
-      toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
     })();
 
     // Save course/hole/view if the app is backgrounded, killed, or the user opens another app.
