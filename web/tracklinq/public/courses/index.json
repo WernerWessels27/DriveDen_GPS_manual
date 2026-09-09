@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "woodhill-golf-estate",
+      "name": "Woodhill Golf Estate",
+      "short_code": "WGE",
+      "pin": "WGE1234567",
+      "active": true
+    }
+    ,  
+           {
       "id": "blair-atholl-golf-estate",
       "name": "Blair Atholl Golf Estate",
       "short_code": "BAG",
