@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "pretoria-country-club",
+      "name": "Pretoria Country Club",
+      "short_code": "PCC",
+      "pin": "PCC1234567",
+      "active": true
+    }
+    , 
+           {
       "id": "woodhill-golf-estate",
       "name": "Woodhill Golf Estate",
       "short_code": "WGE",
