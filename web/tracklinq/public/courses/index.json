@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "blue-valley-golf-estate",
+      "name": "Blue Valley Golf Estate",
+      "short_code": "BVG",
+      "pin": "BVGE123456",
+      "active": true
+    }
+    , 
+           {
       "id": "pretoria-country-club",
       "name": "Pretoria Country Club",
       "short_code": "PCC",
