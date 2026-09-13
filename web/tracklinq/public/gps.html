@@ -137,7 +137,7 @@
     .holeMeta .holeNo { font-size: 20px; font-weight: 900; }
 
     .clubSuggestion {
-      position:absolute; top:104px; left:50%; transform:translateX(-50%);
+      position:absolute; top:116px; left:50%; transform:translateX(-50%);
       z-index:1050; display:inline-flex; align-items:center; justify-content:center; gap:6px;
       padding:7px 12px; border-radius:999px; background:var(--panel);
       border:1px solid var(--chip-border); color:var(--text); box-shadow:var(--shadow);
@@ -478,8 +478,21 @@ body[data-large-text="on"] .holeMeta .holeNo {
   font-size:30px;
 }
 
+body[data-large-text="on"] .clubSuggestion {
+  top:132px;
+  padding:10px 18px;
+  gap:8px;
+  font-size:20px;
+  border-radius:999px;
+}
+
+body[data-large-text="on"] .clubSuggestion .label,
+body[data-large-text="on"] #clubSuggestionText {
+  font-size:20px;
+}
+
 body[data-large-text="on"] .distStack {
-  top:136px;
+  top:168px;
   min-width:300px;
   gap:12px;
 }
@@ -664,7 +677,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
   }
 
   .clubSuggestion {
-    top: 83px;
+    top: 96px;
     max-width: calc(100vw - 96px);
     padding: 5px 9px;
     font-size: 11px;
@@ -673,7 +686,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
   }
 
   .distStack {
-    top: 116px;
+    top: 130px;
     left: 50%;
     transform: translateX(-50%);
     width: min(96vw, 430px);
@@ -3390,16 +3403,35 @@ function ensureInitialFraming(){
     const __flyBtn = $('#flyoverBtn'); if(__flyBtn) __flyBtn.addEventListener('click', ()=>{ startFlyover(); });
     $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; state.viewMode='cart'; doCartView(false); saveGpsResumeState(); });
 
-    // Hole nav
-    $('#prevHole').addEventListener('click', ()=>{
+    function getPlayableHoleNumbers(){
+      return Object.keys(state.course?.holes || {})
+        .map(k => Number(k))
+        .filter(n => Number.isFinite(n) && n > 0)
+        .sort((a,b) => a - b);
+    }
+
+    function moveHoleBy(delta){
+      const holes = getPlayableHoleNumbers();
+      if(!holes.length) return;
+
+      const current = Number(state.hole) || holes[0];
+      let idx = holes.indexOf(current);
+      if(idx < 0){
+        idx = holes.findIndex(n => n > current);
+        if(idx < 0) idx = 0;
+      }
+
+      const nextIdx = (idx + delta + holes.length) % holes.length;
       cancelFlyover();
-      const min=1; state.hole=Math.max(min, state.hole-1); state.initialFramed=false; renderHole(); saveGpsResumeState();
-    });
-    $('#nextHole').addEventListener('click', ()=>{
-      const max=Math.max(...Object.keys(state.course.holes||{}).map(k=>+k).filter(Number.isFinite));
-      cancelFlyover();
-      state.hole=Math.min(max||state.hole+1, state.hole+1); state.initialFramed=false; renderHole(); saveGpsResumeState();
-    });
+      state.hole = holes[nextIdx];
+      state.initialFramed = false;
+      renderHole();
+      saveGpsResumeState();
+    }
+
+    // Hole nav wraps: 1 -> 18, 18 -> 1
+    $('#prevHole').addEventListener('click', ()=> moveHoleBy(-1));
+    $('#nextHole').addEventListener('click', ()=> moveHoleBy(1));
 
     // Settings
     $('#settingsBtn')?.addEventListener('click', openSettingsModal);
