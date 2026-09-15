@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "glenvista-country-club",
+      "name": "Glenvista Country Club",
+      "short_code": "GVC",
+      "pin": "GLENV12345",
+      "active": true
+    }
+    , 
+           {
       "id": "blue-valley-golf-estate",
       "name": "Blue Valley Golf Estate",
       "short_code": "BVG",
