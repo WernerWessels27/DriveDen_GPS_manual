@@ -1836,6 +1836,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       initialFramed:false,
       followCart:false,
       cartAlt:null,
+      cartAccuracy:null,
       cartLatLng:null,
       lastAutoAdvanceTs:0,
       lastAutoAdvanceHole:0,
@@ -1854,6 +1855,118 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       const savedUnit = localStorage.getItem('tl_distance_unit');
       if(savedUnit === 'm' || savedUnit === 'yd') state.unit = savedUnit;
     }catch(_){}
+
+
+    // --- Device dashboard heartbeat ---
+    const DEVICE_ID_STORAGE_KEY = 'ddgps_device_id_v1';
+    const DEVICE_HEARTBEAT_MS = 25000;
+    const DEVICE_HEARTBEAT_MIN_GAP_MS = 9000;
+    const GPS_APP_VERSION = 'gps-dashboard-v1';
+    let deviceHeartbeatTimer = null;
+    let lastDeviceHeartbeatAt = 0;
+
+    function cleanDeviceText(v, max=160){
+      return String(v || '').trim().slice(0, max);
+    }
+
+    function makeFallbackDeviceId(){
+      const rand = Math.random().toString(36).slice(2, 10);
+      const ts = Date.now().toString(36);
+      return `ddgps-${ts}-${rand}`;
+    }
+
+    function getDeviceId(){
+      try{
+        let id = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+        if(!id){
+          id = (crypto && crypto.randomUUID) ? `ddgps-${crypto.randomUUID()}` : makeFallbackDeviceId();
+          localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+        }
+        return id;
+      }catch(_){
+        return makeFallbackDeviceId();
+      }
+    }
+
+    function getCourseShortCodeForHeartbeat(){
+      const meta = state.meta || {};
+      const course = state.course?.course || {};
+      return cleanDeviceText(
+        meta.short_code || meta.shortCode || meta.shortcode || meta.SHORTCODE ||
+        course.short_code || course.shortCode || course.shortcode || course.SHORTCODE ||
+        meta.id || course.id || q('course') || '',
+        80
+      );
+    }
+
+    function getCourseIdForHeartbeat(){
+      const meta = state.meta || {};
+      const course = state.course?.course || {};
+      // Use meta.id first because validatePinFlow stores mode_<meta.id>.
+      return cleanDeviceText(meta.id || q('course') || course.id || getCourseShortCodeForHeartbeat(), 120);
+    }
+
+    function getCourseNameForHeartbeat(){
+      const meta = state.meta || {};
+      const course = state.course?.course || {};
+      return cleanDeviceText(course.name || meta.name || 'Course', 180);
+    }
+
+    function getLoginModeForHeartbeat(){
+      const courseId = getCourseIdForHeartbeat();
+      try{ return isClubModeForCourse(courseId) ? 'club' : 'guest'; }
+      catch(_){ return 'guest'; }
+    }
+
+    function buildDeviceHeartbeat(reason='timer'){
+      const cart = state.cartLatLng || null;
+      const lat = cart && Number.isFinite(Number(cart.lat)) ? Number(cart.lat) : null;
+      const lng = cart && Number.isFinite(Number(cart.lng)) ? Number(cart.lng) : null;
+      const accuracy = Number(state.cartAccuracy);
+      const altitude = Number(state.cartAlt);
+
+      return {
+        deviceId: getDeviceId(),
+        courseId: getCourseIdForHeartbeat(),
+        courseName: getCourseNameForHeartbeat(),
+        shortCode: getCourseShortCodeForHeartbeat(),
+        loginMode: getLoginModeForHeartbeat(),
+        hole: Number(state.hole) || null,
+        lat,
+        lng,
+        accuracy: Number.isFinite(accuracy) ? accuracy : null,
+        altitude: Number.isFinite(altitude) ? altitude : null,
+        viewMode: state.viewMode || 'cart',
+        unit: state.unit || 'm',
+        appVersion: GPS_APP_VERSION,
+        reason
+      };
+    }
+
+    async function sendDeviceHeartbeat(reason='timer'){
+      if(!state.course || !navigator.onLine) return;
+      const now = Date.now();
+      if(reason !== 'start' && reason !== 'online' && now - lastDeviceHeartbeatAt < DEVICE_HEARTBEAT_MIN_GAP_MS) return;
+      lastDeviceHeartbeatAt = now;
+
+      try{
+        await fetch('/api/devices/heartbeat', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify(buildDeviceHeartbeat(reason)),
+          cache:'no-store',
+          keepalive:true
+        });
+      }catch(_){ }
+    }
+
+    function startDeviceHeartbeat(){
+      if(deviceHeartbeatTimer) clearInterval(deviceHeartbeatTimer);
+      sendDeviceHeartbeat('start');
+      deviceHeartbeatTimer = setInterval(()=>sendDeviceHeartbeat('timer'), DEVICE_HEARTBEAT_MS);
+    }
+
+    window.addEventListener('online', ()=>setTimeout(()=>sendDeviceHeartbeat('online'), 1200));
 
 
     // --- Offline course tile download ---
@@ -3549,9 +3662,10 @@ function followPlayerViewIfNeeded(){
 
 
 navigator.geolocation.watchPosition((pos)=>{
-        const { latitude, longitude, altitude } = pos.coords;
+        const { latitude, longitude, altitude, accuracy } = pos.coords;
         state.cartLatLng = { lat: latitude, lng: longitude };
         if (Number.isFinite(altitude)) state.cartAlt = altitude;
+        if (Number.isFinite(accuracy)) state.cartAccuracy = accuracy;
         if (!state.cartMarker) state.cartMarker = L.marker([latitude,longitude], { icon: ICONS.CART, title:'CART', pane:'cartPane', zIndexOffset:10000 }).addTo(map);
         else state.cartMarker.setLatLng([latitude,longitude]);
         if (state.cartMarker && state.cartMarker.setZIndexOffset) state.cartMarker.setZIndexOffset(10000);
@@ -3562,6 +3676,7 @@ navigator.geolocation.watchPosition((pos)=>{
       maybeAutoAdvanceByGps();
       followCartViewIfNeeded();
       followPlayerViewIfNeeded();
+      sendDeviceHeartbeat('gps');
 }, ()=>{}, { enableHighAccuracy:true, maximumAge:5000, timeout:10000 });
     }
 
@@ -4066,6 +4181,7 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
 
         renderHole();
         saveGpsResumeState();
+        startDeviceHeartbeat();
         try { sessionStorage.removeItem('tl_resume_attempting'); } catch(_) {}
         toast(navigator.onLine ? 'Course loaded (online)' : 'Course loaded (offline cached)');
       }catch(err){
