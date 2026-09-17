@@ -1,5 +1,5 @@
 // DriveDen GPS — Service Worker (offline-first + smart ads caching)
-// v19: cold reboot navigation fallback + safer cache lookup across app/runtime caches
+// v20: device dashboard API is network-only + cold reboot fallback
 //
 // Goals:
 // - GPS stays fully offline-capable (app shell + vendor + courses)
@@ -8,7 +8,7 @@
 // - Do NOT cache /api/ads/* mutation endpoints (upload/delete) to avoid stale failures
 
 const CACHE_PREFIX = 'driveden-gps-';
-const CACHE_VERSION = 'v19';
+const CACHE_VERSION = 'v20';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Build absolute URLs relative to the SW scope (works on subpaths too)
@@ -251,6 +251,7 @@ self.addEventListener('fetch', (event) => {
   const isConfigJs = pathname.endsWith('/config.js');
 
   const isApiAds = pathname.startsWith('/api/ads/');
+  const isApiDevices = pathname.startsWith('/api/devices');
   const isAdsJson = pathname.startsWith('/ads/') && pathname.endsWith('/ads.json');
   const isAdsAsset = pathname.startsWith('/ads/') && !pathname.endsWith('/ads.json');
 
@@ -329,8 +330,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3) Ads Manager API: network-only (never cache)
-  if (isApiAds) {
+  // 3) Ads Manager + Device Dashboard APIs: network-only (never cache)
+  if (isApiAds || isApiDevices) {
     event.respondWith(fetch(req));
     return;
   }
