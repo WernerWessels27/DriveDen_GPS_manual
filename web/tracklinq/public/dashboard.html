@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DriveDen Device Dashboard</title>
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <style>
+    :root{
+      --blue:#38b6ff; --dark:#06131f; --panel:#ffffff; --bg:#eef5f9;
+      --text:#0f172a; --muted:#64748b; --border:#dbe4ec; --shadow:0 16px 50px rgba(15,23,42,.14);
+      --online:#16a34a; --recent:#f59e0b; --offline:#94a3b8; --danger:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:var(--dark);color:#fff;box-shadow:var(--shadow);position:sticky;top:0;z-index:20}
+    header h1{margin:0;font-size:20px;letter-spacing:.2px}.brand{display:flex;align-items:center;gap:10px}.brandDot{width:13px;height:13px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 5px rgba(56,182,255,.22)}
+    .topActions{display:flex;gap:8px;align-items:center}.pinBadge{font-weight:800;font-size:12px;color:#cbd5e1}.btn{border:0;border-radius:12px;background:var(--blue);color:#03111d;font-weight:900;padding:10px 13px;cursor:pointer}.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--border)}.btn.danger{background:var(--danger);color:#fff}.btn.small{padding:7px 10px;border-radius:10px;font-size:12px}
+    .login{min-height:calc(100vh - 64px);display:grid;place-items:center;padding:20px}.loginCard{width:min(94vw,430px);background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:24px;box-shadow:var(--shadow)}.loginCard h2{margin:0 0 8px}.loginCard p{margin:0 0 18px;color:var(--muted);line-height:1.45}.loginCard input{width:100%;padding:14px;border:1px solid var(--border);border-radius:14px;font-size:20px;font-weight:900;letter-spacing:2px;text-align:center}.loginCard .btn{width:100%;margin-top:12px}.error{color:var(--danger);font-weight:800;margin-top:10px;min-height:20px}
+    .app{display:none;height:calc(100vh - 64px);grid-template-columns:390px 1fr;gap:12px;padding:12px}.side{background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}.sideHead{padding:14px;border-bottom:1px solid var(--border)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.stat{background:#f8fafc;border:1px solid var(--border);border-radius:14px;padding:10px;text-align:center}.stat strong{display:block;font-size:20px}.stat span{display:block;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}
+    .filters{display:flex;flex-wrap:wrap;gap:7px}.filter{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 11px;font-weight:900;font-size:12px;cursor:pointer}.filter.active{background:var(--dark);color:#fff;border-color:var(--dark)}.search{margin-top:10px}.search input{width:100%;padding:11px;border:1px solid var(--border);border-radius:12px;font-weight:700}
+    .list{overflow:auto;padding:8px;display:grid;gap:8px}.deviceRow{border:1px solid var(--border);background:#fff;border-radius:14px;padding:11px;cursor:pointer;display:grid;gap:5px}.deviceRow:hover{border-color:var(--blue);box-shadow:0 8px 24px rgba(56,182,255,.18)}.rowTop{display:flex;justify-content:space-between;gap:10px;align-items:center}.devName{font-weight:950}.muted{color:var(--muted);font-size:12px;font-weight:700}.status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px;font-weight:900;font-size:11px;background:#f1f5f9}.statusDot{width:9px;height:9px;border-radius:50%;background:var(--offline)}.status.online .statusDot{background:var(--online)}.status.recent .statusDot{background:var(--recent)}.status.offline .statusDot{background:var(--offline)}
+    .mapWrap{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}#map{height:100%;width:100%;min-height:400px}.mapHint{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.94);border:1px solid var(--border);border-radius:14px;padding:9px 12px;font-size:12px;font-weight:800;z-index:500;color:var(--muted);box-shadow:0 8px 22px rgba(0,0,0,.10)}
+    .modalBack{position:fixed;inset:0;background:rgba(2,6,23,.55);z-index:100;display:none;place-items:center;padding:16px}.modal{width:min(96vw,780px);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid var(--border);box-shadow:var(--shadow);padding:18px}.modal h2{margin:0 0 4px}.modalSub{color:var(--muted);font-size:12px;font-weight:800;margin-bottom:14px;word-break:break-all}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.field input,.field textarea{width:100%;border:1px solid var(--border);border-radius:12px;padding:10px;font-weight:750;font-family:inherit}.field textarea{min-height:90px;resize:vertical}.modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.popupTitle{font-weight:950}.popupGrid{display:grid;gap:3px;font-size:12px}.hidden{display:none!important}
+    @media(max-width:900px){.app{grid-template-columns:1fr;height:auto}.mapWrap{height:56vh}.side{max-height:70vh}.formGrid{grid-template-columns:1fr}header h1{font-size:17px}.pinBadge{display:none}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="brandDot"></span><h1>DriveDen Device Dashboard</h1></div>
+    <div class="topActions"><span class="pinBadge" id="scopeLabel">Not logged in</span><button class="btn secondary small" id="logoutBtn" style="display:none">Logout</button></div>
+  </header>
+
+  <section class="login" id="loginView">
+    <div class="loginCard">
+      <h2>Dashboard Login</h2>
+      <p>Enter <strong>02004</strong> for DriveDen admin view, or enter a club/fleet PIN to view only that fleet's devices.</p>
+      <input id="pinInput" inputmode="text" autocomplete="off" placeholder="PIN" />
+      <button class="btn" id="loginBtn">Open Dashboard</button>
+      <div class="error" id="loginError"></div>
+    </div>
+  </section>
+
+  <main class="app" id="appView">
+    <aside class="side">
+      <div class="sideHead">
+        <div class="stats">
+          <div class="stat"><strong id="statOnline">0</strong><span>Online</span></div>
+          <div class="stat"><strong id="statRecent">0</strong><span>Recent</span></div>
+          <div class="stat"><strong id="statOffline">0</strong><span>Offline</span></div>
+          <div class="stat"><strong id="statTotal">0</strong><span>Total</span></div>
+        </div>
+        <div class="filters">
+          <button class="filter active" data-filter="all">All</button>
+          <button class="filter" data-filter="online">Online</button>
+          <button class="filter" data-filter="recent">Recent</button>
+          <button class="filter" data-filter="offline">Offline</button>
+          <button class="filter" data-filter="unassigned">Unassigned</button>
+        </div>
+        <div class="search"><input id="searchInput" placeholder="Search device, client, cart, serial..." /></div>
+      </div>
+      <div class="list" id="deviceList"></div>
+    </aside>
+    <section class="mapWrap">
+      <div id="map"></div>
+      <div class="mapHint" id="mapHint">Live positions update every 15 seconds</div>
+    </section>
+  </main>
+
+  <div class="modalBack" id="deviceModal">
+    <div class="modal">
+      <h2 id="modalTitle">Device</h2>
+      <div class="modalSub" id="modalSub"></div>
+      <form id="deviceForm">
+        <div class="formGrid">
+          <div class="field"><label>Device Name</label><input name="device_name" id="f_device_name" placeholder="Cart 01 / Client Cart" /></div>
+          <div class="field"><label>Client Name</label><input name="client_name" id="f_client_name" placeholder="Client / club / owner" /></div>
+          <div class="field"><label>Install Date</label><input type="date" name="install_date" id="f_install_date" /></div>
+          <div class="field"><label>Warranty Months</label><input type="number" min="0" max="240" name="warranty_months" id="f_warranty_months" placeholder="36" /></div>
+          <div class="field adminOnly"><label>Fleet Short Code</label><input name="assigned_short_code" id="f_assigned_short_code" placeholder="e.g. fancourt" /></div>
+          <div class="field adminOnly"><label>Fleet / Course Name</label><input name="assigned_course_name" id="f_assigned_course_name" placeholder="e.g. Fancourt" /></div>
+          <div class="field"><label>Cart Model</label><input name="cart_model" id="f_cart_model" placeholder="Club Car / EZGO / Marshell" /></div>
+          <div class="field"><label>Cart Serial</label><input name="cart_serial" id="f_cart_serial" /></div>
+          <div class="field"><label>GPS / Radio Serial</label><input name="gps_serial" id="f_gps_serial" /></div>
+          <div class="field"><label>Contact Name</label><input name="contact_name" id="f_contact_name" /></div>
+          <div class="field"><label>Contact Phone</label><input name="contact_phone" id="f_contact_phone" /></div>
+          <div class="field"><label>Contact Email</label><input name="contact_email" id="f_contact_email" /></div>
+          <div class="field full"><label>Notes</label><textarea name="notes" id="f_notes" placeholder="Install notes, warranty notes, client details..."></textarea></div>
+        </div>
+        <div class="modalActions">
+          <button type="button" class="btn secondary" id="closeModalBtn">Close</button>
+          <button type="submit" class="btn">Save Device</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+    const PIN_KEY = 'driveden_dashboard_pin';
+    let pin = localStorage.getItem(PIN_KEY) || '';
+    let scope = null;
+    let devices = [];
+    let filter = 'all';
+    let selectedDeviceId = null;
+    let pollTimer = null;
+    const markers = new Map();
+
+    const map = L.map('map', { zoomControl:true }).setView([-28.7, 24.8], 5);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'' }).addTo(map);
+
+    function esc(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmtDate(v){ if(!v) return '—'; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString(); }
+    function fmtDateTime(v){ if(!v) return 'Never'; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString(); }
+    function minutesText(d){ const m = Number(d.last_seen_minutes); if(!Number.isFinite(m)) return 'Never'; if(m < 1) return 'Just now'; if(m === 1) return '1 min ago'; if(m < 60) return `${m} min ago`; const h=Math.floor(m/60); if(h<24) return `${h}h ago`; return `${Math.floor(h/24)}d ago`; }
+    function hasPosition(d){ return Number.isFinite(Number(d.last_lat)) && Number.isFinite(Number(d.last_lng)); }
+    function isUnassigned(d){ return !(d.client_name || d.assigned_short_code || d.assigned_course_name); }
+
+    function statusHtml(status){ return `<span class="status ${esc(status)}"><span class="statusDot"></span>${esc(status || 'offline')}</span>`; }
+    function markerColor(d){ return d.status === 'online' ? '#16a34a' : d.status === 'recent' ? '#f59e0b' : '#94a3b8'; }
+
+    async function api(path, options={}){
+      const sep = path.includes('?') ? '&' : '?';
+      const url = `${path}${sep}pin=${encodeURIComponent(pin)}&t=${Date.now()}`;
+      const res = await fetch(url, { cache:'no-store', ...options, headers:{ 'Content-Type':'application/json', ...(options.headers || {}) } });
+      const data = await res.json().catch(()=>({ ok:false, error:'Invalid server response' }));
+      if(!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    function showApp(){ $('#loginView').style.display='none'; $('#appView').style.display='grid'; $('#logoutBtn').style.display='inline-flex'; setTimeout(()=>map.invalidateSize(), 100); }
+    function showLogin(){ $('#loginView').style.display='grid'; $('#appView').style.display='none'; $('#logoutBtn').style.display='none'; }
+
+    function setScopeLabel(){
+      const txt = scope ? (scope.type === 'admin' ? 'DriveDen Admin · All Devices' : `${scope.name || scope.shortCode} · Fleet View`) : 'Not logged in';
+      $('#scopeLabel').textContent = txt;
+      $$('.adminOnly').forEach(el => el.classList.toggle('hidden', scope?.type !== 'admin'));
+    }
+
+    function filtered(){
+      const q = ($('#searchInput').value || '').toLowerCase().trim();
+      return devices.filter(d => {
+        const matchesFilter = filter === 'all' || d.status === filter || (filter === 'unassigned' && isUnassigned(d));
+        if(!matchesFilter) return false;
+        if(!q) return true;
+        return [d.device_id,d.device_name,d.client_name,d.assigned_course_name,d.last_course_name,d.cart_model,d.cart_serial,d.gps_serial]
+          .some(v => String(v || '').toLowerCase().includes(q));
+      });
+    }
+
+    function renderStats(){
+      $('#statOnline').textContent = devices.filter(d=>d.status==='online').length;
+      $('#statRecent').textContent = devices.filter(d=>d.status==='recent').length;
+      $('#statOffline').textContent = devices.filter(d=>d.status==='offline').length;
+      $('#statTotal').textContent = devices.length;
+    }
+
+    function renderList(){
+      const list = $('#deviceList');
+      const rows = filtered();
+      if(!rows.length){ list.innerHTML = '<div class="muted" style="padding:14px;">No devices for this filter yet.</div>'; return; }
+      list.innerHTML = rows.map(d => `
+        <div class="deviceRow" data-device-id="${esc(d.device_id)}">
+          <div class="rowTop"><div class="devName">${esc(d.device_name || 'Unassigned Device')}</div>${statusHtml(d.status)}</div>
+          <div class="muted">${esc(d.client_name || 'No client captured')} · ${esc(d.assigned_course_name || d.last_course_name || 'No course yet')}</div>
+          <div class="muted">Hole ${esc(d.last_hole || '—')} · ${minutesText(d)} · Install: ${fmtDate(d.install_date)}</div>
+        </div>`).join('');
+      list.querySelectorAll('[data-device-id]').forEach(el => el.addEventListener('click', ()=>openDevice(el.dataset.deviceId)));
+    }
+
+    function popupHtml(d){
+      return `<div class="popupGrid">
+        <div class="popupTitle">${esc(d.device_name || 'Unassigned Device')}</div>
+        <div>${statusHtml(d.status)}</div>
+        <div><strong>Client:</strong> ${esc(d.client_name || 'Not captured')}</div>
+        <div><strong>Fleet:</strong> ${esc(d.assigned_course_name || d.last_course_name || '—')}</div>
+        <div><strong>Hole:</strong> ${esc(d.last_hole || '—')}</div>
+        <div><strong>Last seen:</strong> ${esc(minutesText(d))}</div>
+        <div><strong>Install:</strong> ${esc(fmtDate(d.install_date))}</div>
+        <button class="btn small" data-edit-device="${esc(d.device_id)}" style="margin-top:6px;width:100%">Open Details</button>
+      </div>`;
+    }
+
+    function renderMap(){
+      const visibleIds = new Set(filtered().map(d=>d.device_id));
+      for(const [id, marker] of markers){
+        if(!visibleIds.has(id) || !hasPosition(devices.find(d=>d.device_id===id))){ map.removeLayer(marker); markers.delete(id); }
+      }
+      filtered().forEach(d => {
+        if(!hasPosition(d)) return;
+        const latlng = [Number(d.last_lat), Number(d.last_lng)];
+        const color = markerColor(d);
+        let marker = markers.get(d.device_id);
+        if(!marker){
+          marker = L.circleMarker(latlng, { radius:10, weight:3, color:'#fff', fillColor:color, fillOpacity:.95 }).addTo(map);
+          markers.set(d.device_id, marker);
+        }else{
+          marker.setLatLng(latlng);
+          marker.setStyle({ fillColor:color });
+        }
+        marker.bindPopup(popupHtml(d));
+      });
+    }
+
+    map.on('popupopen', (e)=>{
+      const btn = e.popup?._contentNode?.querySelector?.('[data-edit-device]');
+      if(btn) btn.addEventListener('click', ()=>openDevice(btn.dataset.editDevice));
+    });
+
+    function render(){ renderStats(); renderList(); renderMap(); }
+
+    async function refreshDevices(){
+      const data = await api('/api/devices');
+      scope = data.scope;
+      devices = Array.isArray(data.devices) ? data.devices : [];
+      setScopeLabel();
+      showApp();
+      render();
+    }
+
+    async function login(){
+      pin = ($('#pinInput').value || '').trim();
+      if(!pin){ $('#loginError').textContent='Enter a PIN.'; return; }
+      $('#loginError').textContent='';
+      try{
+        await refreshDevices();
+        localStorage.setItem(PIN_KEY, pin);
+        if(pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(()=>refreshDevices().catch(console.warn), 15000);
+      }catch(e){
+        $('#loginError').textContent = e.message || 'Login failed';
+        showLogin();
+      }
+    }
+
+    function field(id, value){ const el = $(id); if(el) el.value = value ?? ''; }
+    function openDevice(id){
+      const d = devices.find(x => x.device_id === id);
+      if(!d) return;
+      selectedDeviceId = id;
+      $('#modalTitle').textContent = d.device_name || 'Unassigned Device';
+      $('#modalSub').textContent = `${d.device_id} · Last seen ${minutesText(d)} · ${d.last_course_name || 'No course'}`;
+      field('#f_device_name', d.device_name || '');
+      field('#f_client_name', d.client_name || '');
+      field('#f_install_date', d.install_date ? String(d.install_date).slice(0,10) : '');
+      field('#f_warranty_months', d.warranty_months ?? 36);
+      field('#f_assigned_short_code', d.assigned_short_code || d.last_short_code || '');
+      field('#f_assigned_course_name', d.assigned_course_name || d.last_course_name || '');
+      field('#f_cart_model', d.cart_model || '');
+      field('#f_cart_serial', d.cart_serial || '');
+      field('#f_gps_serial', d.gps_serial || '');
+      field('#f_contact_name', d.contact_name || '');
+      field('#f_contact_phone', d.contact_phone || '');
+      field('#f_contact_email', d.contact_email || '');
+      field('#f_notes', d.notes || '');
+      $('#deviceModal').style.display='grid';
+    }
+
+    function closeDevice(){ $('#deviceModal').style.display='none'; selectedDeviceId=null; }
+
+    $('#deviceForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if(!selectedDeviceId) return;
+      const fd = new FormData(e.currentTarget);
+      const body = Object.fromEntries(fd.entries());
+      try{
+        const data = await api(`/api/devices/${encodeURIComponent(selectedDeviceId)}`, { method:'PATCH', body:JSON.stringify(body) });
+        const idx = devices.findIndex(d=>d.device_id===selectedDeviceId);
+        if(idx >= 0) devices[idx] = data.device;
+        closeDevice();
+        render();
+      }catch(err){ alert(err.message || 'Could not save device'); }
+    });
+
+    $('#loginBtn').addEventListener('click', login);
+    $('#pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
+    $('#logoutBtn').addEventListener('click', ()=>{ localStorage.removeItem(PIN_KEY); pin=''; scope=null; if(pollTimer) clearInterval(pollTimer); showLogin(); });
+    $('#closeModalBtn').addEventListener('click', closeDevice);
+    $('#deviceModal').addEventListener('click', e=>{ if(e.target === $('#deviceModal')) closeDevice(); });
+    $('#searchInput').addEventListener('input', render);
+    $$('.filter').forEach(btn => btn.addEventListener('click', ()=>{
+      $$('.filter').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      filter = btn.dataset.filter;
+      render();
+    }));
+
+    if(pin){ $('#pinInput').value = pin; login(); }
+    else showLogin();
+  </script>
+</body>
+</html>
