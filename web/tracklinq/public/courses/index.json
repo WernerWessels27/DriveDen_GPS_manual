@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "rustenburg-golf-course",
+      "name": "Rustenburg Golf Course",
+      "short_code": "RBG",
+      "pin": "RUST123456",
+      "active": true
+    }
+    , 
+           {
       "id": "glenvista-country-club",
       "name": "Glenvista Country Club",
       "short_code": "GVC",
