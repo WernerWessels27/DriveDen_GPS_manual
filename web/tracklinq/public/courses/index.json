@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "maccauvlei-golf-club",
+      "name": "Maccauvlei Golf Club",
+      "short_code": "MGC",
+      "pin": "MAC1234567",
+      "active": true
+    }
+    ,
+           {
       "id": "rustenburg-golf-course",
       "name": "Rustenburg Golf Course",
       "short_code": "RBG",
