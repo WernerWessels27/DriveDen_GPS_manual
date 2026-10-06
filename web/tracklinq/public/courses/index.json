@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "mbombela-golf-club",
+      "name": "Mbombela Golf Club",
+      "short_code": "MBG",
+      "pin": "MBOM123456",
+      "active": true
+    }
+    , 
+           {
       "id": "maccauvlei-golf-club",
       "name": "Maccauvlei Golf Club",
       "short_code": "MGC",
