@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "paarl-golf-club",
+      "name": "Paarl Golf Club",
+      "short_code": "PGC",
+      "pin": "PAARLGC123",
+      "active": true
+    }
+    ,  
+           {
       "id": "mbombela-golf-club",
       "name": "Mbombela Golf Club",
       "short_code": "MBG",
