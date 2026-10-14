@@ -4417,7 +4417,8 @@ const RULES = {
 
 <script id="adsScript">
 (function(){
-  const ADS_IDLE_MS = 5 * 60 * 1000;
+  const ADS_IDLE_MS = 5 * 60 * 1000; // Club/fleet ads: 5 minutes
+  const GUEST_SPLASH_IDLE_MS = 30 * 60 * 1000; // Non-fleet DriveDen splash: 30 minutes
   const ADS_SLIDE_MS = 10 * 1000;
 
   let lastTouch = Date.now();
@@ -4507,6 +4508,14 @@ const RULES = {
     const courseId = meta?.id || getCourseIdFromUrl();
     if (!courseId) return false;
     return norm(localStorage.getItem(getModeKey(courseId))) === 'club';
+  }
+
+  function getIdleDelayMs(){
+    // Club/fleet carts keep paid ads at 5 minutes.
+    // Guest/non-fleet carts showing only the DriveDen splash wait 30 minutes.
+    return activeAdsKey === 'guest' || startedForKey === 'guest'
+      ? GUEST_SPLASH_IDLE_MS
+      : ADS_IDLE_MS;
   }
 
   async function fetchClubAds(adsKey){
@@ -4651,7 +4660,7 @@ const RULES = {
       if (!enabled || !urls.length) return;
       const ov = document.getElementById('adsOverlay');
       const isVisible = !!ov && ov.style.display !== 'none';
-      if (!isVisible && (now() - lastTouch >= ADS_IDLE_MS)) show();
+      if (!isVisible && (now() - lastTouch >= getIdleDelayMs())) show();
     }, 2000);
   }
 
@@ -4750,7 +4759,7 @@ const RULES = {
   }, 500);
 
   window.__adsDebug = {
-    showNow: ()=>{ lastTouch = now() - ADS_IDLE_MS - 1; show(); },
+    showNow: ()=>{ lastTouch = now() - getIdleDelayMs() - 1; show(); },
     resetIdle: ()=>{ lastTouch = now(); dismiss(); },
     next: ()=>{ if (!urls.length) return; idx = (idx + 1) % urls.length; renderAt(idx); startSlider(); },
     state: ()=>({
