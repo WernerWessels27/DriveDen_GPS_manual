@@ -17,6 +17,14 @@
     }
     ,  
            {
+      "id": "akasia-golf-club",
+      "name": "Akasia Golf Club",
+      "short_code": "AGC",
+      "pin": "AKASIAGC12",
+      "active": true
+    }
+    , 
+           {
       "id": "paarl-golf-club",
       "name": "Paarl Golf Club",
       "short_code": "PGC",
