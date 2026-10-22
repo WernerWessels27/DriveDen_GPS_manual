@@ -15,7 +15,15 @@
       "pin": "EOA1234567",
       "active": true
     }
-    ,  
+    ,
+           {
+      "id": "benoni-country-club",
+      "name": "Benoni Country Club",
+      "short_code": "BCC",
+      "pin": "BENCC12345",
+      "active": true
+    }
+    , 
            {
       "id": "akasia-golf-club",
       "name": "Akasia Golf Club",
