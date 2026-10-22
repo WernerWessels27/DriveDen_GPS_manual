@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "cullinan-golf-club",
+      "name": "Cullinan Golf Club",
+      "short_code": "CGC",
+      "pin": "CULLGC12345",
+      "active": true
+    }
+    ,
+           {
       "id": "the-lake-club-benoni",
       "name": "The Lake Club Benoni",
       "short_code": "LCB",
