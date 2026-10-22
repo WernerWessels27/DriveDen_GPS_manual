@@ -17,6 +17,14 @@
     }
     ,
            {
+      "id": "the-lake-club-benoni",
+      "name": "The Lake Club Benoni",
+      "short_code": "LCB",
+      "pin": "BENL123456",
+      "active": true
+    }
+    ,
+           {
       "id": "benoni-country-club",
       "name": "Benoni Country Club",
       "short_code": "BCC",
