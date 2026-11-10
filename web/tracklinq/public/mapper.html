@@ -91,6 +91,16 @@
     </div>
 
 
+    <h3>Import from Golf Courses API (South Africa)</h3>
+    <div class="muted">Load an API scorecard and any available green centres, then add TEE, FRONT, BACK and hole outlines yourself. Your existing course files are not overwritten.</div>
+    <div class="row" style="margin-top:8px;">
+      <input id="apiMapperSearch" placeholder="Search course name..." autocomplete="off" />
+      <button id="apiMapperSearchBtn">Search API</button>
+    </div>
+    <div id="apiMapperResults" style="display:grid;gap:6px;margin-top:8px;"></div>
+    <div class="saveRow"><button id="apiMapperMoreBtn" disabled style="display:none">Load More Courses</button><button id="apiMapperImportBtn" disabled>Import Selected Course</button></div>
+    <div id="apiMapperStatus" class="status" role="status">Search online to import a course.</div>
+
     <h3>Imagery</h3>
     <div class="muted">
       Default is live Esri imagery. Load historic Wayback imagery, preview versions visually, then save the best-looking version into this course JSON.
@@ -958,6 +968,95 @@
       fitMapToCurrentHole();
       status(`${label} imported`);
     }
+
+
+    // Provider import leaves every manually mapped course untouched. Once
+    // imported, it uses the SAME JSON editor and download workflow as before.
+    const apiMapperSearch = $('#apiMapperSearch');
+    const apiMapperResults = $('#apiMapperResults');
+    const apiMapperStatus = $('#apiMapperStatus');
+    const apiMapperImportBtn = $('#apiMapperImportBtn');
+    let selectedApiMapperId = null;
+    let mapperApiPage = 0;
+    let mapperApiLastPage = 0;
+    let mapperApiQuery = '';
+    let mapperApiRequest = 0;
+    const apiMapperMoreBtn = $('#apiMapperMoreBtn');
+
+    async function mapperLibraryPost(endpoint, payload){
+      const res=await fetch(endpoint,{ method:'POST',cache:'no-store',
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok || !data.ok) throw new Error(data.error || 'Golf course API unavailable');
+      return data;
+    }
+
+    async function mapperApiSearch(page=1){
+      const q=apiMapperSearch.value.trim();
+      if(q.length < 2){ apiMapperStatus.textContent='Enter at least two characters.'; return; }
+      const request=++mapperApiRequest;
+      if(page===1 || q!==mapperApiQuery){
+        selectedApiMapperId=null; apiMapperImportBtn.disabled=true;
+        apiMapperResults.replaceChildren();
+        mapperApiPage=0;
+      }
+      apiMapperMoreBtn.style.display='none';
+      apiMapperStatus.textContent=page===1?'Searching…':'Loading more…';
+      try{
+        const data=await mapperLibraryPost('/api/course-library/search',{q,page});
+        if(request !== mapperApiRequest) return;
+        mapperApiQuery=q; mapperApiPage=page;
+        mapperApiLastPage=Math.min(15, Number(data.meta?.last_page) || page);
+        const courses=Array.isArray(data.courses) ? data.courses : [];
+        apiMapperStatus.textContent=courses.length ? `${apiMapperResults.childElementCount+courses.length} results shown. Select a course to import.` : 'No matches found.';
+        apiMapperMoreBtn.style.display=mapperApiPage < mapperApiLastPage ? '' : 'none';
+        apiMapperMoreBtn.disabled=mapperApiPage >= mapperApiLastPage;
+        courses.forEach(c=>{
+          const b=document.createElement('button');
+          b.type='button';
+          b.style.cssText='display:block;text-align:left;width:100%;background:#f8fafc;border:1px solid #ddd;';
+          b.textContent=`${c.name || c.club || 'Golf Course'} — ${[c.city,c.state].filter(Boolean).join(', ')}`;
+          b.addEventListener('click',()=>{
+            selectedApiMapperId=Number(c.id);
+            apiMapperImportBtn.disabled=false;
+            apiMapperResults.querySelectorAll('button').forEach(x=>x.style.borderColor='#ddd');
+            b.style.borderColor='#16a34a';
+          });
+          apiMapperResults.append(b);
+        });
+      }catch(e){ apiMapperStatus.textContent=e.message || 'Search failed.'; }
+    }
+
+    $('#apiMapperSearchBtn').addEventListener('click',()=>mapperApiSearch(1));
+    apiMapperMoreBtn.addEventListener('click',()=>mapperApiSearch(mapperApiPage+1));
+    apiMapperSearch.addEventListener('input',()=>{ mapperApiRequest++; selectedApiMapperId=null; apiMapperImportBtn.disabled=true; apiMapperMoreBtn.style.display='none'; });
+    apiMapperSearch.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault(); mapperApiSearch(1);} });
+    apiMapperImportBtn.addEventListener('click',async()=>{
+      if(!Number.isSafeInteger(selectedApiMapperId)) return;
+      const existing = !!($('#courseName').value.trim() || Object.keys(state.course?.holes || {}).length);
+      if(existing && !confirm('Replace the CURRENT mapper draft with this API course? Save/export your current draft first.')) return;
+      apiMapperImportBtn.disabled=true;
+      apiMapperStatus.textContent='Importing scorecard and available green coordinates…';
+      try{
+        const data=await mapperLibraryPost('/api/course-library/course',{id:selectedApiMapperId});
+        const imported=data.course;
+        const name=String(imported.course?.name || 'Golf Course');
+        const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,42);
+        imported.course.id=`api-${selectedApiMapperId}-${slug || 'course'}`;
+        imported.course.pin='';
+        imported.course.apiSourceId=selectedApiMapperId;
+        // This is now an ENHANCED mapper draft, not a GPS API-only course.
+        delete imported.apiMode;
+        imported.importedFromApi={ provider:'golfcoursesapi', sourceId:selectedApiMapperId };
+        loadCourseObject(imported,'Golf Courses API');
+        const pos=imported.course?.location;
+        if(pos && Number.isFinite(pos.lat) && Number.isFinite(pos.lng) && !Object.values(imported.holes).some(h=>h.pins?.MID)){
+          map.setView([pos.lat,pos.lng],16);
+        }
+        apiMapperStatus.textContent=`Imported ${name}. Add missing TEE, FRONT, BACK and outlines, then Download Course JSON.`;
+      }catch(e){ apiMapperStatus.textContent=e.message || 'Import failed.'; }
+      finally{ apiMapperImportBtn.disabled=false; }
+    });
 
     $('#importJson').addEventListener('click', ()=> $('#importJsonFile').click());
     $('#importJsonFile').addEventListener('change', (e)=>{
