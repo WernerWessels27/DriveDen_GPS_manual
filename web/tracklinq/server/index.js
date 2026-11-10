@@ -18,6 +18,8 @@ const query = (text, params) => pool.query(text, params);
 
 // ----- Express app -----
 const app = express();
+// Railway typically forwards traffic through one reverse proxy.
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(morgan("tiny"));
 
@@ -40,6 +42,190 @@ app.get("/config.js", (_req, res) => {
 });
 
 app.use(express.static(publicDir));
+
+// ----- Golf Courses API (South Africa) -----
+// Shared Pro subscription. Keep the key on Railway, NEVER in public JavaScript.
+// These are POST endpoints deliberately: the existing GPS service worker only
+// intercepts GET, so live provider searches are not mistakenly stored offline.
+const GOLF_COURSES_API_BASE = 'https://golfcoursesapi.com/api/v1';
+const golfCourseApiCache = new Map();
+const golfCourseClientRates = new Map();
+
+function golfApiKey(){
+  return process.env.GOLF_COURSES_API_KEY || process.env.GOLFCOURSESAPI_KEY || '';
+}
+
+function golfNumber(value, min, max){
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
+}
+
+function golfCoords(lat, lng){
+  const y = golfNumber(lat, -90, 90);
+  const x = golfNumber(lng, -180, 180);
+  return y === null || x === null ? null : { lat:y, lng:x };
+}
+
+function golfApiThrottle(req, res, next){
+  const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
+  const now = Date.now();
+  const rec = golfCourseClientRates.get(ip);
+  if (!rec || now - rec.start > 60000){
+    golfCourseClientRates.set(ip, { start:now, count:1 });
+  } else {
+    rec.count++;
+    if (rec.count > 40) return res.status(429).json({ ok:false, error:'Too many searches; retry shortly.' });
+  }
+  // Avoid unbounded memory in the long-running Railway server.
+  if (golfCourseClientRates.size > 2000){
+    for (const [k,v] of golfCourseClientRates){
+      if(now - v.start > 120000) golfCourseClientRates.delete(k);
+    }
+  }
+  next();
+}
+
+async function golfApiGet(endpoint, ttlMs=10*60*1000){
+  const key = golfApiKey();
+  if (!key){
+    const err = new Error('Golf Courses API key not configured in Railway (GOLF_COURSES_API_KEY).');
+    err.status = 503;
+    throw err;
+  }
+  const now = Date.now();
+  const cached = golfCourseApiCache.get(endpoint);
+  if (cached && cached.expires > now) return cached.value;
+
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 12000);
+  let response;
+  try{
+    response = await fetch(`${GOLF_COURSES_API_BASE}${endpoint}`, {
+      headers:{ Authorization:`Bearer ${key}`, Accept:'application/json' },
+      signal:controller.signal
+    });
+  }catch(e){
+    const err = new Error(e.name === 'AbortError' ? 'Course provider timed out.' : 'Could not reach the course provider.');
+    err.status = 502;
+    throw err;
+  }finally{ clearTimeout(timer); }
+
+  if(!response.ok){
+    const err = new Error(response.status === 401 ? 'Golf Courses API key rejected. Check your Railway key.'
+      : response.status === 403 ? 'Green-centre access is not enabled for this API key.'
+      : response.status === 404 ? 'Course data not found.'
+      : response.status === 429 ? 'Course provider rate limit reached. Try again shortly.'
+      : 'Course provider temporarily unavailable.');
+    err.status = response.status === 401 ? 503 : response.status === 429 ? 429 : response.status === 404 ? 404 : 502;
+    err.upstreamStatus = response.status;
+    throw err;
+  }
+  let value;
+  try{ value = await response.json(); }
+  catch(_){ const err=new Error('Course provider returned invalid data.'); err.status=502; throw err; }
+  golfCourseApiCache.set(endpoint, { value, expires:now + ttlMs });
+  if(golfCourseApiCache.size > 350){
+    for(const [k,v] of golfCourseApiCache){
+      if(v.expires < now) golfCourseApiCache.delete(k);
+    }
+    while(golfCourseApiCache.size > 350) golfCourseApiCache.delete(golfCourseApiCache.keys().next().value);
+  }
+  return value;
+}
+
+function normalizeGolfApiCourse(detailPayload, greensPayload){
+  const c = detailPayload?.data || {};
+  const tees = Array.isArray(c.scorecard?.teeboxes) ? c.scorecard.teeboxes : [];
+  // Choose a representative mid-length tee for a scorecard default; never
+  // invent a physical tee GPS point (the API does not provide tee coordinates).
+  const validTees = tees.filter(t=>Array.isArray(t.holes) && t.holes.length);
+  const byLength = [...validTees].sort((a,b)=>Number(a.total_yards || 0)-Number(b.total_yards || 0));
+  const tee = byLength[Math.floor((byLength.length-1)/2)] || validTees[0] || null;
+  const cardHoles = Array.isArray(tee?.holes) ? tee.holes : [];
+  const greenData = greensPayload?.data || {};
+  const greens = Array.isArray(greenData.holes) ? greenData.holes : [];
+  const greenMap = new Map(greens.map(g=>[Number(g.hole), golfCoords(g.lat,g.lng)]).filter(x=>x[1]));
+  const n = Math.min(36, Math.max(1,
+    Number(c.scorecard?.hole_count) || Number(greenData.hole_count) || cardHoles.length || 18));
+  const holes = {};
+  for(let i=1;i<=n;i++){
+    const card = cardHoles.find(h=>Number(h.hole) === i) || {};
+    const mid = greenMap.get(i);
+    const par = golfNumber(card.par, 3, 6);
+    const stroke = golfNumber(card.handicap, 1, 36);
+    holes[String(i)] = {
+      par:par === null ? null : Math.round(par),
+      stroke:stroke === null ? null : Math.round(stroke),
+      pins:mid ? { MID:mid } : {},
+      apiYards:golfNumber(card.yards, 1, 900),
+      apiMeters:golfNumber(card.meters, 1, 900)
+    };
+  }
+  const location = c.coordinates || {};
+  const position = golfCoords(location.latitude ?? c.latitude, location.longitude ?? c.longitude);
+  const id = Number(c.id);
+  return {
+    course:{
+      id:`api-${id}`,
+      name:String(c.name || c.club || `Golf Course ${id}`),
+      pin:'',
+      location:position,
+      apiProvider:'golfcoursesapi',
+      apiCourseId:id
+    },
+    holes,
+    apiMode:true,
+    apiData:{
+      provider:'Golf Courses API',
+      sourceId:id,
+      teeName:tee?.name || null,
+      teeOptions:validTees.map(t=>({ name:String(t.name || 'Tees'), total_yards:t.total_yards || null })),
+      holeCount:n,
+      holesMapped:greenMap.size,
+      greenCentersAvailable:greenMap.size > 0,
+      greenCentersRestricted:greensPayload === null
+    }
+  };
+}
+
+function golfApiError(res,e){
+  return res.status(e.status || 502).json({ok:false,error:e.message || 'Course provider unavailable.'});
+}
+
+app.post('/api/course-library/search', golfApiThrottle, async (req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  const q=String(req.body?.q || '').trim().slice(0,90);
+  if(q.length < 2) return res.status(400).json({ok:false,error:'Enter at least 2 characters.'});
+  const page=Math.min(15, Math.max(1, Number.parseInt(req.body?.page,10) || 1));
+  const params=new URLSearchParams({ q, country:'ZA', page:String(page), per_page:'25' });
+  try{
+    const data=await golfApiGet(`/courses?${params}`, 4*60*1000);
+    res.json({ok:true, courses:Array.isArray(data?.data) ? data.data.map(c=>({
+      id:c.id, name:c.name, club:c.club, city:c.city, state:c.state, country:c.country,
+      latitude:c.latitude, longitude:c.longitude
+    })) : [], meta:data?.meta || {}});
+  }catch(e){ golfApiError(res,e); }
+});
+
+app.post('/api/course-library/course', golfApiThrottle, async (req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  const id=Number(req.body?.id);
+  if(!Number.isSafeInteger(id) || id <= 0 || id > 1000000000)
+    return res.status(400).json({ok:false,error:'Invalid course ID.'});
+  try{
+    const detail=await golfApiGet(`/courses/${id}`, 20*60*1000);
+    let greens=null;
+    try{ greens=await golfApiGet(`/courses/${id}/green-centers`, 20*60*1000); }
+    catch(e){
+      // 404: unmapped course. 403: plan permission. Other failures remain visible
+      // as scorecard-only data, but never fabricate GPS coordinates.
+      console.warn('Golf course green centers unavailable:', id, e.upstreamStatus || e.status);
+    }
+    res.json({ok:true,course:normalizeGolfApiCourse(detail, greens)});
+  }catch(e){ golfApiError(res,e); }
+});
+// ----- End Golf Courses API -----
 
 // ----- Health -----
 app.get("/health", (_req, res) => res.json({ ok: true }));
