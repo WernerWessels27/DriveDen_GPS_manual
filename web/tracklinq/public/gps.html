@@ -111,7 +111,7 @@
     }
 
 
-    /* API-only courses: CART -> green horizontal map with a single Recenter action. */
+    /* API-only courses: live CART -> MID, landscape horizontal / portrait phone vertical. */
     #apiRecenterBtn { display:none; }
     .apiCourseNotice {
       position:absolute; left:50%; transform:translateX(-50%); bottom:76px;
@@ -130,7 +130,10 @@
     body.api-course .distStack .chipV:first-child,
     body.api-course .distStack .chipV:last-child { display:none!important; }
     body.api-course .distStack { min-width:145px; }
-    @media(max-width:700px){ body.api-course .apiCourseNotice { bottom:65px; font-size:11px; } }
+    /* API courses always frame live CART and MID; no remote-preview mode. */
+    @media(max-width:700px){
+      body.api-course .apiCourseNotice { font-size:11px;max-width:95vw; }
+    }
 
     /* Top full-width course banner */
     .banner {
@@ -1030,7 +1033,6 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
   </div>
 
   <div id="apiCourseNotice" class="apiCourseNotice" role="status" hidden></div>
-
   <!-- Distances stack -->
   <div class="distStack">
     <div class="chipV">
@@ -1053,7 +1055,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
   <!-- Bottom-left stacked view icons -->
   <div class="viewIcons">
-    <button class="viewBtn" id="apiRecenterBtn" title="Recenter CART to GREEN" aria-label="Recenter CART to GREEN" type="button">⦿</button>
+    <button class="viewBtn" id="apiRecenterBtn" title="Recenter real CART and MID" aria-label="Recenter real CART and MID" type="button">⦿</button>
     <button title="Player View (TEE → GREEN)" class="viewBtn" id="playerViewBtn" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L21 21H3L12 3Z" fill="#38b6ff" opacity="0.22"/><path d="M12 3L21 21H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 6V19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3"/><circle cx="12" cy="18.5" r="1.8" fill="currentColor"/><circle cx="12" cy="5" r="1.6" fill="#38b6ff"/></svg></button>
     <button title="Hole View (TEE↔BACK)" class="viewBtn" id="holeViewBtn" aria-pressed="false"><svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" id="golf-3" data-name="Flat Color" xmlns="http://www.w3.org/2000/svg" class="icon flat-color"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <path id="secondary" d="M8.44,12a8.19,8.19,0,0,1,2.3.39,13.58,13.58,0,0,0,3.93.54c3,0,6.33,1.42,6.33,4.54C21,22,14.25,22,12,22c-8.15,0-9-3.81-9-5.44C3,13.7,5,12,8.44,12Z" style="fill: #38b6ff;"/> <path id="primary" d="M8.55,6.11,14,3.38V3a1,1,0,0,1,2,0V16a1,1,0,0,1-2,0V10.62L8.55,7.89a1,1,0,0,1,0-1.78Z" style="fill: #000000;"/> </g> </svg></button>
     <button title="Flyover (TEE→GREEN)" class="viewBtn" id="flyoverBtn"><svg aria-hidden="true" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <rect fill="currentColor" fill-opacity="0.01"/> <path d="M11 11L19 19M37 37L29 29" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <path d="M37 11L29 19M11 37L19 29" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <rect x="19" y="19" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> <path d="M37 18C38.3845 18 39.7379 17.5895 40.889 16.8203C42.0401 16.0511 42.9373 14.9579 43.4672 13.6788C43.997 12.3997 44.1356 10.9922 43.8655 9.63437C43.5954 8.2765 42.9287 7.02922 41.9498 6.05026C40.9708 5.07129 39.7235 4.4046 38.3656 4.13451C37.0078 3.86441 35.6003 4.00303 34.3212 4.53285C33.0421 5.06266 31.9489 5.95987 31.1797 7.11101C30.4105 8.26215 30 9.61553 30 11M37 30C38.3845 30 39.7379 30.4105 40.889 31.1797C42.0401 31.9489 42.9373 33.0421 43.4672 34.3212C43.997 35.6003 44.1356 37.0078 43.8655 38.3656C43.5954 39.7235 42.9287 40.9708 41.9498 41.9497C40.9708 42.9287 39.7235 43.5954 38.3656 43.8655C37.0078 44.1356 35.6003 43.997 34.3212 43.4672C33.0421 42.9373 31.9489 42.0401 31.1797 40.889C30.4105 39.7379 30 38.3845 30 37M11 18C9.61553 18 8.26216 17.5895 7.11101 16.8203C5.95987 16.0511 5.06266 14.9579 4.53285 13.6788C4.00303 12.3997 3.86441 10.9922 4.13451 9.63437C4.4046 8.2765 5.07129 7.02922 6.05026 6.05026C7.02922 5.07129 8.2765 4.4046 9.63437 4.13451C10.9922 3.86441 12.3997 4.00303 13.6788 4.53285C14.9579 5.06266 16.0511 5.95987 16.8203 7.11101C17.5895 8.26215 18 9.61553 18 11M11 30C9.61553 30 8.26216 30.4105 7.11101 31.1797C5.95987 31.9489 5.06266 33.0421 4.53285 34.3212C4.00303 35.6003 3.86441 37.0078 4.13451 38.3656C4.4046 39.7235 5.07129 40.9708 6.05026 41.9497C7.02922 42.9287 8.2765 43.5954 9.63437 43.8655C10.9922 44.1356 12.3997 43.997 13.6788 43.4672C14.9579 42.9373 16.0511 42.0401 16.8203 40.889C17.5895 39.7379 18 38.3845 18 37" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/> </g> </svg></button>
@@ -1878,7 +1880,11 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       focusRaf:null,
       apiMode:false,
       apiCourseId:null,
-      apiFirstFixFramed:false
+      apiFirstFixFramed:false,
+      apiLastFitTs:0,
+      apiLastFitCart:null,
+      apiLastFitGreen:null,
+      apiLastFitZoom:null
     };
 
     try{
@@ -3527,7 +3533,13 @@ function ensureInitialFraming(){
     window.addEventListener('resize', ()=>{
       try{
         if (!state?.course) return;
-        if(state.apiMode){ recenterApiCourse(); return; }
+        if(state.apiMode){
+          // The available map dimensions change when the tablet/phone rotates.
+          setTimeout(()=>{
+            try { map.invalidateSize(); recenterApiCourse(true); }catch(_){}
+          }, 100);
+          return;
+        }
         updateBearingForHole();
         if (state.viewMode === 'player') {
           setTimeout(()=>doPlayerView(true), 120);
@@ -3551,7 +3563,8 @@ function ensureInitialFraming(){
     $('#holeViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=false; state.viewMode='hole'; doHoleView(); saveGpsResumeState(); });
     const __flyBtn = $('#flyoverBtn'); if(__flyBtn) __flyBtn.addEventListener('click', ()=>{ startFlyover(); });
     $('#cartViewBtn').addEventListener('click', ()=>{ cancelFlyover(); state.followCart=true; state.viewMode='cart'; doCartView(false); saveGpsResumeState(); });
-    $('#apiRecenterBtn')?.addEventListener('click',()=>recenterApiCourse());
+    // Recenter frames the real CART and selected MID at any separation.
+    $('#apiRecenterBtn')?.addEventListener('click',()=>recenterApiCourse(true));
 
     function getPlayableHoleNumbers(){
       return Object.keys(state.course?.holes || {})
@@ -3575,7 +3588,11 @@ function ensureInitialFraming(){
       cancelFlyover();
       state.hole = holes[nextIdx];
       state.initialFramed = false;
-      if(state.apiMode) state.apiFirstFixFramed=false;
+      if(state.apiMode) {
+        state.apiFirstFixFramed=false;
+        state.apiLastFitCart=null;
+        state.apiLastFitGreen=null;
+      }
       renderHole();
       saveGpsResumeState();
     }
@@ -3669,7 +3686,8 @@ function maybeAutoAdvanceByGps(){
 function followCartViewIfNeeded(){
   try{
     if(state.apiMode){
-      if(!state.apiFirstFixFramed) recenterApiCourse();
+      // Continuous course-relative tracking: refit as the cart approaches MID.
+      recenterApiCourse();
       return;
     }
     if (!state.followCart) return;
@@ -4203,56 +4221,113 @@ html += `<td>${parIn}</td><td>${parTot}</td><td>–</td><td>–</td></tr>`;
       el.textContent=message || '';
     }
 
-    // A course API does not provide tee GPS coordinates. With the actual CART
-    // position and MID coordinate we can rotate so CART is left / GREEN is right.
-    function recenterApiCourse(){
+    // The API gives a green centre, not a reliable tee box coordinate.
+    // Never make up a tee: use the cart's actual location, irrespective of distance.
+    function apiSelectedMid(){
+      const mid=state.course?.holes?.[String(state.hole)]?.pins?.MID;
+      if(!mid || !Number.isFinite(Number(mid.lat)) || !Number.isFinite(Number(mid.lng))) return null;
+      return {lat:Number(mid.lat),lng:Number(mid.lng)};
+    }
+
+    function apiRealGpsText(){
+      const cart=fromCart();
+      if(!cart) return 'Waiting for GPS location';
+      const accuracy=Number.isFinite(state.cartAccuracy)
+        ? ` (±${Math.round(state.cartAccuracy)} m)` : '';
+      return `CART: ${cart.lat.toFixed(5)}, ${cart.lng.toFixed(5)}${accuracy}`;
+    }
+
+    function apiDistanceText(m){
+      if(!Number.isFinite(m)) return 'distance unknown';
+      return m>=1000 ? `${(m/1000).toFixed(m>=10000?0:1)} km` : `${Math.round(m)} m`;
+    }
+
+    // Use landscape left-to-right on radios and laptops; portrait phone is bottom-to-top.
+    function apiIsPortraitPhone(){
+      const sz=map.getSize();
+      return isMobileView() && sz.y>sz.x;
+    }
+
+    // Fit the projected CART->MID segment along one screen axis at the highest
+    // usable zoom. The zoom consequently increases as the cart nears MID.
+    // This calculation is rotation-independent because it compares segment lengths.
+    function getApiFitZoom(cart,mid,portrait){
+      const sz=map.getSize();
+      const room=portrait
+        ? Math.max(80,sz.y*0.52)
+        : Math.max(80,sz.x*0.55);
+      const highest=Math.min(getHoleFitMaxZoom(),map.getMaxZoom());
+      const lowest=Math.max(0,map.getMinZoom());
+      for(let z=highest;z>=lowest;z--){
+        const a=map.project([cart.lat,cart.lng],z);
+        const b=map.project([mid.lat,mid.lng],z);
+        if(a.distanceTo(b)<=room || z===lowest) return z;
+      }
+      return lowest;
+    }
+
+    // Live API view: centre and align *real* CART and MID at any distance.
+    // Forced on hole change / orientation change / Recenter. Otherwise run
+    // only when a material GPS move or a zoom-step change has occurred.
+    function recenterApiCourse(force=false){
       if(!state.apiMode || !state.course) return;
-      hidePlayerGlView();
-      clearFocusMask();
-      const hole=state.course.holes?.[String(state.hole)];
-      const mid=hole?.pins?.MID;
+      const mid=apiSelectedMid();
       const cart=fromCart();
       if(!mid){
         const pos=state.course.course?.location;
-        if(pos) map.setView([pos.lat,pos.lng],16,{animate:false});
-        const yards=Number(hole?.apiYards);
-        const published=Number.isFinite(yards) && yards > 0
-          ? ` Published hole length: ${Math.round(yards)} yd.` : '';
-        setApiCourseNotice(`Scorecard only — no green GPS coordinates for this hole.${published}`);
+        if(pos && Number.isFinite(Number(pos.lat)) && Number.isFinite(Number(pos.lng))) {
+          map.setView([Number(pos.lat),Number(pos.lng)],16,{animate:false});
+        } else if(cart) map.setView([cart.lat,cart.lng],16,{animate:false});
+        if(map.setBearing) map.setBearing(0);
+        const yards=Number(state.course.holes?.[String(state.hole)]?.apiYards);
+        const published=Number.isFinite(yards) && yards>0 ? ` Published hole length: ${Math.round(yards)} yd.` : '';
+        setApiCourseNotice(`Scorecard only — green GPS coordinates are unavailable for this hole.${published}`);
+        state.apiFirstFixFramed=false;
         return;
       }
       if(!cart){
-        map.setView([mid.lat,mid.lng],Math.min(18,getHoleFitMaxZoom()),{animate:false});
-        if(map.setBearing) map.setBearing(0);
-        setApiCourseNotice('Waiting for GPS position to align CART → GREEN.');
+        // Show the *real green* while waiting, but never substitute a fake CART.
+        if(!state.apiFirstFixFramed || force){
+          if(map.setBearing) map.setBearing(0);
+          map.setView([mid.lat,mid.lng],Math.min(17,getHoleFitMaxZoom()),{animate:false});
+        }
+        state.apiFirstFixFramed=false; // First incoming GPS fix should reframe.
+        setApiCourseNotice('Waiting for CART GPS location. MID position shown.');
         return;
       }
-      const distanceToGreen=distMeters(cart,mid);
-      if(distanceToGreen > 2500){
-        map.setView([mid.lat,mid.lng],Math.min(18,getHoleFitMaxZoom()),{animate:false});
-        if(map.setBearing) map.setBearing(0);
-        state.apiFirstFixFramed=true;
-        setApiCourseNotice('Cart is far from this course. Showing the green until you are nearby.');
-        return;
+
+      const now=Date.now();
+      const portrait=apiIsPortraitPhone();
+      const zoom=getApiFitZoom(cart,mid,portrait);
+      if(!force && state.apiFirstFixFramed){
+        if(now-state.apiLastFitTs<800) return;
+        const moved=state.apiLastFitCart ? distMeters(cart,state.apiLastFitCart) : Infinity;
+        const greenMoved=state.apiLastFitGreen ? distMeters(mid,state.apiLastFitGreen) : Infinity;
+        if(moved<3 && greenMoved<1 && zoom===state.apiLastFitZoom) return;
       }
-      const sz=map.getSize();
-      const maxZ=getHoleFitMaxZoom();
-      let zoom=maxZ;
-      for(;zoom>9;zoom--){
-        const a=map.project([cart.lat,cart.lng],zoom);
-        const b=map.project([mid.lat,mid.lng],zoom);
-        if(a.distanceTo(b) <= Math.max(80, sz.x*0.55)) break;
-      }
-      const center=L.latLng((cart.lat+mid.lat)/2,(cart.lng+mid.lng)/2);
+
+      hidePlayerGlView();
+      clearFocusMask();
+      const a=map.project([cart.lat,cart.lng],zoom);
+      const b=map.project([mid.lat,mid.lng],zoom);
+      const center=map.unproject(L.point((a.x+b.x)/2,(a.y+b.y)/2),zoom);
       map.setView(center,zoom,{animate:false});
-      setBearingBetweenPoints(cart,mid,'horizontal');
+      setBearingBetweenPoints(cart,mid,portrait?'vertical':'horizontal');
+      state.apiLastFitTs=now;
+      state.apiLastFitCart={lat:cart.lat,lng:cart.lng};
+      state.apiLastFitGreen={lat:mid.lat,lng:mid.lng};
+      state.apiLastFitZoom=zoom;
       state.apiFirstFixFramed=true;
-      setApiCourseNotice('CART → GREEN · MID GPS distance');
+      // The MID distance chip already shows the number; do not cover the map
+      // with remote/preview warnings when a real GPS fix is present.
+      setApiCourseNotice('');
     }
 
     function enableApiCourseUi(){
       document.body.classList.add('api-course');
       state.apiFirstFixFramed=false;
+      state.apiLastFitCart=null;
+      state.apiLastFitGreen=null;
       state.followCart=false;
       state.viewMode='api';
       updateViewButtonStates();
