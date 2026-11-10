@@ -53,8 +53,8 @@
 
     .tabs{
       display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:8px;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+       gap:8px;
       margin-bottom:12px;
     }
 
@@ -182,11 +182,12 @@
   <div class="wrap">
     <div class="card">
       <h1>DriveDen GPS</h1>
-      <p>Login with your club PIN or continue as a guest.</p>
+      <p>Choose a club PIN, a DriveDen Enhanced course, or search golf courses across South Africa.</p>
 
       <div class="tabs">
         <button id="tabClub" class="tab active">Club (PIN)</button>
-        <button id="tabGuest" class="tab">Guest (Search Course)</button>
+        <button id="tabGuest" class="tab">Enhanced Courses</button>
+        <button id="tabApi" class="tab">All SA Courses</button>
       </div>
 
       <div id="clubPane">
@@ -202,7 +203,7 @@
 
       <div id="guestPane" class="hidden">
         <div class="group">
-          <label>Search Course</label>
+          <label>Search DriveDen Enhanced Course</label>
           <div class="searchWrap">
             <input id="courseSearch" autocomplete="off" placeholder="Start typing a club name..."/>
             <div id="suggestions" class="suggestions"></div>
@@ -210,11 +211,26 @@
         </div>
 
         <div class="row">
-          <button class="btn" id="guestLoginBtn">Continue as Guest</button>
+          <button class="btn" id="guestLoginBtn">Open Enhanced Course</button>
           <button class="btn secondary" id="refreshBtn">Refresh List</button>
         </div>
 
         <div class="muted" style="margin-top:8px">Guest mode won’t ask for a PIN.</div>
+      </div>
+
+      <div id="apiPane" class="hidden">
+        <div class="group">
+          <label for="apiCourseSearch">Search South African golf courses (online)</label>
+          <div class="row">
+            <input id="apiCourseSearch" autocomplete="off" placeholder="Type a course or club name..." />
+            <button class="btn secondary" id="apiSearchBtn">Search</button>
+          </div>
+          <div id="apiSearchStatus" class="muted" style="margin-top:8px" role="status">Search for a course to begin.</div>
+          <div id="apiSearchResults" style="display:grid;gap:6px;max-height:240px;overflow-y:auto;margin-top:8px"></div>
+          <button class="btn secondary" id="apiLoadMoreBtn" type="button" hidden style="margin-top:8px;width:100%">Load More Courses</button>
+        </div>
+        <button class="btn" id="apiOpenBtn" disabled>Open Selected Course</button>
+        <div class="muted" style="margin-top:8px">API courses provide scorecards and MID GPS distances wherever green coordinates are available. DriveDen Enhanced courses remain separate.</div>
       </div>
 
       <div class="foot">
@@ -255,6 +271,7 @@
 
       const gpsReady = await cachedUrlExists("/gps.html");
       const indexReady = await cachedUrlExists("/courses/index.json") || !!localStorage.getItem("course_index_snapshot");
+      if (saved.source === 'api') return false; // API course lookup needs internet.
       const courseReady = await cachedUrlExists(`/courses/${saved.courseId}.json`);
 
       return gpsReady && indexReady && courseReady;
@@ -295,7 +312,13 @@
         }
 
         const url = new URL("/gps.html", window.location.origin);
-        url.searchParams.set("course", saved.courseId);
+        if(saved.source === 'api') {
+          if(!saved.apiCourseId || !navigator.onLine) return;
+          url.searchParams.set('apiCourse', String(saved.apiCourseId));
+          url.searchParams.set('guest', '1');
+        } else {
+          url.searchParams.set("course", saved.courseId);
+        }
         url.searchParams.set("hole", saved.hole || "1");
         url.searchParams.set("resume", "1");
         url.searchParams.set("t", Date.now().toString());
@@ -333,19 +356,23 @@
     // Tabs
     const tabClub = document.getElementById("tabClub");
     const tabGuest = document.getElementById("tabGuest");
+    const tabApi = document.getElementById("tabApi");
     const clubPane = document.getElementById("clubPane");
     const guestPane = document.getElementById("guestPane");
+    const apiPane = document.getElementById("apiPane");
 
     function setTab(which) {
-      const isClub = which === "club";
-      tabClub.classList.toggle("active", isClub);
-      tabGuest.classList.toggle("active", !isClub);
-      clubPane.classList.toggle("hidden", !isClub);
-      guestPane.classList.toggle("hidden", isClub);
+      tabClub.classList.toggle("active", which === "club");
+      tabGuest.classList.toggle("active", which === "guest");
+      tabApi.classList.toggle("active", which === "api");
+      clubPane.classList.toggle("hidden", which !== "club");
+      guestPane.classList.toggle("hidden", which !== "guest");
+      apiPane.classList.toggle("hidden", which !== "api");
     }
 
     tabClub.addEventListener("click", () => setTab("club"));
     tabGuest.addEventListener("click", () => setTab("guest"));
+    tabApi.addEventListener("click", () => setTab("api"));
 
     // Network-first fetch helper for course index
     // This makes newly added courses appear as soon as the device is online.
@@ -508,6 +535,95 @@
 
     loadCourses().catch(() => {
       alert("Could not load course list (go online once to cache it).");
+    });
+
+
+    // Golf Courses API search runs via the Railway server (never from the browser
+    // directly to the provider). POST bypasses the existing SW GET caching.
+    const apiSearchInput = document.getElementById('apiCourseSearch');
+    const apiResults = document.getElementById('apiSearchResults');
+    const apiStatus = document.getElementById('apiSearchStatus');
+    const apiOpenBtn = document.getElementById('apiOpenBtn');
+    let selectedApiCourseId = null;
+    let apiRequestSerial = 0;
+    let apiSearchDebounce = null;
+    let apiSearchPage = 0;
+    let apiSearchLastPage = 0;
+    let apiSearchQuery = '';
+    const apiLoadMoreBtn = document.getElementById('apiLoadMoreBtn');
+
+    async function libraryPost(endpoint, payload){
+      const resp = await fetch(endpoint, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload), cache:'no-store'
+      });
+      const json = await resp.json().catch(()=>({}));
+      if(!resp.ok || !json.ok) throw new Error(json.error || `Course API error (${resp.status})`);
+      return json;
+    }
+
+    async function searchApiCourses(page=1){
+      const q=apiSearchInput.value.trim();
+      if(q.length < 2){ apiStatus.textContent='Enter at least 2 characters.'; return; }
+      if(!navigator.onLine){ apiStatus.textContent='Connect to the internet to search API courses.'; return; }
+      const serial=++apiRequestSerial;
+      if(page===1 || q !== apiSearchQuery){
+        selectedApiCourseId=null;
+        apiOpenBtn.disabled=true;
+        apiResults.replaceChildren();
+        apiSearchPage=0;
+      }
+      apiLoadMoreBtn.hidden=true;
+      apiStatus.textContent=page===1 ? 'Searching South African courses…' : 'Loading more courses…';
+      try{
+        const json=await libraryPost('/api/course-library/search',{q,page});
+        if(serial !== apiRequestSerial) return;
+        apiSearchQuery=q;
+        apiSearchPage=page;
+        apiSearchLastPage=Math.min(15,Number(json.meta?.last_page) || page);
+        const matches = Array.isArray(json.courses) ? json.courses : [];
+        const total=Number(json.meta?.total) || apiResults.childElementCount + matches.length;
+        apiStatus.textContent=matches.length ? `Showing up to ${apiResults.childElementCount+matches.length} of ${total} matching courses. Select one.` : 'No additional matching courses found.';
+        apiLoadMoreBtn.hidden=apiSearchPage>=apiSearchLastPage;
+        for(const course of matches){
+          const btn=document.createElement('button');
+          btn.type='button'; btn.className='suggestion';
+          btn.style.cssText='text-align:left;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer';
+          const name=document.createElement('strong');
+          name.textContent=String(course.name || course.club || `Course ${course.id}`);
+          const location=document.createElement('div');
+          location.className='muted';
+          location.textContent=[course.city,course.state].filter(Boolean).join(', ') || 'South Africa';
+          btn.append(name,location);
+          btn.addEventListener('click',()=>{
+            apiResults.querySelectorAll('button').forEach(el=>el.style.borderColor='var(--border)');
+            btn.style.borderColor='var(--green)';
+            selectedApiCourseId=Number(course.id);
+            apiOpenBtn.disabled=false;
+          });
+          apiResults.append(btn);
+        }
+      }catch(e){
+        if(serial === apiRequestSerial) apiStatus.textContent=e.message || 'Search failed.';
+      }
+    }
+
+    document.getElementById('apiSearchBtn').addEventListener('click',()=>searchApiCourses(1));
+    apiLoadMoreBtn.addEventListener('click',()=>searchApiCourses(apiSearchPage+1));
+    apiSearchInput.addEventListener('input',()=>{
+      clearTimeout(apiSearchDebounce);
+      apiRequestSerial++;
+      selectedApiCourseId=null; apiOpenBtn.disabled=true;
+      apiLoadMoreBtn.hidden=true;
+      if(apiSearchInput.value.trim().length >= 3) apiSearchDebounce=setTimeout(()=>searchApiCourses(1),420);
+    });
+    apiSearchInput.addEventListener('keydown',e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); clearTimeout(apiSearchDebounce); searchApiCourses(1); }
+    });
+    apiOpenBtn.addEventListener('click',()=>{
+      if(!Number.isSafeInteger(selectedApiCourseId) || selectedApiCourseId <= 0) return;
+      clearGpsResumeState();
+      location.href=`/gps.html?apiCourse=${encodeURIComponent(selectedApiCourseId)}&guest=1`;
     });
 
     // Find a course by PIN
