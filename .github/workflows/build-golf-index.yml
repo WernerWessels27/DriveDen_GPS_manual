@@ -1,0 +1,46 @@
+name: Build South African OSM golf geometry index
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-golf-index.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install osmium
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y osmium-tool
+      - name: Download current South Africa OSM extract
+        run: |
+          curl --fail --location --retry 3 --retry-delay 3 --max-time 900 \
+            --output /tmp/south-africa.osm.pbf \
+            https://download.geofabrik.de/africa/south-africa-latest.osm.pbf
+          test -s /tmp/south-africa.osm.pbf
+      - name: Extract only golf hole, tee, and green geometries
+        run: |
+          osmium tags-filter /tmp/south-africa.osm.pbf 'nwr/golf=hole,tee,green' \
+            -o /tmp/za-golf.osm.pbf --overwrite
+          osmium export /tmp/za-golf.osm.pbf -o /tmp/za-golf.geojson --overwrite
+          python3 tools/build_golf_osm_tiles.py /tmp/za-golf.geojson \
+            web/tracklinq/data/osm-golf-tiles
+      - name: Commit indexed golf map data
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/tracklinq/data/osm-golf-tiles
+          if ! git diff --staged --quiet; then
+            git commit -m 'Refresh South Africa OpenStreetMap golf geometry index'
+            git push
+          fi
