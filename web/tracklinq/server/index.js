@@ -197,9 +197,54 @@ app.post('/api/mapper/publish',enhancedAdminAuth,async(req,res)=>{
 // The Mapper reviews everything before any Enhanced course can be published.
 // Source map data: © OpenStreetMap contributors, ODbL; preserve attribution
 // and comply with ODbL if redistributing derivative datasets.
+// Keep successful OSM lookups for reuse. Overpass is a shared public resource:
+// do not make every Mapper open issue the same expensive external request.
 const osmMapCache = new Map();
 const osmMapRate = new Map();
 let osmPendingRequests = 0;
+let osmCacheTableReady = null;
+const OSM_FRESH_FOR_MS = 24 * 60 * 60 * 1000;
+const OSM_STALE_FOR_MS = 14 * 24 * 60 * 60 * 1000;
+
+async function ensureOSMCacheTable() {
+  if (!osmCacheTableReady) {
+    osmCacheTableReady = query(`CREATE TABLE IF NOT EXISTS driveden_osm_map_cache (
+      cache_key TEXT PRIMARY KEY,
+      features JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`).catch(err => { osmCacheTableReady = null; throw err; });
+  }
+  return osmCacheTableReady;
+}
+
+// Area-specific, indexed bbox queries are generally cheaper than combining
+// node/way/relation around-radius searches. A golf=hole way has the tee-to-green
+// route we need; tee/green geometries are usually ways as well.
+function osmGolfBBoxQuery(lat, lng, radiusM) {
+  const latDelta = radiusM / 111132;
+  const lngDelta = radiusM / (111320 * Math.max(.2, Math.cos(lat*Math.PI/180)));
+  const bbox = [lat-latDelta,lng-lngDelta,lat+latDelta,lng+lngDelta]
+    .map(v=>v.toFixed(6)).join(',');
+  return `[out:json][timeout:17];(way["golf"="hole"](${bbox});way["golf"="green"](${bbox});way["golf"="tee"](${bbox});node["golf"="tee"](${bbox}););out geom;`;
+}
+
+function trimOSMGolfElements(elements) {
+  return elements
+    .filter(el=>['hole','tee','green'].includes(el?.tags?.golf)
+      && (el.type==='node' || (Array.isArray(el.geometry) && el.geometry.length<2000)))
+    .slice(0,1100)
+    .map(el=>({type:el.type,id:el.id,
+      tags:{golf:el.tags.golf,ref:el.tags.ref||'',name:el.tags.name||''},
+      geometry:el.type==='node'?[{lat:el.lat,lon:el.lon}]
+        :(el.geometry || []).map(v=>({lat:v.lat,lon:v.lon}))}));
+}
+
+const osmHosts = [
+  {label:'private.coffee',url:'https://overpass.private.coffee/api/interpreter'},
+  {label:'VK Maps',url:'https://maps.mail.ru/osm/tools/overpass/api/interpreter'},
+  {label:'overpass-api.de',url:'https://overpass-api.de/api/interpreter'}
+];
+
 app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
   const lat = Number(req.body?.lat), lng = Number(req.body?.lng);
   const radius = Number(req.body?.radius);
@@ -214,50 +259,89 @@ app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
   if (usage && now - usage.start < 60_000 && usage.count >= 5)
     return res.status(429).json({ok:false,error:'Please wait a minute before requesting more OSM maps.'});
   osmMapRate.set(client, usage && now-usage.start<60_000 ? {start:usage.start,count:usage.count+1} : {start:now,count:1});
+
   const key = `${lat.toFixed(3)}:${lng.toFixed(3)}:${Math.round(radius/100)}`;
-  const cached = osmMapCache.get(key);
-  if (cached && cached.until > now) {
-    res.setHeader('Cache-Control','no-store');
-    return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true});
+  let cached = osmMapCache.get(key);
+  if (!cached) {
+    // A previous successful lookup should survive app restarts/deploys.
+    try {
+      await ensureOSMCacheTable();
+      const row = await query('SELECT features, updated_at FROM driveden_osm_map_cache WHERE cache_key=$1',[key]);
+      if (row.rows.length && Array.isArray(row.rows[0].features)) {
+        cached = {features:row.rows[0].features, fetchedAt:new Date(row.rows[0].updated_at).getTime()};
+        if (now - cached.fetchedAt <= OSM_STALE_FOR_MS) osmMapCache.set(key,cached);
+        else cached = null;
+      }
+    } catch (err) {
+      console.warn('OSM cache read unavailable:',err?.message);
+    }
   }
-  if (osmPendingRequests >= 2)
+  if (cached && now - cached.fetchedAt < OSM_FRESH_FOR_MS) {
+    res.setHeader('Cache-Control','no-store');
+    return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true,
+      attribution:'© OpenStreetMap contributors (ODbL)'});
+  }
+  if (osmPendingRequests >= 2) {
+    if (cached) return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true,stale:true,
+      attribution:'© OpenStreetMap contributors (ODbL)'});
     return res.status(503).json({ok:false,error:'Another map lookup is running. Please retry shortly.'});
-  const radiusM = Math.round(radius);
-  const queryText=`[out:json][timeout:22];(nwr(around:${radiusM},${lat.toFixed(6)},${lng.toFixed(6)})["golf"~"^(hole|tee|green)$"];);out geom;`;
-  const endpoints = [
-    'https://overpass.private.coffee/api/interpreter',
-    'https://overpass-api.de/api/interpreter'
-  ];
+  }
+
+  const queryText = osmGolfBBoxQuery(lat,lng,Math.round(radius));
   osmPendingRequests++;
   try {
-    let lastFailure='OSM service unavailable.';
-    for(const endpoint of endpoints) {
+    let lastFailure='Public map servers are currently busy.';
+    // One attempt per separate provider; do not hammer a busy service.
+    for(const provider of osmHosts) {
+      const start = Date.now();
       try {
-        const response=await fetch(endpoint,{
+        const response = await fetch(provider.url,{
           method:'POST',
-          headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','Accept':'application/json','User-Agent':'DriveDen-Mapper/1.0 (OpenStreetMap-based golf mapping; driveden-gps.up.railway.app)'},
+          headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept':'application/json',
+            'User-Agent':'DriveDenGPS/1.1 (+https://driveden-gps.up.railway.app)'},
           body:new URLSearchParams({data:queryText}),
-          signal:AbortSignal.timeout(26000)
+          signal:AbortSignal.timeout(17000)
         });
-        if (!response.ok) {lastFailure=`OpenStreetMap lookup returned ${response.status}`;continue;}
-        const raw=await response.text();
-        if (raw.length>4500000) {lastFailure='OSM geometry response was too large.';continue;}
-        const j=JSON.parse(raw);
-        if (!Array.isArray(j.elements)) {lastFailure='Unexpected OpenStreetMap response.';continue;}
-        const features=j.elements
-          .filter(el=>['hole','tee','green'].includes(el?.tags?.golf)
-              && (el.type==='node' || (Array.isArray(el.geometry) && el.geometry.length<2000)))
-          .slice(0,1100)
-          .map(el=>({type:el.type,id:el.id,tags:{golf:el.tags.golf,ref:el.tags.ref||'',name:el.tags.name||''},
-            geometry:el.type==='node'?[{lat:el.lat,lon:el.lon}]:(el.geometry || []).map(v=>({lat:v.lat,lon:v.lon}))}));
-        // Drop other private/unused OSM tag fields; no secrets or user locations stored.
-        if (osmMapCache.size>40) osmMapCache.clear();
-        osmMapCache.set(key,{features,until:Date.now()+2*60*60*1000});
+        if(!response.ok) {
+          console.warn(`OSM lookup ${provider.label}: HTTP ${response.status} after ${Date.now()-start}ms`);
+          lastFailure='Public map servers are busy (HTTP '+response.status+').';
+          continue;
+        }
+        const raw = await response.text();
+        if(raw.length > 4500000) {lastFailure='Map geometry response was too large.';continue;}
+        const j = JSON.parse(raw);
+        if (!Array.isArray(j.elements) || (j.remark && /error|timeout|runtime/i.test(j.remark))) {
+          lastFailure='The map provider returned an incomplete response.';
+          continue;
+        }
+        const features=trimOSMGolfElements(j.elements);
+        console.info(`OSM lookup ${provider.label} succeeded: ${features.length} golf features in ${Date.now()-start}ms`);
+        if(osmMapCache.size>60)osmMapCache.clear();
+        const fetchedAt=Date.now();
+        osmMapCache.set(key,{features,fetchedAt});
+        try {
+          await ensureOSMCacheTable();
+          await query(`INSERT INTO driveden_osm_map_cache(cache_key,features,updated_at)
+            VALUES($1,$2,NOW()) ON CONFLICT(cache_key) DO UPDATE SET
+            features=EXCLUDED.features, updated_at=NOW()`,[key,JSON.stringify(features)]);
+        } catch(err) { console.warn('OSM cache write unavailable:',err?.message); }
         res.setHeader('Cache-Control','no-store');
-        return res.json({ok:true,features,source:'OpenStreetMap',cached:false,attribution:'© OpenStreetMap contributors (ODbL)'});
-      } catch(error) {lastFailure=(error?.name==='TimeoutError'||error?.name==='AbortError')?'OpenStreetMap lookup timed out.':(error?.message || 'OSM unavailable.');}
+        return res.json({ok:true,features,source:'OpenStreetMap',cached:false,
+          attribution:'© OpenStreetMap contributors (ODbL)'});
+      }catch(err) {
+        console.warn(`OSM lookup ${provider.label} failed after ${Date.now()-start}ms: ${err?.name||'Error'}`);
+        lastFailure=err?.name==='TimeoutError'||err?.name==='AbortError'
+          ? 'Public map servers are taking too long.' : 'Could not reach the public map servers.';
+      }
     }
-    return res.status(502).json({ok:false,error:`Could not load OpenStreetMap mapping: ${lastFailure}`});
+    if(cached && now-cached.fetchedAt < OSM_STALE_FOR_MS) {
+      res.setHeader('Cache-Control','no-store');
+      console.warn('OSM providers busy; using last successful cached geometry.');
+      return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true,stale:true,
+        attribution:'© OpenStreetMap contributors (ODbL)'});
+    }
+    return res.status(503).json({ok:false,error:`Could not load OpenStreetMap mapping: ${lastFailure} You can retry shortly; your course data is safe.`});
   } finally { osmPendingRequests--; }
 });
 // ===== END OPENSTREETMAP MAP SUGGESTIONS =====
