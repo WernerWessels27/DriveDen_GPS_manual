@@ -199,6 +199,47 @@ app.post('/api/mapper/publish',enhancedAdminAuth,async(req,res)=>{
 // and comply with ODbL if redistributing derivative datasets.
 // Keep successful OSM lookups for reuse. Overpass is a shared public resource:
 // do not make every Mapper open issue the same expensive external request.
+// Prefer a local, provenance-labelled South Africa golf index over public Overpass.
+// This is generated from a Geofabrik OSM extract, not the editing API or tiles.
+const osmGolfIndexDir = path.join(__dirname, '..', 'data', 'osm-golf-tiles');
+const osmIndexTileCache = new Map();
+function readIndexedOSMGolfFeatures(lat,lng,radiusM) {
+  if (!fs.existsSync(path.join(osmGolfIndexDir,'manifest.json'))) return null;
+  const features=[],seen=new Set();
+  const latSpan=(radiusM+750)/111132;
+  const lngSpan=(radiusM+750)/(111320*Math.max(.2,Math.cos(lat*Math.PI/180)));
+  for(let y=Math.floor(lat)-1;y<=Math.floor(lat)+1;y++) {
+    for(let x=Math.floor(lng)-1;x<=Math.floor(lng)+1;x++) {
+      const tileId=y+'_'+x;
+      let tile=osmIndexTileCache.get(tileId);
+      if (!tile) {
+        try {
+          const filename=path.join(osmGolfIndexDir,tileId+'.json');
+          tile=fs.existsSync(filename)?JSON.parse(fs.readFileSync(filename,'utf8')):[];
+          if(!Array.isArray(tile)) tile=[];
+          if(osmIndexTileCache.size>40)osmIndexTileCache.clear();
+          osmIndexTileCache.set(tileId,tile);
+        } catch(error) {
+          console.warn('OSM indexed tile read failed:',tileId,error?.message);
+          tile=[];
+        }
+      }
+      for(const f of tile) {
+        if(features.length>=1400) break;
+        if(!f || !['hole','tee','green'].includes(f?.tags?.golf))continue;
+        const pts=f.geometry;
+        if(!Array.isArray(pts)||!pts.length)continue;
+        if(!pts.some(p=>Math.abs(Number(p.lat)-lat)<=latSpan && Math.abs(Number(p.lon)-lng)<=lngSpan))continue;
+        const id=String(f.type)+':'+String(f.id);
+        if(seen.has(id))continue;
+        seen.add(id);
+        features.push(f);
+      }
+    }
+  }
+  return features;
+}
+
 const osmMapCache = new Map();
 const osmMapRate = new Map();
 let osmPendingRequests = 0;
@@ -261,6 +302,15 @@ app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
   osmMapRate.set(client, usage && now-usage.start<60_000 ? {start:usage.start,count:usage.count+1} : {start:now,count:1});
 
   const key = `${lat.toFixed(3)}:${lng.toFixed(3)}:${Math.round(radius/100)}`;
+  // The local country extract is available after the index-building Action
+  // commits its tiles. Zero nearby OSM golf features is a valid empty result;
+  // never fall back to a failing external server once an index is installed.
+  const indexedFeatures=readIndexedOSMGolfFeatures(lat,lng,radius);
+  if(indexedFeatures!==null) {
+    res.setHeader('Cache-Control','no-store');
+    return res.json({ok:true,features:indexedFeatures,source:'Geofabrik OSM country extract',
+      cached:true,indexed:true,attribution:'© OpenStreetMap contributors (ODbL)'});
+  }
   let cached = osmMapCache.get(key);
   if (!cached) {
     // A previous successful lookup should survive app restarts/deploys.
