@@ -1,4 +1,5 @@
 import fs from "fs";
+import crypto from "crypto";
 import multer from "multer";
 // /web/tracklinq/server/index.js
 import express from "express";
@@ -40,6 +41,156 @@ app.get("/config.js", (_req, res) => {
     `window.DRIVEDEN_CONFIG = Object.assign({}, window.DRIVEDEN_CONFIG || {}, ${JSON.stringify(config)});`
   );
 });
+
+// ===== DRIVE DEN ENHANCED COURSE PUBLISHING =====
+// A virtual course library overlays the existing public/courses/*.json files.
+// Existing GitHub-mapped courses remain unchanged. New DB courses use dd-* ids.
+// Requires MAPPER_PUBLISH_TOKEN: long, random secret stored ONLY in Railway.
+const enhancedCourseTableSQL = `
+CREATE TABLE IF NOT EXISTS driveden_enhanced_courses (
+  course_id TEXT PRIMARY KEY,
+  course_name TEXT NOT NULL,
+  course_data JSONB NOT NULL,
+  source_api_id BIGINT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);`;
+let enhancedTablePromise;
+function ensureEnhancedTable(){
+  if (!enhancedTablePromise) enhancedTablePromise = query(enhancedCourseTableSQL)
+    .catch(e => { enhancedTablePromise = null; throw e; });
+  return enhancedTablePromise;
+}
+function validEnhancedId(v){
+  const id = String(v || '').toLowerCase();
+  return /^dd-[a-z0-9][a-z0-9-]{2,90}$/.test(id) ? id : null;
+}
+function publishedCourseId(course){
+  const old=String(course?.course?.id || '');
+  if (validEnhancedId(old)) return old;
+  const name=String(course?.course?.name || 'course');
+  const slug=name.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,45) || 'course';
+  const apiId=Number(course?.course?.apiSourceId || course?.course?.apiCourseId || course?.importedFromApi?.sourceId || 0);
+  return `dd-${Number.isSafeInteger(apiId) && apiId > 0 ? `${apiId}-` : ''}${slug}`;
+}
+function enhancedAdminAuth(req,res,next){
+  const secret = String(process.env.MAPPER_PUBLISH_TOKEN || '');
+  if (secret.length < 24) return res.status(503).json({ok:false,error:'Set MAPPER_PUBLISH_TOKEN (24+ random characters) in Railway first.'});
+  const actual = String(req.header('x-mapper-publish-token') || '');
+  // Compare hashes with equal length, rather than direct secret string comparison.
+  const a=crypto.createHash('sha256').update(actual).digest();
+  const b=crypto.createHash('sha256').update(secret).digest();
+  if (!actual || !crypto.timingSafeEqual(a,b)) return res.status(401).json({ok:false,error:'Invalid Mapper publishing token.'});
+  next();
+}
+function validPoint(p){
+  return p && typeof p === 'object' && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+    && p.lat >= -90 && p.lat <= 90 && p.lng >= -180 && p.lng <= 180;
+}
+function validateEnhancedCourse(d){
+  if (!d || typeof d !== 'object' || !d.course || typeof d.course.name !== 'string' || !d.course.name.trim())
+    return 'Course name missing.';
+  const keys=Object.keys(d.holes || {}).filter(k => /^\d+$/.test(k));
+  const maxHole=Math.max(0,...keys.map(Number));
+  if (maxHole < 9 || maxHole > 36 || keys.length !== maxHole || ![9,18,27,36].includes(maxHole))
+    return 'A complete 9, 18, 27 or 36-hole course is required.';
+  for(let i=1;i<=maxHole;i++){
+    const h=d.holes[String(i)];
+    if (!h || typeof h !== 'object') return `Hole ${i} missing.`;
+    for(const k of ['TEE','FRONT','MID','BACK']) if (!validPoint(h.pins?.[k]))
+      return `Hole ${i}: ${k} coordinate is missing or invalid.`;
+    if (!Number.isInteger(h.par) || h.par < 3 || h.par > 6)
+      return `Hole ${i}: verify par before publishing.`;
+    if (!Number.isInteger(h.stroke) || h.stroke < 1 || h.stroke > maxHole)
+      return `Hole ${i}: verify stroke index before publishing.`;
+    if (!Array.isArray(h.outline) || h.outline.length < 6 || h.outline.length > 150 || !h.outline.every(validPoint))
+      return `Hole ${i}: a hole outline with at least 6 valid points is required.`;
+  }
+  if (!d.verification?.coordinatesChecked || !d.verification?.scorecardChecked)
+    return 'Confirm that you checked the mapped coordinates and scorecard.';
+  if (!String(d.verification?.scorecardSource || '').trim())
+    return 'Enter the scorecard verification source.';
+  return null;
+}
+
+// Do not intercept existing static course IDs: only published dd-* IDs.
+app.get('/courses/:id.json', async (req,res,next)=>{
+  const id=validEnhancedId(req.params.id);
+  if (!id) return next();
+  try{
+    await ensureEnhancedTable();
+    const found=await query('SELECT course_data FROM driveden_enhanced_courses WHERE course_id=$1',[id]);
+    if (!found.rows.length) return next();
+    res.setHeader('Cache-Control','no-cache, must-revalidate');
+    res.json(found.rows[0].course_data);
+  }catch(e){ console.error('Enhanced course fetch failed',e); res.status(503).json({ok:false,error:'Course library unavailable'}); }
+});
+
+// Merge DB-published courses with the existing static course index. Existing
+// club PINs and legacy fields are left exactly as they are on disk.
+app.get('/courses/index.json', async (_req,res)=>{
+  try{
+    const raw=JSON.parse(fs.readFileSync(path.join(publicDir,'courses','index.json'),'utf8'));
+    const existing=Array.isArray(raw.courses) ? raw.courses : [];
+    // On SW installation the old service worker prefetches EVERY index item.
+    // Return the static list for that installer-only request so it does not
+    // silently download hundreds of published courses on every device.
+    if (Object.prototype.hasOwnProperty.call(_req.query, 'swts')) {
+      res.setHeader('Cache-Control','no-cache, must-revalidate');
+      return res.json(raw);
+    }
+    let published=[];
+    try{
+      await ensureEnhancedTable();
+      const result=await query('SELECT course_id,course_name FROM driveden_enhanced_courses ORDER BY course_name');
+      published=result.rows.map(r=>({id:r.course_id,name:r.course_name,active:true,pin:''}));
+    }catch(e){ console.error('Enhanced list unavailable, serving static index',e.message); }
+    const found=new Set(existing.map(c=>String(c.id).toLowerCase()));
+    raw.courses=[...existing,...published.filter(c=>!found.has(c.id))];
+    res.setHeader('Cache-Control','no-cache, must-revalidate');
+    res.json(raw);
+  }catch(e){ console.error('Course index merge failed',e); res.status(500).json({ok:false,error:'Course list unavailable'}); }
+});
+
+// Public read-only list for Mapper's 'Load Published' selector.
+app.get('/api/enhanced-courses', async (_req,res)=>{
+  try{
+    await ensureEnhancedTable();
+    const {rows}=await query('SELECT course_id AS id,course_name AS name,updated_at FROM driveden_enhanced_courses ORDER BY course_name');
+    res.setHeader('Cache-Control','no-store');
+    res.json({ok:true,courses:rows});
+  }catch(e){res.status(503).json({ok:false,error:'Course library unavailable'});}
+});
+
+app.post('/api/mapper/publish',enhancedAdminAuth,async(req,res)=>{
+  try{
+    const data=req.body?.course;
+    const err=validateEnhancedCourse(data);
+    if(err) return res.status(400).json({ok:false,error:err});
+    await ensureEnhancedTable();
+    // Keep provider imports traceable; independently review coordinates and
+    // confirm provider retention/reuse rights before relying on source data.
+    const id=publishedCourseId(data);
+    const newData=structuredClone(data);
+    newData.course.id=id;
+    newData.course.pin=''; // published library is Guest access, not a fleet PIN
+    newData.course.name=String(newData.course.name).slice(0,160).trim();
+    newData.publishedAt=new Date().toISOString();
+    newData.publishedBy='driveden-mapper';
+    const sourceId=Number(data.course.apiSourceId || data.course.apiCourseId || data.importedFromApi?.sourceId || 0);
+    const apiId=Number.isSafeInteger(sourceId) && sourceId>0 ? sourceId : null;
+    await query(`INSERT INTO driveden_enhanced_courses (course_id,course_name,course_data,source_api_id)
+      VALUES ($1,$2,$3::jsonb,$4)
+      ON CONFLICT (course_id) DO UPDATE SET
+        course_name=EXCLUDED.course_name,course_data=EXCLUDED.course_data,
+        source_api_id=EXCLUDED.source_api_id,updated_at=NOW()`,
+      [id,newData.course.name,JSON.stringify(newData),apiId]);
+    res.setHeader('Cache-Control','no-store');
+    res.json({ok:true,id,name:newData.course.name,holes:Object.keys(newData.holes).length});
+  }catch(e){console.error('Mapper publish failure',e);res.status(500).json({ok:false,error:'Could not publish course.'});}
+});
+// ===== END ENHANCED COURSE PUBLISHING =====
 
 app.use(express.static(publicDir));
 

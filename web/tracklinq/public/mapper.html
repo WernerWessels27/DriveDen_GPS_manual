@@ -56,13 +56,19 @@
     .nogobar.show { display:flex; flex-wrap:wrap; }
 
     .status { margin-top:8px; font-size:12px; color:var(--muted); }
+    .mapperHighlight{padding:12px;border:1px solid #a5d6f4;border-radius:12px;background:#f0f9ff;margin-top:12px}
+    .mapperHighlight h3{margin-top:0}
+    .mapperHighlight input[type="checkbox"]{width:auto;margin-right:5px}
+    .mapperHighlight .row label{font-size:12px;display:flex;align-items:center;gap:4px}
+    .dd-outline-handle{width:12px;height:12px;border-radius:50%;border:2px solid white;background:#0ea5e9;box-shadow:0 0 0 2px #075985;cursor:grab}
+
   </style>
 </head>
 <body>
   <div id="map"></div>
 
   <div class="panel">
-    <h2>TrackLinq Mapper</h2>
+    <h2>DriveDen Mapper</h2>
 
     <div class="row">
       <div>
@@ -100,6 +106,17 @@
     <div id="apiMapperResults" style="display:grid;gap:6px;margin-top:8px;"></div>
     <div class="saveRow"><button id="apiMapperMoreBtn" disabled style="display:none">Load More Courses</button><button id="apiMapperImportBtn" disabled>Import Selected Course</button></div>
     <div id="apiMapperStatus" class="status" role="status">Search online to import a course.</div>
+
+    <section class="mapperHighlight">
+      <h3>Auto Outline — TEE to BACK</h3>
+      <div class="muted">Creates an <strong>estimated oval-shaped hole boundary</strong> using mapped TEE and BACK points. It is not a surveyed fairway edge. Select MOVE to drag the blue outline points to fit the satellite view.</div>
+      <div class="row" style="margin-top:9px;align-items:end">
+        <label>Full outline width (metres)<input type="number" id="autoOutlineWidth" min="20" max="120" step="5" value="65" /></label>
+        <button id="autoOutlineCurrent" type="button">Outline Current Hole</button>
+      </div>
+      <div class="saveRow"><button id="autoOutlineAll" type="button">Outline All Holes with TEE + BACK</button><button id="suggestGreenEdges" type="button">Suggest FRONT/BACK from TEE + MID</button></div>
+      <div id="autoOutlineStatus" class="status">Suggestions are estimates. Review against satellite imagery before publishing.</div>
+    </section>
 
     <h3>Imagery</h3>
     <div class="muted">
@@ -155,11 +172,11 @@
       <div class="row">
         <div>
           <label class="muted">Par</label>
-          <input id="holePar" type="number" min="3" max="6" value="4"/>
+          <input id="holePar" type="number" min="3" max="6" placeholder="Par"/>
         </div>
         <div>
           <label class="muted">Stroke</label>
-          <input id="holeStroke" type="number" min="1" max="36" value="1"/>
+          <input id="holeStroke" type="number" min="1" max="36" placeholder="SI"/>
         </div>
       </div>
     </div>
@@ -206,6 +223,23 @@
       <button id="loadLocal">Load Saved (Local)</button>
       <button id="saveLocal">Save (Local)</button>
     </div>
+    <section class="mapperHighlight">
+      <h3>Publish Enhanced Course (PostgreSQL)</h3>
+      <div class="muted">Publishes fully mapped, verified courses straight to Enhanced Search. Existing GitHub courses and PIN access are unchanged. To reopen a published course, choose it below.</div>
+      <div id="mappingCompleteness" class="status">Mapping completion: checking…</div>
+      <div class="row" style="margin-top:10px;">
+        <select id="publishedCourseSelect" aria-label="Published courses"><option value="">Published courses…</option></select>
+        <button id="loadPublishedCourse" type="button">Open Published Course</button>
+      </div>
+      <div class="saveRow"><button id="refreshPublishedCourses" type="button">Refresh Published List</button></div>
+      <label style="display:block;margin-top:9px;">Scorecard verification source (e.g. official club card and date)
+        <input id="scorecardSource" placeholder="Official club scorecard, checked on…" maxlength="180" />
+      </label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="verifyCoordinates"/> I have checked TEE, FRONT, MID, BACK and outlines for every hole against reliable imagery or survey data.</label>
+      <label style="display:block;margin-top:6px;"><input type="checkbox" id="verifyScorecard"/> I have checked all pars and stroke indexes against the indicated scorecard source.</label>
+      <div class="saveRow"><button id="publishEnhanced" type="button" style="background:#16a34a;color:#fff">Publish to DriveDen Enhanced</button></div>
+      <div id="publishStatus" class="status" role="status">To publish, map every hole and set the Railway MAPPER_PUBLISH_TOKEN.</div>
+    </section>
     <div id="status" class="status"></div>
   </div>
 
@@ -634,6 +668,7 @@
       state.tool = tool;
       $('#nogobar').classList.remove('show');
       $('#outlinebar').classList.remove('show');
+      if(tool==='MOVE') { setTimeout(()=>loadHoleToUI(),0); }
 
       if (tool==='NO_GO'){
         $('#nogobar').classList.add('show');
@@ -777,21 +812,48 @@
       }
     }
 
+    let outlineHandles=[];
+    let outlineLivePolygon=null;
+    function clearOutlineHandles(){
+      outlineHandles.forEach(h=>{try{map.removeLayer(h)}catch(_){}});
+      outlineHandles=[];
+      if(outlineLivePolygon){try{map.removeLayer(outlineLivePolygon)}catch(_){}}
+      outlineLivePolygon=null;
+    }
     function drawSavedOutline(outline){
+      clearOutlineHandles();
       if (!Array.isArray(outline) || outline.length < 3) return;
-      const latlngs = outline.map(pt => L.latLng(pt.lat, pt.lng));
-      L.polygon(latlngs, { color:'#0ea5e9', weight:2, fill:true, fillColor:'#0ea5e9', fillOpacity:0.10, interactive:false }).addTo(map);
+      const hole=state.course.holes[String(state.hole)];
+      const latlngs = outline.map(pt=>[pt.lat,pt.lng]);
+      outlineLivePolygon=L.polygon(latlngs,{color:'#0ea5e9',weight:2,
+        dashArray:hole?.outlineEstimated && !hole?.outlineReviewed ? '5,6' : null,
+        fill:true,fillColor:'#0ea5e9',fillOpacity:0.10,interactive:false}).addTo(map);
+      if(state.tool!=='MOVE') return;
+      outline.forEach((p,i)=>{
+        const icon=L.divIcon({className:'',html:'<div class="dd-outline-handle"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+        const marker=L.marker([p.lat,p.lng],{icon,draggable:true,bubblingMouseEvents:false,title:'Drag hole outline vertex'}).addTo(map);
+        marker.on('dragend',()=>{
+          const ll=marker.getLatLng();
+          hole.outline[i]={lat:ll.lat,lng:ll.lng};
+          hole.outlineReviewed=false;
+          outlineLivePolygon.setLatLngs(hole.outline.map(v=>[v.lat,v.lng]));
+          updateMappingCompleteness();
+          status('Outline vertex moved. Review hole boundary before publishing.');
+        });
+        outlineHandles.push(marker);
+      });
     }
 
     function finishOutline(){
       if (state.currentOutlinePts.length < 3) return;
       const hKey = String(state.hole);
       const h = state.course.holes[hKey] || { par:4, stroke:1, pins:{} };
-      h.par = parseInt($('#holePar').value,10) || 4;
-      h.stroke = parseInt($('#holeStroke').value,10) || 1;
+      h.par = (parseInt($('#holePar').value,10) || null);
+      h.stroke = (parseInt($('#holeStroke').value,10) || null);
       h.pins = h.pins || {};
       h.outline = state.currentOutlinePts.map(([lat,lng])=>({lat,lng}));
       state.course.holes[hKey] = h;
+      h.outlineEstimated=false; h.outlineReviewed=true;
       if (state.currentOutlineLayer){ map.removeLayer(state.currentOutlineLayer); }
       state.currentOutlineLayer = null;
       state.currentOutlinePts = [];
@@ -858,6 +920,8 @@
 
         if (rec.uniqueKey){
           pins[rec.uniqueKey] = obj;
+          const cbox=$('#verifyCoordinates'); if(cbox) cbox.checked=false;
+          updateMappingCompleteness();
         } else if (rec.listKey){
           pins[rec.listKey][rec.listIndex] = obj;
         }
@@ -885,8 +949,8 @@
     function getHolePins(){
       const hKey = String(state.hole);
       state.course.holes[hKey] = state.course.holes[hKey] || { par:4, stroke:1, pins:{} };
-      state.course.holes[hKey].par = parseInt($('#holePar').value,10) || 4;
-      state.course.holes[hKey].stroke = parseInt($('#holeStroke').value,10) || 1;
+      state.course.holes[hKey].par = (parseInt($('#holePar').value,10) || null);
+      state.course.holes[hKey].stroke = (parseInt($('#holeStroke').value,10) || null);
       state.course.holes[hKey].pins = state.course.holes[hKey].pins || {};
       return state.course.holes[hKey].pins;
     }
@@ -894,14 +958,15 @@
     function saveHoleToState(){
       const hKey = String(state.hole);
       const h = state.course.holes[hKey] || { par:4, stroke:1, pins:{} };
-      h.par = parseInt($('#holePar').value,10) || 4;
-      h.stroke = parseInt($('#holeStroke').value,10) || 1;
+      h.par = (parseInt($('#holePar').value,10) || null);
+      h.stroke = (parseInt($('#holeStroke').value,10) || null);
       state.course.holes[hKey] = h;
       status(`Hole ${hKey} saved`);
     }
 
     function loadHoleToUI(){
       clearLiveMarkers();
+      clearOutlineHandles();
       // remove polygons (keep baselayer)
       map.eachLayer(l => {
         if (l instanceof L.Polygon && !l._url) { try{ map.removeLayer(l); }catch{} }
@@ -909,8 +974,8 @@
 
       const hKey = String(state.hole);
       const h = state.course.holes[hKey];
-      $('#holePar').value = h?.par ?? 4;
-      $('#holeStroke').value = h?.stroke ?? 1;
+      $('#holePar').value = h?.par ?? '';
+      $('#holeStroke').value = h?.stroke ?? '';
       const p = h?.pins || {};
 
       if (p.TEE)   addMarker(ICONS.TEE, p.TEE, 'TEE', true);
@@ -931,6 +996,7 @@
 
       // Recreate saved hole outline
       drawSavedOutline(h?.outline);
+      updateMappingCompleteness();
     }
 
     function fitMapToCurrentHole(){
@@ -967,8 +1033,177 @@
       loadHoleToUI();
       fitMapToCurrentHole();
       status(`${label} imported`);
+      syncVerificationUI();
     }
 
+
+
+    // ===== Auto-outline suggestions, mapping readiness and publishing =====
+    function mapPointOK(p){
+      return !!p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng))
+        && Math.abs(Number(p.lat))<=90 && Math.abs(Number(p.lng))<=180;
+    }
+    function outlineFromTeeToBack(tee,back,widthM){
+      if(!mapPointOK(tee)||!mapPointOK(back)) return null;
+      const lat0=(Number(tee.lat)+Number(back.lat))*Math.PI/360;
+      const metersLat=111132;
+      const metersLng=111320*Math.cos(lat0);
+      if(metersLng<1000) return null;
+      const dx=(Number(back.lng)-Number(tee.lng))*metersLng;
+      const dy=(Number(back.lat)-Number(tee.lat))*metersLat;
+      const length=Math.hypot(dx,dy);
+      if(length<35 || length>1400) return null;
+      const ux=dx/length,uy=dy/length,vx=-uy,vy=ux;
+      const major=length/2+9;
+      const minor=Math.min(60,Math.max(10,Number(widthM)/2||32.5));
+      const verts=[];
+      for(let i=0;i<32;i++){
+        const t=2*Math.PI*i/32;
+        const forward=length/2+major*Math.cos(t);
+        const across=minor*Math.sin(t);
+        verts.push({
+          lat:Number(tee.lat)+(forward*uy+across*vy)/metersLat,
+          lng:Number(tee.lng)+(forward*ux+across*vx)/metersLng
+        });
+      }
+      return verts;
+    }
+    function currentOutlineWidth(){return Math.max(20,Math.min(120,Number($('#autoOutlineWidth').value)||65));}
+    function saveAutoOutline(h,overwrite=false){
+      if(!h || (!overwrite && Array.isArray(h.outline) && h.outline.length>=3)) return false;
+      const shape=outlineFromTeeToBack(h.pins?.TEE,h.pins?.BACK,currentOutlineWidth());
+      if(!shape) return false;
+      h.outline=shape;h.outlineEstimated=true;h.outlineReviewed=false;
+      return true;
+    }
+    $('#autoOutlineCurrent').addEventListener('click',()=>{
+      saveHoleToState();
+      const h=state.course.holes[String(state.hole)];
+      const has=h?.outline?.length>=3;
+      if(has&&!confirm('Replace current hole outline with a new approximate oval?')) return;
+      if(!saveAutoOutline(h,true)) return $('#autoOutlineStatus').textContent='Map TEE and BACK first (35–1400 m apart).';
+      loadHoleToUI();fitMapToCurrentHole();
+      $('#autoOutlineStatus').textContent=`Estimated outline generated for Hole ${state.hole}. Drag the blue vertices using MOVE to match the actual hole.`;
+    });
+    $('#autoOutlineAll').addEventListener('click',()=>{
+      saveHoleToState();
+      let done=0,skipped=0;
+      for(const h of Object.values(state.course.holes||{})){
+        if(saveAutoOutline(h,false)) done++;
+        else skipped++;
+      }
+      loadHoleToUI();
+      $('#autoOutlineStatus').textContent=`Created ${done} approximate outlines; ${skipped} skipped (missing points or existing outlines). Review each hole.`;
+    });
+    // Optional estimates ONLY. Never treat estimated green boundaries as surveyed data.
+    $('#suggestGreenEdges').addEventListener('click',()=>{
+      saveHoleToState();
+      const h=state.course.holes[String(state.hole)];
+      if(!mapPointOK(h?.pins?.TEE)||!mapPointOK(h?.pins?.MID)){
+        $('#autoOutlineStatus').textContent='Map TEE and MID first to suggest green edges.';return;
+      }
+      if((h.pins.FRONT||h.pins.BACK)&&!confirm('Replace existing FRONT/BACK with estimates?'))return;
+      const t=h.pins.TEE,m=h.pins.MID;
+      const mLat=111132,mLng=111320*Math.cos(Number(m.lat)*Math.PI/180);
+      const dx=(m.lng-t.lng)*mLng,dy=(m.lat-t.lat)*mLat,len=Math.hypot(dx,dy);
+      if(len<25)return $('#autoOutlineStatus').textContent='TEE and MID are too close for a reliable estimate.';
+      const ux=dx/len,uy=dy/len,edge=12;
+      h.pins.FRONT={lat:m.lat-edge*uy/mLat,lng:m.lng-edge*ux/mLng};
+      h.pins.BACK ={lat:m.lat+edge*uy/mLat,lng:m.lng+edge*ux/mLng};
+      h.greenEdgesEstimated=true;
+      $('#verifyCoordinates').checked=false;
+      loadHoleToUI();
+      $('#autoOutlineStatus').textContent='FRONT/BACK ±12 m suggested from TEE→MID direction. Move both markers to the actual green edges; these are estimates.';
+    });
+    function mappingGaps(){
+      saveHoleToState();
+      const keys=Object.keys(state.course.holes||{}).map(Number).filter(Number.isFinite);
+      const count=Math.max(0,...keys);
+      const problems=[];let complete=0;
+      if(![9,18,27,36].includes(count)) problems.push('select a complete 9/18/27/36-hole course');
+      for(let i=1;i<=count;i++){
+        const h=state.course.holes[String(i)];
+        if(!h){problems.push(`H${i}: missing`);continue;}
+        const missing=['TEE','FRONT','MID','BACK'].filter(k=>!mapPointOK(h.pins?.[k]));
+        if(!Array.isArray(h.outline)||h.outline.length<6) missing.push('OUTLINE');
+        if(!Number.isInteger(h.par)||h.par<3||h.par>6) missing.push('PAR');
+        if(!Number.isInteger(h.stroke)||h.stroke<1||h.stroke>count) missing.push('SI');
+        if(missing.length) problems.push(`H${i}: ${missing.join('/')}`);
+        else complete++;
+      }
+      return {count,complete,problems};
+    }
+    function updateMappingCompleteness(){
+      const el=$('#mappingCompleteness'); if(!el)return;
+      const {count,complete,problems}=mappingGaps();
+      el.textContent=`Mapped: ${complete}/${count||'—'} holes complete. `+(problems.length?problems.slice(0,6).join(' • ')+(problems.length>6?` • +${problems.length-6} more`:''):'Ready for review & publishing.');
+    }
+    function syncVerificationUI(){
+      const v=state.course.verification||{};
+      $('#scorecardSource').value=v.scorecardSource||'';
+      $('#verifyCoordinates').checked=!!v.coordinatesChecked;
+      $('#verifyScorecard').checked=!!v.scorecardChecked;
+      updateMappingCompleteness();
+    }
+    const publishMessage=$('#publishStatus');
+    let mapperPublishSecret=''; // memory only; not stored in localStorage or URL
+    async function refreshPublishedCourses(){
+      const select=$('#publishedCourseSelect');
+      select.replaceChildren(new Option('Published courses…',''));
+      try{
+        const res=await fetch('/api/enhanced-courses',{cache:'no-store'});
+        const data=await res.json();if(!res.ok||!data.ok)throw Error(data.error||'Could not load courses');
+        (data.courses||[]).forEach(c=>select.add(new Option(c.name,c.id)));
+      }catch(e){publishMessage.textContent=e.message;}
+    }
+    $('#refreshPublishedCourses').addEventListener('click',refreshPublishedCourses);
+    $('#loadPublishedCourse').addEventListener('click',async()=>{
+      const id=$('#publishedCourseSelect').value;
+      if(!id)return;
+      if(!confirm('Load published course into Mapper? Export or save your existing draft first.'))return;
+      try{
+        const res=await fetch(`/courses/${encodeURIComponent(id)}.json`,{cache:'no-store'});
+        if(!res.ok)throw Error('Could not load this course');
+        loadCourseObject(await res.json(),'Published DriveDen course');
+        syncVerificationUI();
+      }catch(e){publishMessage.textContent=e.message;}
+    });
+    $('#publishEnhanced').addEventListener('click',async()=>{
+      const b=$('#publishEnhanced');
+      const {count,complete,problems}=mappingGaps();
+      if(problems.length||count!==complete){
+        publishMessage.textContent='Incomplete mapping: '+problems.slice(0,7).join(' • ');
+        return;
+      }
+      if(!$('#verifyCoordinates').checked||!$('#verifyScorecard').checked||!$('#scorecardSource').value.trim()){
+        publishMessage.textContent='Review the mapping and scorecard, tick both checks and enter the scorecard source.';
+        return;
+      }
+      if(!confirm(`Publish ${$('#courseName').value||'this course'} (${count} holes) into the DriveDen Enhanced library? Existing published versions will be replaced.`))return;
+      if(!mapperPublishSecret){
+        mapperPublishSecret=prompt('Enter your Railway MAPPER_PUBLISH_TOKEN (not your API key):')||'';
+      }
+      if(!mapperPublishSecret)return;
+      b.disabled=true;publishMessage.textContent='Publishing verified course…';
+      try{
+        const data=collectCourse();
+        data.verification={coordinatesChecked:true,scorecardChecked:true,
+          scorecardSource:$('#scorecardSource').value.trim(),checkedAt:new Date().toISOString()};
+        const res=await fetch('/api/mapper/publish',{method:'POST',cache:'no-store',headers:{
+          'Content-Type':'application/json','x-mapper-publish-token':mapperPublishSecret
+        },body:JSON.stringify({course:data})});
+        const result=await res.json().catch(()=>({}));
+        if(!res.ok||!result.ok)throw Error(result.error||'Publishing failed');
+        $('#courseId').value=result.id;state.course.course.id=result.id;
+        publishMessage.textContent=`Published ${result.name} (${result.holes} holes). Search for it under DriveDen Enhanced Courses.`;
+        await refreshPublishedCourses();$('#publishedCourseSelect').value=result.id;
+      }catch(e){
+        if(/token|unauthor/i.test(e.message))mapperPublishSecret='';
+        publishMessage.textContent=e.message||'Publishing failed.';
+      }finally{b.disabled=false;}
+    });
+    refreshPublishedCourses();
+    // ===== END mapping tools =====
 
     // Provider import leaves every manually mapped course untouched. Once
     // imported, it uses the SAME JSON editor and download workflow as before.
@@ -1048,6 +1283,7 @@
         // This is now an ENHANCED mapper draft, not a GPS API-only course.
         delete imported.apiMode;
         imported.importedFromApi={ provider:'golfcoursesapi', sourceId:selectedApiMapperId };
+        imported.verification={coordinatesChecked:false,scorecardChecked:false,scorecardSource:''};
         loadCourseObject(imported,'Golf Courses API');
         const pos=imported.course?.location;
         if(pos && Number.isFinite(pos.lat) && Number.isFinite(pos.lng) && !Object.values(imported.holes).some(h=>h.pins?.MID)){
@@ -1082,12 +1318,18 @@
       state.course.course.name = ($('#courseName').value || '').trim();
       state.course.course.pin = ($('#coursePin').value || '').trim().toUpperCase();
       state.course.esriTileMaxZoom = getEsriTileMaxZoom();
+      state.course.verification = { ...(state.course.verification||{}),
+        coordinatesChecked:!!$('#verifyCoordinates').checked,
+        scorecardChecked:!!$('#verifyScorecard').checked,
+        scorecardSource:$('#scorecardSource').value.trim() };
       if (state.course.imagery && state.course.imagery.type === 'esri-wayback') {
         state.course.imagery.tileMaxZoom = getEsriTileMaxZoom();
       }
       return state.course;
     }
 
+    $('#holePar').addEventListener('change',()=>{ $('#verifyScorecard').checked=false;saveHoleToState(); updateMappingCompleteness(); });
+    $('#holeStroke').addEventListener('change',()=>{ $('#verifyScorecard').checked=false;saveHoleToState(); updateMappingCompleteness(); });
     $('#saveHole').addEventListener('click', ()=>{
       saveHoleToState();
     });
@@ -1138,6 +1380,7 @@
         state.hole = 1;
         $('#holeNo').value = '1';
         loadHoleToUI();
+        syncVerificationUI();
         status('Local save loaded');
       }catch(e){
         alert('Failed to load local save');
