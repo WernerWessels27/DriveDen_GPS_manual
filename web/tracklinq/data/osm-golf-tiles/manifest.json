@@ -1,0 +1,12 @@
+{
+  "source": "Geofabrik South Africa OpenStreetMap extract",
+  "attribution": "\u00a9 OpenStreetMap contributors",
+  "licence": "ODbL 1.0",
+  "generatedAt": "2026-11-25T21:28:47.494562+00:00",
+  "featureCounts": {
+    "hole": 1453,
+    "tee": 7173,
+    "green": 3388
+  },
+  "tileCount": 33
+}
