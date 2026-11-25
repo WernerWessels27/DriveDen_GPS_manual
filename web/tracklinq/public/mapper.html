@@ -253,6 +253,18 @@
       <h3>Publish Enhanced Course (PostgreSQL)</h3>
       <div class="muted">Publishes fully mapped, verified courses straight to Enhanced Search. Existing GitHub courses and PIN access are unchanged. To reopen a published course, choose it below.</div>
       <div id="mappingCompleteness" class="status">Mapping completion: checking…</div>
+      <section class="mapperHighlight" style="background:#fff;margin-top:10px" id="strokeIndexEditor">
+        <h3>Fill Missing Stroke Indexes (SI)</h3>
+        <div class="muted">No need to re-import or redraw the holes. Enter one SI per hole in playing order (1 to 18). Check these values against the club's current scorecard before publishing.</div>
+        <textarea id="bulkStrokeIndexes" rows="2" placeholder="e.g., 9, 7, 3, 17, 11, 15, 1, 13, 5, 6, 10, 8, 18, 16, 14, 12, 4, 2" style="box-sizing:border-box;resize:vertical;width:100%;margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:9px;font:inherit" spellcheck="false" aria-label="Stroke indexes in hole order"></textarea>
+        <div class="saveRow">
+          <button id="fillStrokeIndexes" type="button" style="background:#38b6ff;color:#03131f">Apply Full SI Set</button>
+          <button id="fetchStrokeIndexes" type="button">Try API Scorecard</button>
+          <button id="georgeStrokeIndexes" type="button">Load Historic George SI</button>
+        </div>
+        <div id="strokeIndexStatus" class="status" role="status">Only stroke indexes change. Existing TEE points, green pins and outlines stay unchanged.</div>
+        <div class="muted" style="margin-top:7px">George references: <a href="https://cdn.retailtribe.com/websites/merchant/golf/downloads/GEORGE%20-%20New%20scorecard%20proof.pdf" target="_blank" rel="noopener noreferrer">club-hosted historic scorecard proof</a>. A <a href="https://www.golfify.io/courses/george-golf-club" target="_blank" rel="noopener noreferrer">second published scorecard</a> shows different SI assignments. Confirm the current club scorecard before publishing.</div>
+      </section>
       <div class="muted" style="margin-top:5px">Imported OSM geometry: © OpenStreetMap contributors (ODbL). Review usage and attribution obligations before publishing commercial course datasets.</div>
       <div class="row" style="margin-top:10px;">
         <select id="publishedCourseSelect" aria-label="Published courses"><option value="">Published courses…</option></select>
@@ -1551,6 +1563,80 @@
       $('#verifyScorecard').checked=!!v.scorecardChecked;
       updateMappingCompleteness();
     }
+    // ===== Bulk Stroke Index editor =====
+    const strokeIndexMessage=$('#strokeIndexStatus');
+    const GEORGE_HISTORIC_STROKES=[9,7,3,17,11,15,1,13,5,6,10,8,18,16,14,12,4,2];
+    function parseStrokeIndexSequence(text,count){
+      const tokens=String(text||'').trim().split(/[\s,;|]+/).filter(Boolean);
+      if(tokens.length!==count)throw Error('Enter exactly '+count+' stroke indexes in hole order. Found '+tokens.length+'.');
+      const numbers=tokens.map(x=>Number(x));
+      if(numbers.some(x=>!Number.isInteger(x)||x<1||x>count))
+        throw Error('Each stroke index must be a whole number from 1 to '+count+'.');
+      if(new Set(numbers).size!==count)
+        throw Error('Stroke indexes must be unique: include every number from 1 to '+count+' once.');
+      return numbers;
+    }
+    function applyStrokeIndexSequence(numbers,source='Manual scorecard entry'){
+      saveHoleToState();
+      let existing=0,updated=0;
+      for(let i=1;i<=numbers.length;i++){
+        const h=state.course.holes[String(i)];
+        if(!h)throw Error('Hole '+i+' has not been imported. Import the course first.');
+        if(Number.isInteger(h.stroke)&&h.stroke>=1&&h.stroke<=numbers.length)existing++;
+      }
+      if(existing && !confirm(existing+' hole(s) already have a Stroke Index. Replace the complete '+numbers.length+'-hole SI sequence with your reviewed scorecard?'))return false;
+      for(let i=1;i<=numbers.length;i++){
+        const h=state.course.holes[String(i)];
+        if(h.stroke!==numbers[i-1]){h.stroke=numbers[i-1];updated++;}
+      }
+      $('#holeStroke').value=String(state.course.holes[String(state.hole)]?.stroke??'');
+      $('#verifyScorecard').checked=false;
+      state.course.verification={...(state.course.verification||{}),scorecardChecked:false};
+      renderWholeCourseOverview();
+      updateMappingCompleteness();
+      strokeIndexMessage.textContent=updated+' stroke indexes updated ('+source+'). Existing map geometry preserved. Verify against the current club scorecard, enter your source, and tick the scorecard verification checkbox before publishing.';
+      return true;
+    }
+    $('#fillStrokeIndexes').addEventListener('click',()=>{
+      try {
+        const values=parseStrokeIndexSequence($('#bulkStrokeIndexes').value,state.holeCount);
+        applyStrokeIndexSequence(values);
+      } catch(e){strokeIndexMessage.textContent=e.message||'Invalid stroke index sequence.';}
+    });
+    $('#georgeStrokeIndexes').addEventListener('click',()=>{
+      if(!/\bgeorge\b/i.test($('#courseName').value)){
+        strokeIndexMessage.textContent='The historic George reference is only for George Golf Club. Use the current scorecard for this course.';
+        return;
+      }
+      $('#bulkStrokeIndexes').value=GEORGE_HISTORIC_STROKES.join(', ');
+      strokeIndexMessage.textContent='Historical George Golf Club scorecard loaded into the input ONLY, not applied. This older scorecard differs from another published version. Confirm the current official indexes before applying.';
+    });
+    $('#fetchStrokeIndexes').addEventListener('click',async()=>{
+      const id=Number(state.course.course?.apiSourceId||state.course.course?.apiCourseId||state.course.importedFromApi?.sourceId);
+      if(!Number.isSafeInteger(id)||id<=0){
+        strokeIndexMessage.textContent='This course has no Golf Courses API source ID. Paste its official stroke indexes instead.';
+        return;
+      }
+      const btn=$('#fetchStrokeIndexes');
+      btn.disabled=true;
+      strokeIndexMessage.textContent='Checking the source API scorecard for available stroke indexes…';
+      try{
+        const response=await fetch('/api/course-library/course',{method:'POST',cache:'no-store',
+          headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+        const json=await response.json();
+        if(!response.ok||!json.ok)throw Error(json.error||'API lookup failed');
+        const nums=Array.from({length:state.holeCount},(_,i)=>json.course?.holes?.[String(i+1)]?.stroke);
+        if(nums.some(x=>!Number.isInteger(x)||x<1||x>state.holeCount)||new Set(nums).size!==state.holeCount){
+          strokeIndexMessage.textContent='The API does not have a complete, consistent '+state.holeCount+'-hole SI set. Use the official club scorecard with the bulk entry tool.';
+          return;
+        }
+        $('#bulkStrokeIndexes').value=nums.join(', ');
+        strokeIndexMessage.textContent='Found '+nums.length+' API stroke indexes ('+(json.course?.apiData?.strokeTeeName||json.course?.apiData?.teeName||'tee not specified')+'). Review against the current club scorecard, then click Apply Full SI Set.';
+      }catch(e){strokeIndexMessage.textContent=e.message||'Could not retrieve the API scorecard.';}
+      finally{btn.disabled=false;}
+    });
+    // ===== End bulk SI editor =====
+
     const publishMessage=$('#publishStatus');
     let mapperPublishSecret=''; // memory only; not stored in localStorage or URL
     async function refreshPublishedCourses(){
