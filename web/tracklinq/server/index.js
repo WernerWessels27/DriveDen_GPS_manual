@@ -504,12 +504,29 @@ function normalizeGolfApiCourse(detailPayload, greensPayload){
   const greenMap = new Map(greens.map(g=>[Number(g.hole), golfCoords(g.lat,g.lng)]).filter(x=>x[1]));
   const n = Math.min(36, Math.max(1,
     Number(c.scorecard?.hole_count) || Number(greenData.hole_count) || cardHoles.length || 18));
+  // Some provider tee sets have missing handicap/SI values while another
+  // tee set has a complete, consistent 1..N SI sequence. Keep the chosen
+  // default tee for par/distance; use a complete single source for SI only.
+  // Never invent indexes or combine conflicting partial tee sequences.
+  const hasCompleteStrokeIndexes=t=>{
+    if(!Array.isArray(t?.holes))return false;
+    const si=Array.from({length:n},(_,k)=>{
+      const hole=t.holes.find(h=>Number(h.hole)===k+1);
+      const v=Number(hole?.handicap);
+      return Number.isInteger(v)&&v>=1&&v<=n?v:null;
+    });
+    return si.every(Number.isInteger)&&new Set(si).size===n;
+  };
+  const strokeTee=hasCompleteStrokeIndexes(tee)?tee:
+    (validTees.find(hasCompleteStrokeIndexes)||tee);
+  const strokeCardHoles=Array.isArray(strokeTee?.holes)?strokeTee.holes:[];
   const holes = {};
   for(let i=1;i<=n;i++){
     const card = cardHoles.find(h=>Number(h.hole) === i) || {};
     const mid = greenMap.get(i);
     const par = golfNumber(card.par, 3, 6);
-    const stroke = golfNumber(card.handicap, 1, 36);
+    const strokeCard = strokeCardHoles.find(h=>Number(h.hole)===i)||{};
+    const stroke = golfNumber(strokeCard.handicap, 1, 36);
     holes[String(i)] = {
       par:par === null ? null : Math.round(par),
       stroke:stroke === null ? null : Math.round(stroke),
@@ -536,6 +553,8 @@ function normalizeGolfApiCourse(detailPayload, greensPayload){
       provider:'Golf Courses API',
       sourceId:id,
       teeName:tee?.name || null,
+      strokeTeeName:strokeTee?.name || null,
+      strokeIndexesComplete:hasCompleteStrokeIndexes(strokeTee),
       teeOptions:validTees.map(t=>({ name:String(t.name || 'Tees'), total_yards:t.total_yards || null })),
       holeCount:n,
       holesMapped:greenMap.size,
