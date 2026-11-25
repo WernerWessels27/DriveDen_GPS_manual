@@ -192,6 +192,77 @@ app.post('/api/mapper/publish',enhancedAdminAuth,async(req,res)=>{
 });
 // ===== END ENHANCED COURSE PUBLISHING =====
 
+// ===== MAP SUGGESTIONS FROM OPENSTREETMAP (geometry, not satellite AI) =====
+// OSM golf=hole ways typically run tee-to-green, with ref=hole number.
+// The Mapper reviews everything before any Enhanced course can be published.
+// Source map data: © OpenStreetMap contributors, ODbL; preserve attribution
+// and comply with ODbL if redistributing derivative datasets.
+const osmMapCache = new Map();
+const osmMapRate = new Map();
+let osmPendingRequests = 0;
+app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
+  const lat = Number(req.body?.lat), lng = Number(req.body?.lng);
+  const radius = Number(req.body?.radius);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius)
+      || lat < -35.5 || lat > -21 || lng < 16 || lng > 34
+      || radius < 300 || radius > 4200) {
+    return res.status(400).json({ok:false,error:'Select a South African course with valid green coordinates.'});
+  }
+  const client = String(req.ip || 'unknown');
+  const now = Date.now();
+  const usage = osmMapRate.get(client);
+  if (usage && now - usage.start < 60_000 && usage.count >= 5)
+    return res.status(429).json({ok:false,error:'Please wait a minute before requesting more OSM maps.'});
+  osmMapRate.set(client, usage && now-usage.start<60_000 ? {start:usage.start,count:usage.count+1} : {start:now,count:1});
+  const key = `${lat.toFixed(3)}:${lng.toFixed(3)}:${Math.round(radius/100)}`;
+  const cached = osmMapCache.get(key);
+  if (cached && cached.until > now) {
+    res.setHeader('Cache-Control','no-store');
+    return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true});
+  }
+  if (osmPendingRequests >= 2)
+    return res.status(503).json({ok:false,error:'Another map lookup is running. Please retry shortly.'});
+  const radiusM = Math.round(radius);
+  const queryText=`[out:json][timeout:22];(nwr(around:${radiusM},${lat.toFixed(6)},${lng.toFixed(6)})["golf"~"^(hole|tee|green)$"];);out geom;`;
+  const endpoints = [
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
+  ];
+  osmPendingRequests++;
+  try {
+    let lastFailure='OSM service unavailable.';
+    for(const endpoint of endpoints) {
+      try {
+        const response=await fetch(endpoint,{
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','Accept':'application/json','User-Agent':'DriveDen-Mapper/1.0 (OpenStreetMap-based golf mapping; driveden-gps.up.railway.app)'},
+          body:new URLSearchParams({data:queryText}),
+          signal:AbortSignal.timeout(26000)
+        });
+        if (!response.ok) {lastFailure=`OpenStreetMap lookup returned ${response.status}`;continue;}
+        const raw=await response.text();
+        if (raw.length>4500000) {lastFailure='OSM geometry response was too large.';continue;}
+        const j=JSON.parse(raw);
+        if (!Array.isArray(j.elements)) {lastFailure='Unexpected OpenStreetMap response.';continue;}
+        const features=j.elements
+          .filter(el=>['hole','tee','green'].includes(el?.tags?.golf)
+              && (el.type==='node' || (Array.isArray(el.geometry) && el.geometry.length<2000)))
+          .slice(0,1100)
+          .map(el=>({type:el.type,id:el.id,tags:{golf:el.tags.golf,ref:el.tags.ref||'',name:el.tags.name||''},
+            geometry:el.type==='node'?[{lat:el.lat,lon:el.lon}]:(el.geometry || []).map(v=>({lat:v.lat,lon:v.lon}))}));
+        // Drop other private/unused OSM tag fields; no secrets or user locations stored.
+        if (osmMapCache.size>40) osmMapCache.clear();
+        osmMapCache.set(key,{features,until:Date.now()+2*60*60*1000});
+        res.setHeader('Cache-Control','no-store');
+        return res.json({ok:true,features,source:'OpenStreetMap',cached:false,attribution:'© OpenStreetMap contributors (ODbL)'});
+      } catch(error) {lastFailure=(error?.name==='TimeoutError'||error?.name==='AbortError')?'OpenStreetMap lookup timed out.':(error?.message || 'OSM unavailable.');}
+    }
+    return res.status(502).json({ok:false,error:`Could not load OpenStreetMap mapping: ${lastFailure}`});
+  } finally { osmPendingRequests--; }
+});
+// ===== END OPENSTREETMAP MAP SUGGESTIONS =====
+
+
 app.use(express.static(publicDir));
 
 // ----- Golf Courses API (South Africa) -----
