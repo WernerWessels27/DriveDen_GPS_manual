@@ -61,6 +61,14 @@
     .mapperHighlight input[type="checkbox"]{width:auto;margin-right:5px}
     .mapperHighlight .row label{font-size:12px;display:flex;align-items:center;gap:4px}
     .dd-outline-handle{width:16px;height:16px;border-radius:50%;border:3px solid white;background:#0284c7;box-shadow:0 0 0 2px #075985;cursor:grab}.dd-outline-handle.end{background:#f59e0b}
+    .dd-pin-row{display:flex;gap:6px;align-items:stretch}.dd-pin-row input{flex:1;min-width:0}
+    .dd-pin-row button{white-space:nowrap;flex-shrink:0;font-size:11px;padding:8px}
+    .dd-hole-number-icon{background:transparent;border:0}
+    .dd-hole-number{width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:2px solid #fff;border-radius:50%;font-size:13px;font-weight:900;line-height:1;color:#fff;background:#64748b;box-shadow:0 1px 3px #0008,0 0 0 2px #fff7;cursor:pointer;user-select:none}
+    .dd-hole-number.complete{background:#16a34a}.dd-hole-number.partial{background:#f59e0b;color:#111827}
+    .dd-hole-number.selected{background:#0284c7;color:#fff;box-shadow:0 0 0 3px #fff,0 0 0 5px #0284c7}
+    .dd-hole-number:hover{transform:scale(1.15)}
+    #toggleCourseOverview[aria-pressed="true"]{background:#0ea5e9;color:#03131f;border-color:#0284c7}
 
   </style>
 </head>
@@ -161,7 +169,7 @@
     <div class="row">
       <div>
         <label class="muted">10-digit PIN</label>
-        <input id="coursePin" placeholder="e.g., WGC1234567" maxlength="10" />
+        <div class="dd-pin-row"><input id="coursePin" placeholder="Auto-generated 10-digit PIN" maxlength="10" autocomplete="off" inputmode="numeric" /><button id="generateCoursePin" type="button" title="Generate a new 10-digit numeric PIN">Regenerate</button></div>
       </div>
       <div>
         <label class="muted"># Holes</label>
@@ -187,6 +195,17 @@
         </div>
       </div>
     </div>
+
+    <section class="mapperHighlight" id="courseOverviewPanel" aria-label="Course overview">
+      <h3>Whole Course Overview</h3>
+      <div class="muted">See every hole outline and numbered marker together. Click a hole number to make it active for editing; the other holes remain visible.</div>
+      <div class="saveRow">
+        <button id="toggleCourseOverview" type="button" aria-pressed="true">Show Selected Hole Only</button>
+        <button id="fitEntireCourse" type="button">Fit All Holes</button>
+        <button id="zoomSelectedHole" type="button">Zoom Selected</button>
+      </div>
+      <div id="courseOverviewStatus" class="status" role="status">Numbers: blue = selected, green = mapped, amber = still missing data.</div>
+    </section>
 
     <h3>Place Pins</h3>
     <div class="toolgrid" id="tools">
@@ -624,6 +643,7 @@
       },
       holeCount: 18,
       hole: 1,
+      allHolesVisible: true,
       tool: 'MOVE',
       markers: [],
       drawingNoGo: false,
@@ -633,6 +653,149 @@
       currentOutlinePts: [],
       currentOutlineLayer: null,
     };
+
+    // --- Whole-course overview & club PIN helper ---
+    // This layer is presentation-only. It never changes or exports the saved outlines.
+    const allHoleOverviewLayer = L.layerGroup().addTo(map);
+    function overviewPointOK(p){
+      return !!p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng))
+        && Math.abs(Number(p.lat))<=90 && Math.abs(Number(p.lng))<=180;
+    }
+    function overviewBadgePosition(h){
+      const controls=(h?.outlineControlPoints||[]).filter(overviewPointOK);
+      if(controls.length>=2){
+        const mid=Math.floor((controls.length-1)/2),a=controls[mid],b=controls[mid+1];
+        return {lat:(a.lat+b.lat)/2,lng:(a.lng+b.lng)/2};
+      }
+      const a=h?.pins?.TEE,b=h?.pins?.MID;
+      if(overviewPointOK(a)&&overviewPointOK(b))
+        return {lat:a.lat*0.48+b.lat*0.52,lng:a.lng*0.48+b.lng*0.52};
+      if(overviewPointOK(b))return b;
+      if(overviewPointOK(a))return a;
+      const shape=(h?.outline||[]).filter(overviewPointOK);
+      if(shape.length)return shape[Math.floor(shape.length/2)];
+      return overviewPointOK(h?.pins?.BACK)?h.pins.BACK:null;
+    }
+    function renderWholeCourseOverview(){
+      allHoleOverviewLayer.clearLayers();
+      const button=$('#toggleCourseOverview');
+      button.textContent=state.allHolesVisible?'Show Selected Hole Only':'Show All Holes';
+      button.setAttribute('aria-pressed',String(state.allHolesVisible));
+      const message=$('#courseOverviewStatus');
+      if(!state.allHolesVisible){
+        message.textContent='Selected hole only. Use Show All Holes to restore the full-course view.';
+        return;
+      }
+      let visible=0,outlined=0;
+      for(let n=1;n<=state.holeCount;n++){
+        const h=state.course.holes[String(n)];
+        if(!h)continue;
+        const points=(Array.isArray(h.outline)?h.outline:[]).filter(overviewPointOK);
+        if(points.length>=3){
+          outlined++;
+          // The active hole already has its own editable boundary.
+          if(n!==state.hole){
+            L.polygon(points.map(p=>[p.lat,p.lng]),{
+              color:'#38b6ff',weight:1.8,opacity:0.9,fillColor:'#38b6ff',fillOpacity:0.065,
+              dashArray:h.outlineEstimated&&!h.outlineReviewed?'5,6':null,
+              interactive:false
+            }).addTo(allHoleOverviewLayer);
+          }
+        }
+        const anchor=overviewBadgePosition(h);
+        if(!anchor)continue;
+        visible++;
+        const complete=points.length>=3&&['TEE','FRONT','MID','BACK'].every(k=>overviewPointOK(h.pins?.[k]));
+        const style=n===state.hole?'selected':complete?'complete':'partial';
+        const marker=L.marker([anchor.lat,anchor.lng],{
+          icon:L.divIcon({
+            className:'dd-hole-number-icon',
+            html:'<div class="dd-hole-number '+style+'">'+n+'</div>',
+            iconSize:[30,30],iconAnchor:[15,15]
+          }),
+          interactive:true,keyboard:true,bubblingMouseEvents:false,
+          zIndexOffset:n===state.hole?300:80,
+          title:'Select hole '+n
+        }).addTo(allHoleOverviewLayer);
+        marker.bindTooltip('Hole '+n+' · Par '+(h.par??'—')+' · SI '+(h.stroke??'—'),{
+          direction:'top',offset:[0,-16]
+        });
+        marker.on('click',()=>{
+          if(state.drawingNoGo||state.drawingOutline){
+            status('Finish or cancel the current drawing before switching holes.');
+            return;
+          }
+          if(state.hole!==n){
+            saveHoleToState();
+            state.hole=n;
+            $('#holeNo').value=String(n);
+            loadHoleToUI();
+            status('Hole '+n+' selected. Other holes stay visible; use Zoom Selected to inspect it.');
+          }
+        });
+      }
+      message.textContent=visible+' numbered holes visible, '+outlined+' outlines. Blue = active, green = mapped, amber = incomplete. Click any number to select it.';
+    }
+    function fitMapToEntireCourse(){
+      const coords=[];
+      for(let n=1;n<=state.holeCount;n++){
+        const h=state.course.holes[String(n)];
+        if(!h)continue;
+        for(const k of ['TEE','FRONT','MID','BACK']){
+          const p=h.pins?.[k];if(overviewPointOK(p))coords.push([p.lat,p.lng]);
+        }
+        const outline=Array.isArray(h.outline)?h.outline:[];
+        const step=Math.max(1,Math.ceil(outline.length/40));
+        for(let i=0;i<outline.length;i+=step){
+          const p=outline[i];if(overviewPointOK(p))coords.push([p.lat,p.lng]);
+        }
+      }
+      if(!coords.length){
+        status('Import or map a course first to display all its holes.');
+        return;
+      }
+      map.fitBounds(L.latLngBounds(coords),{padding:[55,55],maxZoom:17});
+    }
+    $('#toggleCourseOverview').addEventListener('click',()=>{
+      saveHoleToState();
+      state.allHolesVisible=!state.allHolesVisible;
+      loadHoleToUI();
+      if(state.allHolesVisible)fitMapToEntireCourse();
+      else fitMapToCurrentHole();
+    });
+    $('#fitEntireCourse').addEventListener('click',()=>{saveHoleToState();fitMapToEntireCourse();});
+    $('#zoomSelectedHole').addEventListener('click',()=>{saveHoleToState();fitMapToCurrentHole();});
+    function createNumericCoursePin(){
+      if(!window.crypto?.getRandomValues)throw Error('Secure random PIN generation requires HTTPS.');
+      const digits=[];
+      while(digits.length<10){
+        const bytes=new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        for(const val of bytes){
+          if(val>=250)continue;
+          const digit=val%10;
+          if(digits.length===0&&digit===0)continue;
+          digits.push(String(digit));
+          if(digits.length===10)break;
+        }
+      }
+      return digits.join('');
+    }
+    function ensureCoursePin(){
+      const input=$('#coursePin');
+      if(input.value.trim())return;
+      const next=createNumericCoursePin();
+      input.value=next;
+      state.course.course.pin=next;
+    }
+    $('#generateCoursePin').addEventListener('click',()=>{
+      if($('#coursePin').value.trim()&&!confirm('Replace the existing club PIN? Devices using the old PIN will need to be updated.'))return;
+      const next=createNumericCoursePin();
+      $('#coursePin').value=next;
+      state.course.course.pin=next;
+      status('New 10-digit numeric club PIN generated for this draft.');
+    });
+    ensureCoursePin();
 
     // --- UI Init ---
     function fillHoleDropdown(n=18){
@@ -651,6 +814,7 @@
       state.holeCount = parseInt(e.target.value,10);
       fillHoleDropdown(state.holeCount);
       status('Hole count updated');
+      loadHoleToUI();
     });
 
     $('#holeNo').addEventListener('change', e=>{
@@ -1033,6 +1197,7 @@
 
       // Recreate saved hole outline
       drawSavedOutline(h?.outline);
+      renderWholeCourseOverview();
       updateMappingCompleteness();
     }
 
@@ -1060,6 +1225,7 @@
       $('#courseId').value = obj.course?.id || '';
       $('#courseName').value = obj.course?.name || '';
       $('#coursePin').value = obj.course?.pin || '';
+      ensureCoursePin();
       const nums = Object.keys(obj.holes||{}).map(k=>+k).filter(n=>Number.isFinite(n));
       const inferredCount = nums.length ? Math.max(Math.max(...nums), 18) : 18;
       $('#holeCount').value = String(inferredCount);
@@ -1068,7 +1234,8 @@
       fillHoleDropdown(inferredCount);
       $('#holeNo').value = '1';
       loadHoleToUI();
-      fitMapToCurrentHole();
+      if(state.allHolesVisible)fitMapToEntireCourse();
+      else fitMapToCurrentHole();
       status(`${label} imported`);
       syncVerificationUI();
     }
@@ -1252,7 +1419,9 @@
         $('#holeNo').value=String(state.hole);
         // Ensure MOVE is selected so the new few control points can be dragged.
         $$('#tools .tool').forEach(t=>t.classList.toggle('active',t.dataset.tool==='MOVE'));
-        setTool('MOVE');loadHoleToUI();fitMapToCurrentHole();
+        setTool('MOVE');loadHoleToUI();
+        if(state.allHolesVisible)fitMapToEntireCourse();
+        else fitMapToCurrentHole();
       }
       return {matched,teeN,outlineN,edgesN,disagree,notes:perHole};
     }
@@ -1609,6 +1778,7 @@
         $('#courseId').value = obj.course?.id || '';
         $('#courseName').value = obj.course?.name || '';
         $('#coursePin').value = obj.course?.pin || '';
+        ensureCoursePin();
         const most = Math.max(...Object.keys(obj.holes||{}).map(k=>+k).filter(n=>Number.isFinite(n)));
         const inferredCount = Number.isFinite(most) ? Math.max(most, 18) : 18;
         $('#holeCount').value = String(inferredCount);
@@ -1617,6 +1787,7 @@
         state.hole = 1;
         $('#holeNo').value = '1';
         loadHoleToUI();
+        if(state.allHolesVisible)fitMapToEntireCourse();
         syncVerificationUI();
         status('Local save loaded');
       }catch(e){
