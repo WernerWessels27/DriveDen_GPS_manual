@@ -60,7 +60,7 @@
     .mapperHighlight h3{margin-top:0}
     .mapperHighlight input[type="checkbox"]{width:auto;margin-right:5px}
     .mapperHighlight .row label{font-size:12px;display:flex;align-items:center;gap:4px}
-    .dd-outline-handle{width:12px;height:12px;border-radius:50%;border:2px solid white;background:#0ea5e9;box-shadow:0 0 0 2px #075985;cursor:grab}
+    .dd-outline-handle{width:16px;height:16px;border-radius:50%;border:3px solid white;background:#0284c7;box-shadow:0 0 0 2px #075985;cursor:grab}.dd-outline-handle.end{background:#f59e0b}
 
   </style>
 </head>
@@ -107,15 +107,22 @@
     <div class="saveRow"><button id="apiMapperMoreBtn" disabled style="display:none">Load More Courses</button><button id="apiMapperImportBtn" disabled>Import Selected Course</button></div>
     <div id="apiMapperStatus" class="status" role="status">Search online to import a course.</div>
 
+    <section class="mapperHighlight" id="osmAutoSection">
+      <h3>Auto Map Course — TEE &amp; Smooth Hole Outlines</h3>
+      <div class="muted">After importing an API course, automatically propose tee positions from OpenStreetMap hole routes and create smooth curved outlines. Uses available mapped geometry, not AI image analysis. All points remain suggestions until reviewed.</div>
+      <div class="saveRow"><button id="osmAutoMap" type="button" style="background:#38b6ff;color:#03131f">Auto Map Course</button><label style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="osmOnlyMissing" checked style="width:auto"> Keep existing pins/outlines</label></div>
+      <div id="osmAutoMapStatus" class="status" role="status">Import an API course with MID coordinates first. Source: © OpenStreetMap contributors (ODbL).</div>
+    </section>
+
     <section class="mapperHighlight">
-      <h3>Auto Outline — TEE to BACK</h3>
-      <div class="muted">Creates an <strong>estimated oval-shaped hole boundary</strong> using mapped TEE and BACK points. It is not a surveyed fairway edge. Select MOVE to drag the blue outline points to fit the satellite view.</div>
+      <h3>Smooth Outline — TEE to GREEN</h3>
+      <div class="muted">Creates an <strong>estimated curved hole corridor</strong> using the imported hole route, or a straight line from TEE to GREEN if no route exists. In MOVE mode, drag the few blue <strong>centreline</strong> controls to follow a dogleg. Change the width to adjust the whole boundary smoothly.</div>
       <div class="row" style="margin-top:9px;align-items:end">
         <label>Full outline width (metres)<input type="number" id="autoOutlineWidth" min="20" max="120" step="5" value="65" /></label>
         <button id="autoOutlineCurrent" type="button">Outline Current Hole</button>
       </div>
-      <div class="saveRow"><button id="autoOutlineAll" type="button">Outline All Holes with TEE + BACK</button><button id="suggestGreenEdges" type="button">Suggest FRONT/BACK from TEE + MID</button></div>
-      <div id="autoOutlineStatus" class="status">Suggestions are estimates. Review against satellite imagery before publishing.</div>
+      <div class="saveRow"><button id="autoOutlineAll" type="button">Outline All Holes with TEE + GREEN</button><button id="suggestGreenEdges" type="button">Suggest FRONT/BACK from TEE + MID</button></div>
+      <div id="autoOutlineStatus" class="status">Auto outlines are approximate. Adjust 2–6 centreline handles and width, then review on the satellite image.</div>
     </section>
 
     <h3>Imagery</h3>
@@ -227,6 +234,7 @@
       <h3>Publish Enhanced Course (PostgreSQL)</h3>
       <div class="muted">Publishes fully mapped, verified courses straight to Enhanced Search. Existing GitHub courses and PIN access are unchanged. To reopen a published course, choose it below.</div>
       <div id="mappingCompleteness" class="status">Mapping completion: checking…</div>
+      <div class="muted" style="margin-top:5px">Imported OSM geometry: © OpenStreetMap contributors (ODbL). Review usage and attribution obligations before publishing commercial course datasets.</div>
       <div class="row" style="margin-top:10px;">
         <select id="publishedCourseSelect" aria-label="Published courses"><option value="">Published courses…</option></select>
         <button id="loadPublishedCourse" type="button">Open Published Course</button>
@@ -814,11 +822,13 @@
 
     let outlineHandles=[];
     let outlineLivePolygon=null;
+    let outlineSpine=null;
     function clearOutlineHandles(){
       outlineHandles.forEach(h=>{try{map.removeLayer(h)}catch(_){}});
       outlineHandles=[];
       if(outlineLivePolygon){try{map.removeLayer(outlineLivePolygon)}catch(_){}}
-      outlineLivePolygon=null;
+      if(outlineSpine){try{map.removeLayer(outlineSpine)}catch(_){}}
+      outlineLivePolygon=null;outlineSpine=null;
     }
     function drawSavedOutline(outline){
       clearOutlineHandles();
@@ -829,13 +839,38 @@
         dashArray:hole?.outlineEstimated && !hole?.outlineReviewed ? '5,6' : null,
         fill:true,fillColor:'#0ea5e9',fillOpacity:0.10,interactive:false}).addTo(map);
       if(state.tool!=='MOVE') return;
+      const smoothControls=Array.isArray(hole?.outlineControlPoints)&&hole.outlineControlPoints.length>=2;
+      if(smoothControls){
+        const controls=hole.outlineControlPoints;
+        outlineSpine=L.polyline(controls.map(p=>[p.lat,p.lng]),{color:'#38b6ff',weight:2,dashArray:'5,6',interactive:false}).addTo(map);
+        controls.forEach((p,i)=>{
+          const icon=L.divIcon({className:'',html:`<div class="dd-outline-handle ${i===0||i===controls.length-1?'end':''}"></div>`,iconSize:[17,17],iconAnchor:[8,8]});
+          const marker=L.marker([p.lat,p.lng],{icon,draggable:true,bubblingMouseEvents:false,title:'Drag curve control (not a tee or green GPS marker)'}).addTo(map);
+          marker.on('drag',()=>{
+            const ll=marker.getLatLng();controls[i]={lat:ll.lat,lng:ll.lng};
+            const poly=smoothCorridor(controls,hole.outlineWidthM||currentOutlineWidth());
+            if(poly){hole.outline=poly;outlineLivePolygon.setLatLngs(poly.map(v=>[v.lat,v.lng]));}
+            outlineSpine.setLatLngs(controls.map(v=>[v.lat,v.lng]));
+          });
+          marker.on('dragend',()=>{
+            hole.outlineEstimated=true;hole.outlineReviewed=false;
+            $('#verifyCoordinates').checked=false;
+            updateMappingCompleteness();
+            status('Curved boundary updated. Review before publishing.');
+          });
+          outlineHandles.push(marker);
+        });
+        return;
+      }
+      // Existing manually drawn polygons retain their individual edit handles.
       outline.forEach((p,i)=>{
-        const icon=L.divIcon({className:'',html:'<div class="dd-outline-handle"></div>',iconSize:[14,14],iconAnchor:[7,7]});
-        const marker=L.marker([p.lat,p.lng],{icon,draggable:true,bubblingMouseEvents:false,title:'Drag hole outline vertex'}).addTo(map);
+        const icon=L.divIcon({className:'',html:'<div class="dd-outline-handle"></div>',iconSize:[17,17],iconAnchor:[8,8]});
+        const marker=L.marker([p.lat,p.lng],{icon,draggable:true,bubblingMouseEvents:false,title:'Drag outline vertex'}).addTo(map);
         marker.on('dragend',()=>{
           const ll=marker.getLatLng();
           hole.outline[i]={lat:ll.lat,lng:ll.lng};
           hole.outlineReviewed=false;
+          $('#verifyCoordinates').checked=false;
           outlineLivePolygon.setLatLngs(hole.outline.map(v=>[v.lat,v.lng]));
           updateMappingCompleteness();
           status('Outline vertex moved. Review hole boundary before publishing.');
@@ -852,6 +887,7 @@
       h.stroke = (parseInt($('#holeStroke').value,10) || null);
       h.pins = h.pins || {};
       h.outline = state.currentOutlinePts.map(([lat,lng])=>({lat,lng}));
+      delete h.outlineControlPoints;delete h.outlineWidthM;
       state.course.holes[hKey] = h;
       h.outlineEstimated=false; h.outlineReviewed=true;
       if (state.currentOutlineLayer){ map.removeLayer(state.currentOutlineLayer); }
@@ -878,7 +914,7 @@
 
     function clearOutline(){
       const h = state.course.holes[String(state.hole)];
-      if (h && h.outline) delete h.outline;
+      if (h && h.outline) {delete h.outline;delete h.outlineControlPoints;delete h.outlineWidthM;}
       cancelOutline();
       loadHoleToUI();
       status('Hole outline cleared');
@@ -974,6 +1010,7 @@
 
       const hKey = String(state.hole);
       const h = state.course.holes[hKey];
+      if(h?.outlineWidthM)$('#autoOutlineWidth').value=String(h.outlineWidthM);
       $('#holePar').value = h?.par ?? '';
       $('#holeStroke').value = h?.stroke ?? '';
       const p = h?.pins || {};
@@ -1043,47 +1080,247 @@
       return !!p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng))
         && Math.abs(Number(p.lat))<=90 && Math.abs(Number(p.lng))<=180;
     }
-    function outlineFromTeeToBack(tee,back,widthM){
-      if(!mapPointOK(tee)||!mapPointOK(back)) return null;
-      const lat0=(Number(tee.lat)+Number(back.lat))*Math.PI/360;
-      const metersLat=111132;
-      const metersLng=111320*Math.cos(lat0);
-      if(metersLng<1000) return null;
-      const dx=(Number(back.lng)-Number(tee.lng))*metersLng;
-      const dy=(Number(back.lat)-Number(tee.lat))*metersLat;
-      const length=Math.hypot(dx,dy);
-      if(length<35 || length>1400) return null;
-      const ux=dx/length,uy=dy/length,vx=-uy,vy=ux;
-      const major=length/2+9;
-      const minor=Math.min(60,Math.max(10,Number(widthM)/2||32.5));
-      const verts=[];
-      for(let i=0;i<32;i++){
-        const t=2*Math.PI*i/32;
-        const forward=length/2+major*Math.cos(t);
-        const across=minor*Math.sin(t);
-        verts.push({
-          lat:Number(tee.lat)+(forward*uy+across*vy)/metersLat,
-          lng:Number(tee.lng)+(forward*ux+across*vx)/metersLng
-        });
+
+    // ===== Curved corridor geometry: low number of editable centreline controls =====
+    function gpsMeters(p,q){
+      if(!mapPointOK(p)||!mapPointOK(q))return Infinity;
+      const lat=(Number(p.lat)+Number(q.lat))*Math.PI/360;
+      return Math.hypot((Number(q.lat)-Number(p.lat))*111132,(Number(q.lng)-Number(p.lng))*111320*Math.cos(lat));
+    }
+    function planarPts(points){
+      const meanLat=points.reduce((s,p)=>s+Number(p.lat),0)/points.length;
+      const mLng=111320*Math.cos(meanLat*Math.PI/180),mLat=111132;
+      const origin=points[0];
+      return {pts:points.map(p=>({x:(p.lng-origin.lng)*mLng,y:(p.lat-origin.lat)*mLat})),
+        back:p=>({lat:origin.lat+p.y/mLat,lng:origin.lng+p.x/mLng})};
+    }
+    function smoothPathXY(points){
+      const list=[];
+      for(let i=0;i<points.length-1;i++){
+        const a=points[Math.max(0,i-1)],b=points[i],c=points[i+1],d=points[Math.min(points.length-1,i+2)];
+        for(let k=0;k<8;k++){
+          const t=k/8,t2=t*t,t3=t2*t;
+          const cat=(key)=>.5*((2*b[key])+(-a[key]+c[key])*t+(2*a[key]-5*b[key]+4*c[key]-d[key])*t2+(-a[key]+3*b[key]-3*c[key]+d[key])*t3);
+          list.push({x:cat('x'),y:cat('y')});
+        }
       }
-      return verts;
+      list.push(points[points.length-1]);
+      return list;
+    }
+    function smoothCorridor(points,width){
+      if(!Array.isArray(points)||points.length<2||!points.every(mapPointOK))return null;
+      if(gpsMeters(points[0],points[points.length-1])<30)return null;
+      const xy=planarPts(points),path=smoothPathXY(xy.pts),half=Math.max(10,Math.min(60,Number(width)/2||32.5));
+      const left=[],right=[];
+      for(let i=0;i<path.length;i++){
+        const before=path[Math.max(0,i-1)],after=path[Math.min(path.length-1,i+1)];
+        const dx=after.x-before.x,dy=after.y-before.y,mag=Math.hypot(dx,dy)||1;
+        const taper=0.68+0.32*Math.sin(Math.PI*i/(path.length-1));
+        const nx=-dy/mag*half*taper,ny=dx/mag*half*taper;
+        left.push({x:path[i].x+nx,y:path[i].y+ny});
+        right.push({x:path[i].x-nx,y:path[i].y-ny});
+      }
+      // Add rounded ends, preserving a capsule rather than square corners.
+      function cap(center,from,to,forward){
+        const start=Math.atan2(from.y-center.y,from.x-center.x);
+        const a=[];for(let n=1;n<=7;n++){
+          const angle=start+(forward?1:-1)*Math.PI*n/8;
+          a.push({x:center.x+half*.68*Math.cos(angle),y:center.y+half*.68*Math.sin(angle)});
+        }return a;
+      }
+      // For the end cap, follow the tangent beyond the green; at the start cap, beyond tee.
+      const out=[...left];
+      const end=path[path.length-1],endPrev=path[path.length-2];
+      const endTan=Math.atan2(end.y-endPrev.y,end.x-endPrev.x);
+      for(let i=1;i<=8;i++){const a=endTan+Math.PI/2-Math.PI*i/8;out.push({x:end.x+half*.68*Math.cos(a),y:end.y+half*.68*Math.sin(a)});}
+      out.push(...right.reverse());
+      const start=path[0],next=path[1];
+      const startTan=Math.atan2(next.y-start.y,next.x-start.x);
+      for(let i=1;i<8;i++){const a=startTan-Math.PI/2-Math.PI*i/8;out.push({x:start.x+half*.68*Math.cos(a),y:start.y+half*.68*Math.sin(a)});}
+      const step=Math.max(1,Math.floor(out.length/110));
+      return out.filter((_,i)=>i%step===0).map(xy.back);
+    }
+    function pointDistanceToLine(p,a,b){
+      const vx=b.x-a.x,vy=b.y-a.y,l2=vx*vx+vy*vy||1;
+      const t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l2));
+      return Math.hypot(p.x-a.x-t*vx,p.y-a.y-t*vy);
+    }
+    function simplifyRoute(points,maxControls=6){
+      if(!Array.isArray(points)||points.length<2)return null;
+      const clean=points.filter(mapPointOK).filter((p,i,arr)=>i===0||gpsMeters(p,arr[i-1])>=2);
+      if(clean.length<2)return null;
+      const {pts}=planarPts(clean);
+      function simplify(eps){
+        const keep=new Set([0,pts.length-1]);
+        function rdp(a,b){if(b-a<=1)return;let far=-1,idx=-1;
+          for(let i=a+1;i<b;i++){const d=pointDistanceToLine(pts[i],pts[a],pts[b]);if(d>far){far=d;idx=i;}}
+          if(far>eps){keep.add(idx);rdp(a,idx);rdp(idx,b);}}
+        rdp(0,pts.length-1);
+        return [...keep].sort((a,b)=>a-b).map(i=>clean[i]);
+      }
+      let reduced=simplify(10),eps=10;
+      while(reduced.length>maxControls&&eps<180){eps=eps*1.5;reduced=simplify(eps);}
+      if(reduced.length>maxControls)reduced=Array.from({length:maxControls},(_,i)=>clean[Math.round((clean.length-1)*i/(maxControls-1))]);
+      return reduced;
+    }
+    // ===== OSM geometry import =====
+    function osmHoleNumber(v){
+      const m=String(v??'').trim().match(/^(?:hole\s*)?(\d{1,2})$/i);
+      return m?Number(m[1]):null;
+    }
+    function osmGeoPoints(feature){
+      return (feature?.geometry||[]).filter(p=>Number.isFinite(+p.lat)&&Number.isFinite(+p.lon)).map(p=>({lat:Number(p.lat),lng:Number(p.lon)}));
+    }
+    function osmAreaCentre(points){
+      if(!points?.length)return null;
+      const p=points.length>2 && gpsMeters(points[0],points[points.length-1])<1?points.slice(0,-1):points;
+      return {lat:p.reduce((s,x)=>s+x.lat,0)/p.length,lng:p.reduce((s,x)=>s+x.lng,0)/p.length};
+    }
+    function osmGreenEdges(poly,route){
+      if(poly?.length<4||route?.length<2)return null;
+      const centre=osmAreaCentre(poly),mLat=111132,mLng=111320*Math.cos(centre.lat*Math.PI/180);
+      const a=route[Math.max(0,route.length-3)],b=route[route.length-1];
+      const dx=(b.lng-a.lng)*mLng,dy=(b.lat-a.lat)*mLat,length=Math.hypot(dx,dy);
+      if(length<5)return null;
+      const ux=dx/length,uy=dy/length;
+      const sorted=poly.map(p=>({p,score:((p.lng-centre.lng)*mLng*ux+(p.lat-centre.lat)*mLat*uy)})).sort((a,b)=>a.score-b.score);
+      if(sorted.at(-1).score-sorted[0].score<6 || sorted.at(-1).score-sorted[0].score>90)return null;
+      return {front:sorted[0].p,back:sorted.at(-1).p,centre};
+    }
+    function suggestOSMGeometry(features,onlyMissing=true){
+      const course=state.course;
+      let teeN=0,outlineN=0,edgesN=0,matched=0,disagree=0;
+      const perHole=[];
+      const holeWays=(features||[]).filter(f=>f.tags?.golf==='hole');
+      const greens=(features||[]).filter(f=>f.tags?.golf==='green').map(f=>({f,points:osmGeoPoints(f)})).filter(x=>x.points.length>=3);
+      const tees=(features||[]).filter(f=>f.tags?.golf==='tee').map(f=>({f,points:osmGeoPoints(f)})).filter(x=>x.points.length);
+      const alreadyUsed=new Set();
+      for(let hNo=1;hNo<=state.holeCount;hNo++){
+        const h=course.holes[String(hNo)];
+        if(!h)continue;
+        const mid=h.pins?.MID;
+        const routes=holeWays.filter(x=>osmHoleNumber(x.tags?.ref)===hNo)
+          .map(f=>({f,points:osmGeoPoints(f)})).filter(x=>x.points.length>=2)
+          .map(x=>{
+            const pts=x.points;
+            const endD=mapPointOK(mid)?gpsMeters(mid,pts.at(-1)):Infinity;
+            const startD=mapPointOK(mid)?gpsMeters(mid,pts[0]):Infinity;
+            return {...x,reverse:startD+10<endD,score:Math.min(endD,startD)};
+          }).sort((a,b)=>a.score-b.score);
+        // No green information: cannot safely match multiple nearby courses or a route to an imported hole.
+        const match=routes.find(x=>x.score<=125 && !alreadyUsed.has(String(x.f.type)+x.f.id));
+        if(!match){perHole.push(`H${hNo}: no confidently matched OSM hole route`);continue;}
+        const path=match.reverse?[...match.points].reverse():match.points;
+        if(gpsMeters(path[0],path.at(-1))<35||gpsMeters(path[0],path.at(-1))>1250){perHole.push(`H${hNo}: hole route implausible`);continue;}
+        alreadyUsed.add(String(match.f.type)+match.f.id);matched++;
+        let proposedTee=path[0],teeSource='OSM hole-route start';
+        const nearTees=tees.map(t=>({t,d:gpsMeters(osmAreaCentre(t.points),proposedTee)})).filter(x=>x.d<65).sort((a,b)=>a.d-b.d);
+        if(nearTees.length){proposedTee=osmAreaCentre(nearTees[0].t.points);teeSource='OSM mapped tee area';}
+        const greenList=greens.map(g=>({g,d:gpsMeters(osmAreaCentre(g.points),path.at(-1))})).filter(x=>x.d<60).sort((a,b)=>a.d-b.d);
+        const green=greenList[0]?.g;
+        const greenEdges=green?osmGreenEdges(green.points,path):null;
+        if(mapPointOK(mid)&&greenEdges&&gpsMeters(mid,greenEdges.centre)>18){disagree++;perHole.push(`H${hNo}: API MID differs from OSM green by ${Math.round(gpsMeters(mid,greenEdges.centre))}m—verify manually`);}
+        if(!h.pins)h.pins={};
+        if(!onlyMissing||!mapPointOK(h.pins.TEE)){
+          h.pins.TEE={lat:proposedTee.lat,lng:proposedTee.lng};teeN++;
+          h.osmTeeSuggestion={source:teeSource,reviewed:false,routeId:match.f.id,endpointToMidM:Math.round(match.score)};
+        }
+        if(greenEdges){
+          let suggestedEdge=false;
+          if(!onlyMissing||!mapPointOK(h.pins.FRONT)){
+            h.pins.FRONT={lat:greenEdges.front.lat,lng:greenEdges.front.lng};edgesN++;suggestedEdge=true;
+          }
+          if(!onlyMissing||!mapPointOK(h.pins.BACK)){
+            h.pins.BACK={lat:greenEdges.back.lat,lng:greenEdges.back.lng};edgesN++;suggestedEdge=true;
+          }
+          if(suggestedEdge)h.greenEdgesEstimated=true;
+        }
+        const newControls=simplifyRoute(path,6);
+        if(newControls&&(!onlyMissing||!Array.isArray(h.outline)||h.outline.length<6)){
+          h.outlineControlPoints=newControls;
+          h.outlineWidthM=currentOutlineWidth();
+          const outline=smoothCorridor(newControls,h.outlineWidthM);
+          if(outline&&outline.length>6){h.outline=outline;h.outlineEstimated=true;h.outlineReviewed=false;outlineN++;}
+        }
+        if(match.score>45) perHole.push(`H${hNo}: green match ${Math.round(match.score)}m—check tee/route`);
+      }
+      if(teeN||outlineN||edgesN){
+        course.mappingSources={...(course.mappingSources||{}),osm:{attribution:'© OpenStreetMap contributors',licence:'ODbL',reviewRequired:true,importedAt:new Date().toISOString()}};
+        if(!course.verification)course.verification={};
+        course.verification.coordinatesChecked=false;
+        $('#verifyCoordinates').checked=false;
+        $('#holeNo').value=String(state.hole);
+        // Ensure MOVE is selected so the new few control points can be dragged.
+        $$('#tools .tool').forEach(t=>t.classList.toggle('active',t.dataset.tool==='MOVE'));
+        setTool('MOVE');loadHoleToUI();fitMapToCurrentHole();
+      }
+      return {matched,teeN,outlineN,edgesN,disagree,notes:perHole};
+    }
+    async function autoMapCourseFromOSM(){
+      saveHoleToState();
+      const mids=Object.values(state.course.holes||{}).map(h=>h.pins?.MID).filter(mapPointOK);
+      const msg=$('#osmAutoMapStatus'),button=$('#osmAutoMap');
+      if(mids.length<3){msg.textContent='First import an API course with at least three mapped MID points.';return;}
+      const lat=mids.reduce((s,p)=>s+p.lat,0)/mids.length;
+      const lng=mids.reduce((s,p)=>s+p.lng,0)/mids.length;
+      const centre={lat,lng};
+      const farthest=Math.max(...mids.map(p=>gpsMeters(centre,p)));
+      const radius=Math.max(600,Math.min(4200,Math.round(farthest+500)));
+      if(farthest>3200){msg.textContent='The imported green points are too far apart to map safely. Check the course location.';return;}
+      if(!mapperPublishSecret){
+        mapperPublishSecret=prompt('Enter the Railway Mapper publishing token to access OpenStreetMap mapping (kept only in this page memory):')?.trim()||'';
+        if(!mapperPublishSecret)return;
+      }
+      button.disabled=true;
+      msg.textContent='Finding mapped golf holes and tee areas near the selected course…';
+      try{
+        const response=await fetch('/api/mapper/osm-features',{method:'POST',cache:'no-store',
+          headers:{'Content-Type':'application/json','x-mapper-publish-token':mapperPublishSecret},
+          body:JSON.stringify({lat,lng,radius})});
+        const data=await response.json();
+        if(!response.ok||!data.ok){if(response.status===401)mapperPublishSecret='';throw Error(data.error||'Map request failed');}
+        const outcome=suggestOSMGeometry(data.features,!!$('#osmOnlyMissing').checked);
+        const preview=outcome.notes.slice(0,7).join(' • ');
+        msg.textContent=`OSM matched ${outcome.matched}/${state.holeCount} hole routes. Added ${outcome.teeN} TEE, ${outcome.edgesN} FRONT/BACK and ${outcome.outlineN} curved outlines. ${outcome.disagree} API MID positions differ from OSM greens. ${preview} ${outcome.notes.length>7?' …':''} All suggestions require satellite review. © OpenStreetMap contributors (ODbL).`;
+        if(!outcome.matched)msg.textContent+=' No reliable routes found; nothing was changed.';
+      }catch(e){msg.textContent=`Could not auto-map: ${e.message||e}. Existing course data unchanged.`;}
+      finally{button.disabled=false;}
+    }
+    $('#osmAutoMap').addEventListener('click',autoMapCourseFromOSM);
+
+    function outlineFromTeeToBack(tee,back,widthM){
+      return smoothCorridor([tee,back],widthM);
     }
     function currentOutlineWidth(){return Math.max(20,Math.min(120,Number($('#autoOutlineWidth').value)||65));}
     function saveAutoOutline(h,overwrite=false){
       if(!h || (!overwrite && Array.isArray(h.outline) && h.outline.length>=3)) return false;
-      const shape=outlineFromTeeToBack(h.pins?.TEE,h.pins?.BACK,currentOutlineWidth());
+      const tee=h.pins?.TEE, end=h.pins?.BACK||h.pins?.MID;
+      if(!mapPointOK(tee)||!mapPointOK(end))return false;
+      const controls=Array.isArray(h.outlineControlPoints)&&h.outlineControlPoints.length>=2?h.outlineControlPoints:[tee,end];
+      const shape=smoothCorridor(controls,currentOutlineWidth());
       if(!shape) return false;
+      h.outlineControlPoints=controls;h.outlineWidthM=currentOutlineWidth();
       h.outline=shape;h.outlineEstimated=true;h.outlineReviewed=false;
       return true;
     }
+    $('#autoOutlineWidth').addEventListener('input',()=>{
+      const h=state.course.holes[String(state.hole)];
+      if(!Array.isArray(h?.outlineControlPoints)||h.outlineControlPoints.length<2)return;
+      h.outlineWidthM=currentOutlineWidth();
+      h.outline=smoothCorridor(h.outlineControlPoints,h.outlineWidthM)||h.outline;
+      h.outlineReviewed=false;
+      $('#verifyCoordinates').checked=false;
+      drawSavedOutline(h.outline);
+      $('#autoOutlineStatus').textContent=`Width adjusted to ${h.outlineWidthM} m. Review the new curved outline.`;
+    });
     $('#autoOutlineCurrent').addEventListener('click',()=>{
       saveHoleToState();
       const h=state.course.holes[String(state.hole)];
       const has=h?.outline?.length>=3;
       if(has&&!confirm('Replace current hole outline with a new approximate oval?')) return;
-      if(!saveAutoOutline(h,true)) return $('#autoOutlineStatus').textContent='Map TEE and BACK first (35–1400 m apart).';
+      if(!saveAutoOutline(h,true)) return $('#autoOutlineStatus').textContent='Map TEE and MID/BACK first, or use Auto Map Course.';
       loadHoleToUI();fitMapToCurrentHole();
-      $('#autoOutlineStatus').textContent=`Estimated outline generated for Hole ${state.hole}. Drag the blue vertices using MOVE to match the actual hole.`;
+      $('#autoOutlineStatus').textContent=`Smooth outline generated for Hole ${state.hole}. Drag the 2–6 blue centreline controls and adjust width to match the satellite image.`;
     });
     $('#autoOutlineAll').addEventListener('click',()=>{
       saveHoleToState();
@@ -1093,7 +1330,7 @@
         else skipped++;
       }
       loadHoleToUI();
-      $('#autoOutlineStatus').textContent=`Created ${done} approximate outlines; ${skipped} skipped (missing points or existing outlines). Review each hole.`;
+      $('#autoOutlineStatus').textContent=`Created ${done} smooth outlines; ${skipped} skipped (missing TEE/MID or existing outlines). Review each hole.`;
     });
     // Optional estimates ONLY. Never treat estimated green boundaries as surveyed data.
     $('#suggestGreenEdges').addEventListener('click',()=>{
