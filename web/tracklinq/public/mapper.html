@@ -118,7 +118,7 @@
     <section class="mapperHighlight" id="osmAutoSection">
       <h3>Auto Map Course — TEE &amp; Smooth Hole Outlines</h3>
       <div class="muted">After importing an API course, automatically propose tee positions from OpenStreetMap hole routes and create smooth curved outlines. Uses available mapped geometry, not AI image analysis. All points remain suggestions until reviewed.</div>
-      <div class="saveRow"><button id="osmAutoMap" type="button" style="background:#38b6ff;color:#03131f">Auto Map Course</button><label style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="osmOnlyMissing" checked style="width:auto"> Keep existing pins/outlines</label></div>
+      <div class="saveRow"><button id="osmAutoMap" type="button" style="background:#38b6ff;color:#03131f">Auto Map Course</button><label style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="osmOnlyMissing" checked style="width:auto"> Keep existing TEE/FRONT/BACK/outlines</label><label style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="osmPreferMappedMid" checked style="width:auto"> Prefer mapped green centre for MID</label></div>
       <div id="osmAutoMapStatus" class="status" role="status">Import an API course with MID coordinates first. Source: © OpenStreetMap contributors (ODbL).</div>
     </section>
 
@@ -1368,7 +1368,7 @@
     }
     function suggestOSMGeometry(features,onlyMissing=true){
       const course=state.course;
-      let teeN=0,outlineN=0,edgesN=0,matched=0,disagree=0;
+      let teeN=0,outlineN=0,edgesN=0,midN=0,matched=0,disagree=0;
       const perHole=[];
       const holeWays=(features||[]).filter(f=>f.tags?.golf==='hole');
       const greens=(features||[]).filter(f=>f.tags?.golf==='green').map(f=>({f,points:osmGeoPoints(f)})).filter(x=>x.points.length>=3);
@@ -1397,9 +1397,28 @@
         if(nearTees.length){proposedTee=osmAreaCentre(nearTees[0].t.points);teeSource='OSM mapped tee area';}
         const greenList=greens.map(g=>({g,d:gpsMeters(osmAreaCentre(g.points),path.at(-1))})).filter(x=>x.d<60).sort((a,b)=>a.d-b.d);
         const green=greenList[0]?.g;
+        const greenCentre=green?osmAreaCentre(green.points):null;
         const greenEdges=green?osmGreenEdges(green.points,path):null;
-        if(mapPointOK(mid)&&greenEdges&&gpsMeters(mid,greenEdges.centre)>18){disagree++;perHole.push(`H${hNo}: API MID differs from OSM green by ${Math.round(gpsMeters(mid,greenEdges.centre))}m—verify manually`);}
+        if(mapPointOK(mid)&&mapPointOK(greenCentre)&&gpsMeters(mid,greenCentre)>18){disagree++;perHole.push(`H${hNo}: API MID differs from mapped green by ${Math.round(gpsMeters(mid,greenCentre))}m—verify carefully`);}
         if(!h.pins)h.pins={};
+        // Use the mapped OSM green-centre when explicitly opted in. Preserve the
+        // provider's MID for comparison; reject distant/ambiguous green matches.
+        if($('#osmPreferMappedMid').checked&&mapPointOK(greenCentre)){
+          const currentMid=h.pins.MID;
+          const originalMid=mapPointOK(h.apiMidReference)?h.apiMidReference:currentMid;
+          const distance=mapPointOK(originalMid)?gpsMeters(originalMid,greenCentre):Infinity;
+          if(distance<=65){
+            if(!mapPointOK(h.apiMidReference)&&mapPointOK(currentMid))h.apiMidReference={...currentMid};
+            if(!mapPointOK(currentMid)||gpsMeters(currentMid,greenCentre)>.8){
+              h.pins.MID={lat:greenCentre.lat,lng:greenCentre.lng};
+              midN++;
+            }
+            h.osmMidSuggestion={source:'OSM mapped green geometry',greenId:green.f.id,
+              reviewed:false,distanceFromApiM:Math.round(distance)};
+          }else{
+            perHole.push(`H${hNo}: mapped MID ${Math.round(distance)}m from API reference — unchanged for safety`);
+          }
+        }
         if(!onlyMissing||!mapPointOK(h.pins.TEE)){
           h.pins.TEE={lat:proposedTee.lat,lng:proposedTee.lng};teeN++;
           h.osmTeeSuggestion={source:teeSource,reviewed:false,routeId:match.f.id,endpointToMidM:Math.round(match.score)};
@@ -1423,7 +1442,7 @@
         }
         if(match.score>45) perHole.push(`H${hNo}: green match ${Math.round(match.score)}m—check tee/route`);
       }
-      if(teeN||outlineN||edgesN){
+      if(teeN||outlineN||edgesN||midN){
         course.mappingSources={...(course.mappingSources||{}),osm:{attribution:'© OpenStreetMap contributors',licence:'ODbL',reviewRequired:true,importedAt:new Date().toISOString()}};
         if(!course.verification)course.verification={};
         course.verification.coordinatesChecked=false;
@@ -1435,7 +1454,7 @@
         if(state.allHolesVisible)fitMapToEntireCourse();
         else fitMapToCurrentHole();
       }
-      return {matched,teeN,outlineN,edgesN,disagree,notes:perHole};
+      return {matched,teeN,outlineN,edgesN,midN,disagree,notes:perHole};
     }
     async function autoMapCourseFromOSM(){
       saveHoleToState();
@@ -1462,7 +1481,7 @@
         if(!response.ok||!data.ok){if(response.status===401)mapperPublishSecret='';throw Error(data.error||'Map request failed');}
         const outcome=suggestOSMGeometry(data.features,!!$('#osmOnlyMissing').checked);
         const preview=outcome.notes.slice(0,7).join(' • ');
-        msg.textContent=`OSM matched ${outcome.matched}/${state.holeCount} hole routes. Added ${outcome.teeN} TEE, ${outcome.edgesN} FRONT/BACK and ${outcome.outlineN} curved outlines. ${outcome.disagree} API MID positions differ from OSM greens. ${preview} ${outcome.notes.length>7?' …':''} All suggestions require satellite review. © OpenStreetMap contributors (ODbL).`;
+        msg.textContent=`OSM matched ${outcome.matched}/${state.holeCount} hole routes. Added ${outcome.teeN} TEE, ${outcome.edgesN} FRONT/BACK, ${outcome.outlineN} curved outlines; switched ${outcome.midN} MID positions to mapped green centres (API reference retained). ${outcome.disagree} API MID positions differ from OSM greens. ${preview} ${outcome.notes.length>7?' …':''} All suggestions require satellite review. © OpenStreetMap contributors (ODbL).`;
         if(!outcome.matched)msg.textContent+=' No reliable routes found; nothing was changed.';
       }catch(e){msg.textContent=`Could not auto-map: ${e.message||e}. Existing course data unchanged.`;}
       finally{button.disabled=false;}
