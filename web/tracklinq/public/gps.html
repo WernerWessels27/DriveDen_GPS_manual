@@ -213,8 +213,9 @@
   border-radius: 14px; background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); cursor: pointer;
   font-size: 24px; user-select: none; box-shadow: var(--shadow);
 }
-#hazardsToggleBtn{font-size:10px;font-weight:900;line-height:1;gap:2px;align-content:center}
-#hazardsToggleBtn svg{width:20px;height:20px}
+#hazardsToggleBtn{align-content:center}
+#hazardsToggleBtn svg{width:24px;height:24px}
+@media(max-width:700px){#hazardsToggleBtn{width:44px;height:44px;border-radius:12px}}
 #hazardsToggleBtn[aria-pressed="true"]{color:#38b6ff}
 .viewBtn[aria-pressed="true"]{
   border-color:#38b6ff;
@@ -897,6 +898,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
   <!-- GPS Settings (top-right) -->
   <div class="topRightCol" style="position:absolute;top:108px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px;">
     <button class="settingsBtn" id="settingsBtn" title="GPS Settings" aria-label="GPS Settings">⚙</button>
+    <button class="settingsBtn" id="hazardsToggleBtn" type="button" aria-pressed="true" title="Show or hide hazards" aria-label="Show or hide hazards"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3z" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round"/><path d="M12 9v5" style="stroke:currentColor;stroke-width:2;stroke-linecap:round"/><circle cx="12" cy="17.5" r="1" style="fill:currentColor"/></svg></button>
   </div>
 
   <!-- GPS Settings modal -->
@@ -1068,7 +1070,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
   <!-- Bottom-left stacked view icons -->
   <div class="viewIcons">
-    <button class="viewBtn" id="hazardsToggleBtn" type="button" aria-pressed="true" title="Show or hide hazards and fairway guide" aria-label="Show or hide hazards and fairway guide"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3z" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round"/><path d="M12 9v5" style="stroke:currentColor;stroke-width:2;stroke-linecap:round"/><circle cx="12" cy="17.5" r="1" style="fill:currentColor"/></svg><span>HAZARDS</span></button>
+
     <button class="viewBtn" id="apiRecenterBtn" title="Recenter CART and MID" aria-label="Recenter CART and MID" type="button"><svg aria-hidden="true" viewBox="-0.08 0 20.163 20.163" xmlns="http://www.w3.org/2000/svg" fill="currentColor"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <g id="golf-cart" transform="translate(-2 -1.837)"> <path id="secondary" fill="currentColor" d="M20,13H9l-.72-1.45a1,1,0,0,0-.9-.55H4a1,1,0,0,0-1,1v6a1,1,0,0,0,1,1H5a2,2,0,0,1,4,0h6a2,2,0,0,1,4,0h1a1,1,0,0,0,1-1V14A1,1,0,0,0,20,13Z"/> <path id="primary" d="M5,19H4a1,1,0,0,1-1-1V12a1,1,0,0,1,1-1H7.38a1,1,0,0,1,.9.55L9,13H20a1,1,0,0,1,1,1v4a1,1,0,0,1-1,1H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> <path id="primary-2" data-name="primary" d="M6,3v8M17,3l1.82,10M15,19H9m5.82-6-.55-3M7,17a2,2,0,1,0,2,2A2,2,0,0,0,7,17Zm10,0a2,2,0,1,0,2,2A2,2,0,0,0,17,17ZM4,3H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> </g> </g> </svg></button>
     <button class="viewBtn" id="apiGreenZoomBtn" title="Zoom to green" aria-label="Zoom to green" type="button"><svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" id="golf-3" data-name="Flat Color" xmlns="http://www.w3.org/2000/svg" class="icon flat-color"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <path id="secondary" d="M8.44,12a8.19,8.19,0,0,1,2.3.39,13.58,13.58,0,0,0,3.93.54c3,0,6.33,1.42,6.33,4.54C21,22,14.25,22,12,22c-8.15,0-9-3.81-9-5.44C3,13.7,5,12,8.44,12Z" style="fill: #38b6ff;"/> <path id="primary" d="M8.55,6.11,14,3.38V3a1,1,0,0,1,2,0V16a1,1,0,0,1-2,0V10.62L8.55,7.89a1,1,0,0,1,0-1.78Z" style="fill: #000000;"/> </g> </svg></button>
     <button title="Player View (TEE → GREEN)" class="viewBtn" id="playerViewBtn" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L21 21H3L12 3Z" fill="#38b6ff" opacity="0.22"/><path d="M12 3L21 21H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 6V19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3"/><circle cx="12" cy="18.5" r="1.8" fill="currentColor"/><circle cx="12" cy="5" r="1.6" fill="#38b6ff"/></svg></button>
@@ -1560,47 +1562,6 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     map.createPane('cartPane');
     map.getPane('cartPane').style.zIndex = '1040';
     map.getPane('cartPane').style.pointerEvents = 'none';
-
-    // Screen-space guide uses the same rotation-aware projection as the fog and cart.
-    // A custom Leaflet pane outside the rotation hierarchy can misalign its SVG paths.
-    const mapperGuideCanvas=document.createElement('canvas');
-    Object.assign(mapperGuideCanvas.style,{position:'absolute',inset:'0',width:'100%',height:'100%',zIndex:'510',pointerEvents:'none',display:'none'});
-    $('#map').appendChild(mapperGuideCanvas);
-    const mapperGuideCtx=mapperGuideCanvas.getContext('2d');
-    let mapperGuidePoints=[],mapperGuideRaf=null;
-    function redrawMapperGuide(){
-      mapperGuideRaf=null;
-      if(!state.hazardsEnabled||!mapperGuideCtx||mapperGuidePoints.length<2){mapperGuideCanvas.style.display='none';return;}
-      try{
-        const size=map.getSize(),ratio=window.devicePixelRatio||1;
-        const w=Math.max(1,Math.round(size.x*ratio)),h=Math.max(1,Math.round(size.y*ratio));
-        if(mapperGuideCanvas.width!==w)mapperGuideCanvas.width=w;
-        if(mapperGuideCanvas.height!==h)mapperGuideCanvas.height=h;
-        const ctx=mapperGuideCtx;
-        ctx.setTransform(ratio,0,0,ratio,0,0);
-        ctx.clearRect(0,0,size.x,size.y);
-        const pts=mapperGuidePoints.map(p=>map.latLngToContainerPoint(L.latLng(p.lat,p.lng)));
-        if(!pts.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))){mapperGuideCanvas.style.display='none';return;}
-        ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
-        pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-        ctx.lineWidth=3;ctx.strokeStyle='#38b6ff';ctx.lineCap='round';ctx.lineJoin='round';
-        ctx.setLineDash([6,6]);ctx.stroke();ctx.setLineDash([]);
-        for(const p of pts.slice(1,-1)){
-          ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);
-          ctx.fillStyle='#38b6ff';ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();
-        }
-        mapperGuideCanvas.style.display='block';
-      }catch(_){mapperGuideCanvas.style.display='none';}
-    }
-    function updateMapperGuide(){
-      if(mapperGuideRaf!==null)cancelAnimationFrame(mapperGuideRaf);
-      mapperGuideRaf=requestAnimationFrame(redrawMapperGuide);
-    }
-    function clearMapperGuide(){
-      mapperGuidePoints=[];
-      if(mapperGuideRaf!==null)cancelAnimationFrame(mapperGuideRaf);
-      mapperGuideRaf=null;mapperGuideCanvas.style.display='none';
-    }
 
     // Hazard overlay uses rotation-aware screen coordinates, like the fairway guide.
     const hazardCanvas=document.createElement('canvas');
@@ -2713,8 +2674,8 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       state.hazardsEnabled=!state.hazardsEnabled;
       try{localStorage.setItem('ddgps_hazards_visible_v1',state.hazardsEnabled?'on':'off');}catch(_){}
       updateSettingsControls();
-      if(state.hazardsEnabled){updateMapperGuide();updateHazards();}
-      else{mapperGuideCanvas.style.display='none';clearHazards();}
+      if(state.hazardsEnabled)updateHazards();
+      else clearHazards();
       toast(state.hazardsEnabled?'Hazards on':'Hazards off');
     }
 
@@ -2735,7 +2696,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function clearMarkers(){
       state.markers.forEach(m=>m.remove());
       state.markers=[];
-      clearMapperGuide();
+
       clearHazards();
     }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
@@ -2755,28 +2716,12 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       return !!p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))
         &&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lng))<=180;
     }
-    function mapperStyleGuidePoints(hole,pins){
-      const tee=pins?.TEE,mid=pins?.MID;
-      if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(mid)||distMeters(tee,mid)<2)return [];
-      const controls=(Array.isArray(hole?.outlineControlPoints)?hole.outlineControlPoints:[]).filter(mapperStyleValidPoint);
-      if(controls.length<2)return [tee,mid];
-      // Mapper routes are normally ordered TEE to green. Orient defensively for imported drafts.
-      const first=controls[0],last=controls[controls.length-1];
-      if(distMeters(first,tee)+distMeters(last,mid)>distMeters(last,tee)+distMeters(first,mid))controls.reverse();
-      const points=[tee];
-      for(const p of controls.slice(1,-1)){
-        if(distMeters(points[points.length-1],p)>2&&distMeters(p,mid)>2)points.push(p);
-      }
-      points.push(mid);
-      return points;
-    }
     function renderMapperStylePins(hole,pins){
       for(const key of ['TEE','FRONT','MID','BACK']){
         const point=pins[key];
         if(mapperStyleValidPoint(point))addMarker(point.lat,point.lng,mapperStylePinIcon(key),key);
       }
-      mapperGuidePoints=mapperStyleGuidePoints(hole,pins);
-      updateMapperGuide();
+
     }
 
     function isMobileView(){
@@ -3348,7 +3293,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       state.focusRaf = requestAnimationFrame(redrawFocusMaskNow);
     }
     map.on('move zoom zoomend moveend resize viewreset rotate rotateend', ()=>{
-      if(mapperGuidePoints.length>=2)updateMapperGuide();
+
       updateHazards();
       updateFocusMask();
       updateCartAboveFocusOverlay();
@@ -4844,7 +4789,6 @@ const RULES = {
 <script id="adsScript">
 (function(){
   const ADS_IDLE_MS = 5 * 60 * 1000; // Club/fleet ads: 5 minutes
-  const GUEST_SPLASH_IDLE_MS = 30 * 60 * 1000; // Non-fleet DriveDen splash: 30 minutes
   const ADS_SLIDE_MS = 10 * 1000;
 
   let lastTouch = Date.now();
@@ -4936,13 +4880,7 @@ const RULES = {
     return norm(localStorage.getItem(getModeKey(courseId))) === 'club';
   }
 
-  function getIdleDelayMs(){
-    // Club/fleet carts keep paid ads at 5 minutes.
-    // Guest/non-fleet carts showing only the DriveDen splash wait 30 minutes.
-    return activeAdsKey === 'guest' || startedForKey === 'guest'
-      ? GUEST_SPLASH_IDLE_MS
-      : ADS_IDLE_MS;
-  }
+  function getIdleDelayMs(){ return ADS_IDLE_MS; }
 
   async function fetchClubAds(adsKey){
     if (!adsKey) return [];
@@ -4956,18 +4894,6 @@ const RULES = {
     }catch(_){
       return [];
     }
-  }
-
-  async function fetchGuestSplashUrls(){
-    const candidates = ['/images/guest-splash.png', '/guest-splash.png'];
-    const ok = [];
-    for (const u of candidates){
-      try{
-        const res = await fetch(u, { cache:'no-store' });
-        if (res && res.ok) ok.push(u);
-      }catch(_){}
-    }
-    return ok;
   }
 
   function persistUrls(key, list){
@@ -5095,14 +5021,7 @@ const RULES = {
     let persistKey = '';
 
     if (isGuest(meta)){
-      latest = await fetchGuestSplashUrls();
-      if (!latest.length){
-        latest = restoreUrls('guest');
-        if (!latest.length) latest = ['/images/guest-splash.png', '/guest-splash.png'];
-      }
-      startedForKey = 'guest';
-      persistKey = 'guest';
-      metaSnapshot = meta || { id:getCourseIdFromUrl(), short_code:'', name:'Guest' };
+      enabled=false;urls=[];startedForKey=null;activeAdsKey=null;dismiss();return;
     } else if (isClub(meta)){
       const adsKey = await resolveShortCode(meta);
       latest = await fetchClubAds(adsKey);
