@@ -93,7 +93,7 @@
       border-radius:50%;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.45);
       color:#17212d;font-family:system-ui,sans-serif;font-size:12px;font-weight:950;line-height:1}
     .dd-mapper-tee{width:34px;height:34px;background:#38b6ff;color:#fff;border-color:#fff;letter-spacing:-.4px}
-    .dd-mapper-mid{width:43px;height:43px;background:#38b6ff;color:#fff;font-size:14px;border-color:#fff}
+    .dd-mapper-mid{width:43px;height:43px;background:#fbbf24;color:#17212d;font-size:14px;border-color:#fff}
     .dd-mapper-front{width:13px;height:13px;background:#fff;border:2px solid #334155}
     .dd-mapper-back{width:13px;height:13px;background:#ef4444;border:2px solid #fff}
     .dd-mapper-hole-number{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
@@ -2653,14 +2653,18 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       return !!p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))
         &&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lng))<=180;
     }
-    function mapperStyleLabelPosition(tee,mid){
-      // The label always sits halfway along the straight TEE -> MID line.
-      // Do not use the mapping outline or its editable dogleg centreline here.
+    function mapperStyleLabelPosition(hole,tee,mid){
+      // Match the Mapper overview badge, including its editable fairway centreline.
+      const controls=(Array.isArray(hole?.outlineControlPoints)?hole.outlineControlPoints:[]).filter(mapperStyleValidPoint);
+      if(controls.length>=2){
+        const i=Math.floor((controls.length-1)/2),a=controls[i],b=controls[i+1];
+        return {lat:(Number(a.lat)+Number(b.lat))/2,lng:(Number(a.lng)+Number(b.lng))/2};
+      }
       if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(mid))return null;
-      return {lat:(Number(tee.lat)+Number(mid.lat))/2,
-        lng:(Number(tee.lng)+Number(mid.lng))/2};
+      return {lat:Number(tee.lat)*0.48+Number(mid.lat)*0.52,
+        lng:Number(tee.lng)*0.48+Number(mid.lng)*0.52};
     }
-    function renderMapperStylePins(_hole,pins){
+    function renderMapperStylePins(hole,pins){
       for(const key of ['TEE','FRONT','MID','BACK']){
         const point=pins[key];
         if(mapperStyleValidPoint(point))addMarker(point.lat,point.lng,mapperStylePinIcon(key),key);
@@ -2668,9 +2672,9 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       const tee=pins.TEE,mid=pins.MID;
       if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(mid))return;
       if(distMeters(tee,mid)<2)return;
-      const label=mapperStyleLabelPosition(tee,mid);
+      const label=mapperStyleLabelPosition(hole,tee,mid);
       if(!label)return;
-      // Exactly three co-linear locations: TEE -> hole number -> MID.
+      // Three locations: TEE -> mapped fairway hole number -> MID.
       // This is a visual guide above the existing white fog, never an outline.
       const latlngs=[[tee.lat,tee.lng],[label.lat,label.lng],[mid.lat,mid.lng]];
       L.polyline(latlngs,{pane:'mapperGuidePane',color:'#38b6ff',weight:5,opacity:.95,
