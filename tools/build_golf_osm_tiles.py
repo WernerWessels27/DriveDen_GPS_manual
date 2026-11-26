@@ -39,6 +39,16 @@ def geometry_points(geom):
             result.append({"lat": round(lat, 7), "lon": round(lon, 7)})
     return result[:1800]
 
+def hazard_kind(prop):
+    golf = prop.get("golf")
+    if golf == "bunker":
+        return "bunker"
+    if golf in ("water_hazard", "lateral_water_hazard") or prop.get("natural") == "water" or prop.get("waterway") == "riverbank":
+        return "water"
+    if prop.get("waterway") in ("river", "stream", "canal", "ditch"):
+        return "water_line"
+    return None
+
 def main():
     if len(sys.argv) != 3:
         raise SystemExit("usage: build_golf_osm_tiles.py INPUT.geojson DESTINATION_DIRECTORY")
@@ -47,14 +57,20 @@ def main():
     target.mkdir(parents=True, exist_ok=True)
     source = json.loads(input_path.read_text(encoding="utf-8"))
     grouped = {}
-    counts = {"hole": 0, "tee": 0, "green": 0}
+    counts = {"hole": 0, "tee": 0, "green": 0, "bunker": 0, "water": 0, "water_line": 0}
     for i, feat in enumerate(source.get("features", [])):
         prop = feat.get("properties") or {}
         golf = prop.get("golf")
+        if golf not in ("hole", "tee", "green"):
+            golf = hazard_kind(prop)
         if golf not in counts:
             continue
         coords = geometry_points(feat.get("geometry"))
-        if len(coords) < (2 if golf == "hole" else 1):
+        if golf in ("bunker", "water") and feat["geometry"]["type"] not in ("Polygon", "MultiPolygon"):
+            continue
+        if golf == "water_line" and feat["geometry"]["type"] not in ("LineString", "MultiLineString"):
+            continue
+        if len(coords) < (4 if golf in ("bunker", "water") else 2 if golf in ("hole", "water_line") else 1):
             continue
         centre_lat = sum(p["lat"] for p in coords) / len(coords)
         centre_lon = sum(p["lon"] for p in coords) / len(coords)
@@ -69,6 +85,26 @@ def main():
         counts[golf] += 1
     if counts["hole"] < 20:
         raise SystemExit(f"Refusing to publish unexpectedly sparse golf dataset: {counts}")
+    # Retain hazards only near mapped golf routes.
+    cells = set()
+    for items in grouped.values():
+        for item in items:
+            if item["tags"]["golf"] in ("hole", "tee", "green"):
+                for pt in item["geometry"]:
+                    cells.add((math.floor(pt["lat"] * 100), math.floor(pt["lon"] * 100)))
+    nearby = {(a+dy,b+dx) for a,b in cells for dy in (-1,0,1) for dx in (-1,0,1)}
+    for key in list(grouped):
+        kept = []
+        for item in grouped[key]:
+            kind = item["tags"]["golf"]
+            if kind in ("water", "water_line", "bunker") and not any((math.floor(p["lat"]*100), math.floor(p["lon"]*100)) in nearby for p in item["geometry"]):
+                counts[kind] -= 1
+                continue
+            kept.append(item)
+        if kept:
+            grouped[key] = kept
+        else:
+            del grouped[key]
     for old in target.glob("*.json"):
         old.unlink()
     for key, items in grouped.items():

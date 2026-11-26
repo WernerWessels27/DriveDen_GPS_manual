@@ -226,8 +226,8 @@ function readIndexedOSMGolfFeatures(lat,lng,radiusM) {
         }
       }
       for(const f of tile) {
-        if(features.length>=1400) break;
-        if(!f || !['hole','tee','green'].includes(f?.tags?.golf))continue;
+        if(features.length>=3000) break;
+        if(!f || !['hole','tee','green','bunker','water','water_line'].includes(f?.tags?.golf))continue;
         const pts=f.geometry;
         if(!Array.isArray(pts)||!pts.length)continue;
         if(!pts.some(p=>Math.abs(Number(p.lat)-lat)<=latSpan && Math.abs(Number(p.lon)-lng)<=lngSpan))continue;
