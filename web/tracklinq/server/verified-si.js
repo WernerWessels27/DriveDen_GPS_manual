@@ -1,4 +1,5 @@
-// Private verified scorecard reference; no external lookup or full dataset exposed.
+import {readFileSync} from "node:fs";
+// Verified course scorecard facts; served only as matching Mapper results.
 function normalizeName(s){return String(s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/\b(golf|country|club|course|gc|cc|the|and)\b/g," ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
 function matchVerified(records,name,club,pars,tee){
   const n=normalizeName(name),cl=normalizeName(club);
@@ -30,9 +31,10 @@ function matchVerified(records,name,club,pars,tee){
 let records;
 export function verifiedStrokeOptions(name,club,pars,tee){
  if(!records){
-  records=[];
-  try{for(let i=0;i<64;i++){const chunk=process.env['VERIFIED_SI_DATA_'+i];if(!chunk)break;const rows=JSON.parse(chunk);if(!Array.isArray(rows))throw Error('Invalid reference');records.push(...rows);}}
-  catch(e){console.warn('Verified SI reference unavailable');records=[];}
+  try{
+   const snapshot=JSON.parse(readFileSync(new URL('./verified-scorecards.json',import.meta.url),'utf8'));
+   records=snapshot.courses.map(c=>[normalizeName(c.name),normalizeName(c.clubName),c.tees.map(t=>[t.tee,t.gender,t.pars.join(''),t.strokeIndexes.map(n=>n.toString(19)).join('')])]);
+  }catch(e){console.warn('Verified SI reference unavailable:',e.message);records=[];}
  }
  return matchVerified(records,name,club,pars,tee);
 }
