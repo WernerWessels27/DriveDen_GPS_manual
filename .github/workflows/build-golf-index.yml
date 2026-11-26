@@ -28,9 +28,9 @@ jobs:
             --output /tmp/south-africa.osm.pbf \
             https://download.geofabrik.de/africa/south-africa-latest.osm.pbf
           test -s /tmp/south-africa.osm.pbf
-      - name: Extract only golf hole, tee, and green geometries
+      - name: Extract golf geometry and water hazards
         run: |
-          osmium tags-filter /tmp/south-africa.osm.pbf 'nwr/golf=hole,tee,green' \
+          osmium tags-filter /tmp/south-africa.osm.pbf 'nwr/golf=hole,tee,green,bunker,water_hazard,lateral_water_hazard' 'wr/natural=water' 'wr/waterway=riverbank,river,stream,canal,ditch' \
             -o /tmp/za-golf.osm.pbf --overwrite
           osmium export /tmp/za-golf.osm.pbf -o /tmp/za-golf.geojson --overwrite
           python3 tools/build_golf_osm_tiles.py /tmp/za-golf.geojson \
