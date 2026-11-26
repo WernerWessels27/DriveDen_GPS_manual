@@ -125,9 +125,9 @@
 
     <section class="mapperHighlight">
       <h3>Smooth Outline — TEE to GREEN</h3>
-      <div class="muted">Creates an <strong>estimated curved hole corridor</strong> using the imported hole route, or a straight line from TEE to GREEN if no route exists. In MOVE mode, drag the few blue <strong>centreline</strong> controls to follow a dogleg. Change the width to adjust the whole boundary smoothly.</div>
+      <div class="muted">Creates an <strong>estimated curved hole corridor</strong> using the imported hole route, or a straight line from TEE to GREEN if no route exists. In MOVE mode, drag the few blue <strong>centreline</strong> controls to follow a dogleg. Change the width to adjust all smooth hole boundaries together.</div>
       <div class="row" style="margin-top:9px;align-items:end">
-        <label>Full outline width (metres)<input type="number" id="autoOutlineWidth" min="20" max="120" step="5" value="65" /></label>
+        <label>Full outline width — all smooth holes (metres)<input type="number" id="autoOutlineWidth" min="20" max="120" step="5" value="65" /></label>
         <button id="autoOutlineCurrent" type="button">Outline Current Hole</button>
       </div>
       <div class="saveRow"><button id="autoOutlineAll" type="button">Outline All Holes with TEE + GREEN</button><button id="suggestGreenEdges" type="button">Suggest FRONT/BACK from TEE + MID</button></div>
@@ -1647,15 +1647,28 @@
       h.outline=shape;h.outlineEstimated=true;h.outlineReviewed=false;
       return true;
     }
-    $('#autoOutlineWidth').addEventListener('input',()=>{
-      const h=state.course.holes[String(state.hole)];
-      if(!Array.isArray(h?.outlineControlPoints)||h.outlineControlPoints.length<2)return;
-      h.outlineWidthM=currentOutlineWidth();
-      h.outline=smoothCorridor(h.outlineControlPoints,h.outlineWidthM)||h.outline;
-      h.outlineReviewed=false;
-      $('#verifyCoordinates').checked=false;
-      drawSavedOutline(h.outline);
-      $('#autoOutlineStatus').textContent=`Width adjusted to ${h.outlineWidthM} m. Review the new curved outline.`;
+    $('#autoOutlineWidth').addEventListener('change',()=>{
+      saveHoleToState();
+      const width=currentOutlineWidth();
+      $('#autoOutlineWidth').value=String(width);
+      let updated=0,skipped=0;
+      for(const h of Object.values(state.course.holes||{})){
+        if(!Array.isArray(h?.outlineControlPoints)||h.outlineControlPoints.length<2){skipped++;continue;}
+        const shape=smoothCorridor(h.outlineControlPoints,width);
+        if(!shape||shape.length<3){skipped++;continue;}
+        h.outlineWidthM=width;
+        h.outline=shape;
+        h.outlineReviewed=false;
+        updated++;
+      }
+      if(updated){
+        $('#verifyCoordinates').checked=false;
+        if(state.course.verification)state.course.verification.coordinatesChecked=false;
+        drawSavedOutline(state.course.holes[String(state.hole)]?.outline);
+        renderWholeCourseOverview();
+        updateMappingCompleteness();
+      }
+      $('#autoOutlineStatus').textContent=`Width adjusted to ${width} m for ${updated} holes. ${skipped} without smooth centreline controls left unchanged. Review before publishing.`;
     });
     $('#autoOutlineCurrent').addEventListener('click',()=>{
       saveHoleToState();
