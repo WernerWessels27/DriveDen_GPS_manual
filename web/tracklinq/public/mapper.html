@@ -1957,7 +1957,7 @@
         publishMessage.textContent='Review the mapping and scorecard, tick both checks and enter the scorecard source.';
         return;
       }
-      if(!confirm(`Publish ${$('#courseName').value||'this course'} (${count} holes) into the DriveDen Enhanced library? Existing published versions will be replaced.`))return;
+      if(!confirm(`Publish ${$('#courseName').value||'this course'} (${count} holes) into the DriveDen Enhanced library? You will be asked to confirm if an existing course matches.`))return;
       if(!mapperPublishSecret){
         mapperPublishSecret=prompt('Enter your Railway MAPPER_PUBLISH_TOKEN (not your API key):')||'';
       }
@@ -1967,13 +1967,30 @@
         const data=collectCourse();
         data.verification={coordinatesChecked:true,scorecardChecked:true,
           scorecardSource:$('#scorecardSource').value.trim(),checkedAt:new Date().toISOString()};
-        const res=await fetch('/api/mapper/publish',{method:'POST',cache:'no-store',headers:{
-          'Content-Type':'application/json','x-mapper-publish-token':mapperPublishSecret
-        },body:JSON.stringify({course:data})});
-        const result=await res.json().catch(()=>({}));
+        const publish=async(replaceCourseId)=>{
+          const res=await fetch('/api/mapper/publish',{method:'POST',cache:'no-store',headers:{
+            'Content-Type':'application/json','x-mapper-publish-token':mapperPublishSecret
+          },body:JSON.stringify({course:data,replaceCourseId})});
+          return {res,result:await res.json().catch(()=>({}))};
+        };
+        let {res,result}=await publish();
+        if(res.status===409&&Array.isArray(result.duplicates)&&result.duplicates.length){
+          const options=result.duplicates;
+          let chosen=options[0];
+          if(options.length>1){
+            const choice=prompt('Multiple existing versions found. Enter the number of the version to replace (other versions will be kept):\n'+options.map((o,i)=>`${i+1}. ${o.name} — ${o.id} — updated ${new Date(o.updatedAt).toLocaleString()}`).join('\n'));
+            if(choice===null){publishMessage.textContent='Publishing cancelled. No changes made.';return;}
+            chosen=options[Number(choice)-1];
+            if(!chosen)throw Error('Invalid version selection. No changes made.');
+          }
+          if(!confirm(`"${chosen.name}" already exists in DriveDen Enhanced. Replace this version? Its existing course ID will be retained.`)){
+            publishMessage.textContent='Publishing cancelled. No changes made.';return;
+          }
+          ({res,result}=await publish(chosen.id));
+        }
         if(!res.ok||!result.ok)throw Error(result.error||'Publishing failed');
         $('#courseId').value=result.id;state.course.course.id=result.id;
-        publishMessage.textContent=`Published ${result.name} (${result.holes} holes). Search for it under DriveDen Enhanced Courses.`;
+        publishMessage.textContent=`${result.replaced?'Updated':'Published'} ${result.name} (${result.holes} holes). Search for it under DriveDen Enhanced Courses.`;
         await refreshPublishedCourses();$('#publishedCourseSelect').value=result.id;
       }catch(e){
         if(/token|unauthor/i.test(e.message))mapperPublishSecret='';
