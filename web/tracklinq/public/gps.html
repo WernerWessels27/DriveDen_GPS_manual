@@ -92,12 +92,12 @@
     .dd-mapper-pin{box-sizing:border-box;display:flex;align-items:center;justify-content:center;
       border-radius:50%;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.45);
       color:#17212d;font-family:system-ui,sans-serif;font-size:12px;font-weight:950;line-height:1}
-    .dd-mapper-tee{width:34px;height:34px;background:#fbbf24;border-color:#fff;letter-spacing:-.4px}
-    .dd-mapper-mid{width:43px;height:43px;background:#facc15;font-size:14px;border-color:#fff}
+    .dd-mapper-tee{width:34px;height:34px;background:#38b6ff;color:#fff;border-color:#fff;letter-spacing:-.4px}
+    .dd-mapper-mid{width:43px;height:43px;background:#38b6ff;color:#fff;font-size:14px;border-color:#fff}
     .dd-mapper-front{width:13px;height:13px;background:#fff;border:2px solid #334155}
     .dd-mapper-back{width:13px;height:13px;background:#ef4444;border:2px solid #fff}
     .dd-mapper-hole-number{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
-      background:#0f172a;color:#fff;border:2px solid #facc15;border-radius:50%;
+      background:#0f172a;color:#fff;border:2px solid #38b6ff;border-radius:50%;
       box-shadow:0 2px 7px rgba(0,0,0,.7);font-weight:950;font-size:14px}
     .playerGlMarker {
       display: inline-flex; align-items: center; gap: 5px;
@@ -949,7 +949,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         <div class="settingsRow" id="mapperStyleSettingsRow">
           <div class="settingsRowText">
             <strong>Map Markers &amp; Line</strong>
-            <span>Mapper Style shows larger yellow TEE/MID markers, small FRONT/BACK markers, and a striped centreline with the hole number. The white-fog outline stays unchanged.</span>
+            <span>Mapper Style shows larger DriveDen-blue TEE/MID markers, small FRONT/BACK markers, and a straight dotted TEE → hole number → MID line. The white-fog outline stays unchanged.</span>
           </div>
           <select class="settingsSelect" id="mapperStyleSelect" aria-label="GPS map marker style">
             <option value="classic">Classic</option>
@@ -2653,52 +2653,34 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       return !!p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))
         &&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lng))<=180;
     }
-    function mapperStyleLabelPosition(path){
-      if(path.length<2)return null;
-      const lengths=[];let total=0;
-      for(let i=1;i<path.length;i++){const d=distMeters(path[i-1],path[i]);lengths.push(d);total+=d;}
-      if(total<1)return path[Math.floor(path.length/2)];
-      let target=total*0.53;
-      for(let i=1;i<path.length;i++){
-        const length=lengths[i-1];
-        if(target<=length&&length>0){
-          const t=target/length,a=path[i-1],b=path[i];
-          return {lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t};
-        }
-        target-=length;
-      }
-      return path[Math.floor(path.length/2)];
+    function mapperStyleLabelPosition(tee,mid){
+      // The label always sits halfway along the straight TEE -> MID line.
+      // Do not use the mapping outline or its editable dogleg centreline here.
+      if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(mid))return null;
+      return {lat:(Number(tee.lat)+Number(mid.lat))/2,
+        lng:(Number(tee.lng)+Number(mid.lng))/2};
     }
-    function renderMapperStylePins(hole,pins){
+    function renderMapperStylePins(_hole,pins){
       for(const key of ['TEE','FRONT','MID','BACK']){
         const point=pins[key];
         if(mapperStyleValidPoint(point))addMarker(point.lat,point.lng,mapperStylePinIcon(key),key);
       }
-      const tee=pins.TEE,target=pins.MID||pins.BACK;
-      if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(target))return;
-      const src=Array.isArray(hole.outlineControlPoints)?hole.outlineControlPoints:[];
-      const path=src.filter(mapperStyleValidPoint).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
-      if(path.length<2){path.length=0;path.push(tee,target);}
-      else{
-        if(distMeters(path[0],tee)>3)path.unshift(tee);
-        if(distMeters(path[path.length-1],target)>3)path.push(target);
-      }
-      if(path.length<2||path.some(p=>!mapperStyleValidPoint(p)))return;
-      const latlngs=path.map(p=>[p.lat,p.lng]);
-      // Stripes follow the mapped hole centreline. They are not the boundary.
-      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#14202b',weight:6,opacity:.75,
+      const tee=pins.TEE,mid=pins.MID;
+      if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(mid))return;
+      if(distMeters(tee,mid)<2)return;
+      const label=mapperStyleLabelPosition(tee,mid);
+      if(!label)return;
+      // Exactly three co-linear locations: TEE -> hole number -> MID.
+      // This is a visual guide above the existing white fog, never an outline.
+      const latlngs=[[tee.lat,tee.lng],[label.lat,label.lng],[mid.lat,mid.lng]];
+      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#38b6ff',weight:5,opacity:.95,
         interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapperStyleLineGroup);
-      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#fff',weight:3.5,opacity:1,
-        dashArray:'10,12',interactive:false,lineCap:'round'}).addTo(mapperStyleLineGroup);
-      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#facc15',weight:3.5,opacity:1,
-        dashArray:'10,12',dashOffset:'11',interactive:false,lineCap:'round'}).addTo(mapperStyleLineGroup);
-      const label=mapperStyleLabelPosition(path);
-      if(label){
-        const number=Number(state.hole);
-        const icon=L.divIcon({className:'',html:'<div class="dd-mapper-hole-number">'+number+'</div>',
-          iconSize:[30,30],iconAnchor:[15,15]});
-        addMarker(label.lat,label.lng,icon,'Hole '+number);
-      }
+      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#fff',weight:2.8,opacity:1,
+        dashArray:'2,11',interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapperStyleLineGroup);
+      const number=Number(state.hole);
+      const icon=L.divIcon({className:'',html:'<div class="dd-mapper-hole-number">'+number+'</div>',
+        iconSize:[30,30],iconAnchor:[15,15]});
+      addMarker(label.lat,label.lng,icon,'Hole '+number);
     }
 
     function isMobileView(){
