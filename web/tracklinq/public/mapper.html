@@ -256,8 +256,9 @@
       <div id="mappingCompleteness" class="status">Mapping completion: checking…</div>
       <section class="mapperHighlight" style="background:#fff;margin-top:10px" id="strokeIndexEditor">
         <h3>Stroke Index Assistant (Any Course)</h3>
-        <div class="muted">SI is loaded automatically when the course API provides it. If anything is missing, upload the club's scorecard photo/PDF or paste scorecard text here. The reader suggests all hole indexes for you to review. It never changes your mapped coordinates.</div>
+        <div class="muted">Verified Stroke Indexes are loaded automatically when a matching course scorecard is available. Otherwise SI is loaded from the course API when provided. If anything is missing, upload the club's scorecard photo/PDF or paste scorecard text here. The reader suggests all hole indexes for you to review. It never changes your mapped coordinates.</div>
         <div id="siAvailability" class="status" style="font-weight:800">Checking SI availability…</div>
+        <div id="verifiedSIRow" style="display:none;margin-top:8px"><label for="verifiedSISelect">Verified scorecard allocation</label><select id="verifiedSISelect" style="width:100%"></select></div>
         <div class="saveRow" style="align-items:center">
           <input id="siScorecardFile" type="file" accept="image/*,.pdf,application/pdf,.txt,text/plain" style="min-width:0;max-width:100%;font-size:12px" aria-label="Club scorecard photo or PDF" />
           <button id="siReadScorecardFile" type="button" style="background:#38b6ff;color:#03131f">Read Scorecard</button>
@@ -1267,6 +1268,7 @@
       else fitMapToCurrentHole();
       status(`${label} imported`);
       syncVerificationUI();
+      showVerifiedSIOptions(obj);
     }
 
 
@@ -1602,6 +1604,41 @@
     }
     // ===== Bulk Stroke Index editor =====
     const strokeIndexMessage=$('#strokeIndexStatus');
+    function showVerifiedSIOptions(obj){
+      const options=obj.mapperVerifiedSI?.options||[];
+      const row=$('#verifiedSIRow'),select=$('#verifiedSISelect');
+      select.replaceChildren();
+      row.style.display=options.length>1?'':'none';
+      $('#bulkStrokeIndexes').value='';
+      if(options.length>1){
+        const placeholder=document.createElement('option');
+        placeholder.value='';placeholder.textContent='Choose the tee / gender allocation';select.append(placeholder);
+        options.forEach((o,i)=>{const item=document.createElement('option');item.value=String(i);item.textContent=o.label;select.append(item);});
+      }
+      if(obj.mapperVerifiedSI?.applied){
+        $('#bulkStrokeIndexes').value=Array.from({length:18},(_,i)=>obj.holes[String(i+1)].stroke).join(', ');
+        strokeIndexMessage.textContent='Verified Stroke Indexes automatically populated for all 18 holes.';
+      }else if(options.length>1){strokeIndexMessage.textContent='Verified scorecards available. Choose the appropriate tee / gender allocation.';}
+    }
+    function applyVerifiedSI(option){
+      if(!option||state.holeCount!==18)return;
+      const nums=parseStrokeIndexSequence(option.numbers.join(','),18);
+      saveHoleToState();
+      if(!Array.from({length:18},(_,i)=>state.course.holes[String(i+1)]).every(Boolean))return;
+      nums.forEach((si,i)=>state.course.holes[String(i+1)].stroke=si);
+      state.course.mapperVerifiedSI.applied=true;
+      $('#holeStroke').value=String(state.course.holes[String(state.hole)].stroke);
+      $('#bulkStrokeIndexes').value=nums.join(', ');
+      $('#scorecardSource').value='Verified course scorecard (2026-10-15)';
+      $('#verifyScorecard').checked=false;
+      state.course.verification={...(state.course.verification||{}),scorecardChecked:false,scorecardSource:$('#scorecardSource').value};
+      renderWholeCourseOverview();updateMappingCompleteness();refreshSIAvailability();
+      strokeIndexMessage.textContent='Verified Stroke Indexes populated for all 18 holes.';
+    }
+    $('#verifiedSISelect').addEventListener('change',()=>{
+      const v=$('#verifiedSISelect').value;if(v==='')return;
+      applyVerifiedSI(state.course.mapperVerifiedSI?.options?.[Number(v)]);
+    });
     const GEORGE_HISTORIC_STROKES=[9,7,3,17,11,15,1,13,5,6,10,8,18,16,14,12,4,2];
     function parseStrokeIndexSequence(text,count){
       const tokens=String(text||'').trim().split(/[\s,;|]+/).filter(Boolean);
@@ -1684,8 +1721,9 @@
       const unique=new Set(filled).size;
       const complete=filled.length===count&&unique===count;
       const availability=$('#siAvailability');
+      const verified=complete&&count===18&&state.course.mapperVerifiedSI?.applied&&state.course.mapperVerifiedSI.options.some(o=>o.numbers.every((si,i)=>holes[String(i+1)]?.stroke===si));
       if(availability)availability.textContent=complete
-        ? '✓ SI available for all '+count+' holes. Review against club scorecard before publishing.'
+        ? (verified?'✓ Verified Stroke Indexes — all '+count+' holes populated.':'✓ SI available for all '+count+' holes. Review against club scorecard before publishing.')
         : 'Missing Stroke Index: '+filled.length+'/'+count+' holes have SI. Use the scorecard reader below.';
       return complete;
     }
@@ -1875,7 +1913,7 @@
       apiMapperImportBtn.disabled=true;
       apiMapperStatus.textContent='Importing scorecard and available green coordinates…';
       try{
-        const data=await mapperLibraryPost('/api/course-library/course',{id:selectedApiMapperId});
+        const data=await mapperLibraryPost('/api/course-library/course',{id:selectedApiMapperId,verifiedSI:true});
         const imported=data.course;
         const name=String(imported.course?.name || 'Golf Course');
         const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,42);
@@ -1885,14 +1923,14 @@
         // This is now an ENHANCED mapper draft, not a GPS API-only course.
         delete imported.apiMode;
         imported.importedFromApi={ provider:'golfcoursesapi', sourceId:selectedApiMapperId };
-        imported.verification={coordinatesChecked:false,scorecardChecked:false,scorecardSource:''};
+        imported.verification={coordinatesChecked:false,scorecardChecked:false,scorecardSource:imported.mapperVerifiedSI?.applied?'Verified course scorecard (2026-10-15)':''};
         loadCourseObject(imported,'Golf Courses API');
         const pos=imported.course?.location;
         if(pos && Number.isFinite(pos.lat) && Number.isFinite(pos.lng) && !Object.values(imported.holes).some(h=>h.pins?.MID)){
           map.setView([pos.lat,pos.lng],16);
         }
         const isSIReady=refreshSIAvailability();
-        apiMapperStatus.textContent=`Imported ${name}. ${isSIReady?'Stroke indexes loaded from API.':'Stroke indexes incomplete — use the Scorecard Reader before publishing.'} Add missing TEE, FRONT, BACK and outlines.`;
+        apiMapperStatus.textContent=`Imported ${name}. ${imported.mapperVerifiedSI?.applied?'Verified Stroke Indexes loaded automatically.':imported.mapperVerifiedSI?.options?.length>1?'Choose a verified scorecard allocation.':isSIReady?'Stroke indexes loaded from API.':'Stroke indexes incomplete — use the Scorecard Reader before publishing.'} Add missing TEE, FRONT, BACK and outlines.`;
       }catch(e){ apiMapperStatus.textContent=e.message || 'Import failed.'; }
       finally{ apiMapperImportBtn.disabled=false; }
     });

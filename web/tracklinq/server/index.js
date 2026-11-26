@@ -1,3 +1,4 @@
+import { verifiedStrokeOptions } from "./verified-si.js";
 import fs from "fs";
 import crypto from "crypto";
 import multer from "multer";
@@ -597,7 +598,20 @@ app.post('/api/course-library/course', golfApiThrottle, async (req,res)=>{
       // as scorecard-only data, but never fabricate GPS coordinates.
       console.warn('Golf course green centers unavailable:', id, e.upstreamStatus || e.status);
     }
-    res.json({ok:true,course:normalizeGolfApiCourse(detail, greens)});
+    const course=normalizeGolfApiCourse(detail, greens);
+    // Only Mapper imports opt in. GPS API-only behavior is unchanged.
+    if(req.body?.verifiedSI===true){
+      const raw=detail?.data||{};
+      const club=typeof raw.club==='string'?raw.club:raw.club?.name||'';
+      const pars=Array.from({length:18},(_,i)=>course.holes[String(i+1)]?.par);
+      const options=Object.keys(course.holes).length===18
+        ? verifiedStrokeOptions(course.course.name,club,pars,course.apiData.teeName):[];
+      if(options.length===1){
+        options[0].numbers.forEach((si,i)=>{course.holes[String(i+1)].stroke=si;});
+      }
+      course.mapperVerifiedSI={options,applied:options.length===1,verifiedOn:'2026-10-15'};
+    }
+    res.json({ok:true,course});
   }catch(e){ golfApiError(res,e); }
 });
 // ----- End Golf Courses API -----
