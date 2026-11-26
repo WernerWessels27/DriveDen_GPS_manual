@@ -88,6 +88,17 @@
     body.player-gl-active #playerMap .maplibregl-canvas {
       touch-action: none;
     }
+    /* Optional Mapper-style map graphics; the existing white focus mask is untouched. */
+    .dd-mapper-pin{box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+      border-radius:50%;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.65),0 0 0 1px rgba(0,0,0,.45);
+      color:#17212d;font-family:system-ui,sans-serif;font-size:12px;font-weight:950;line-height:1}
+    .dd-mapper-tee{width:34px;height:34px;background:#fbbf24;border-color:#fff;letter-spacing:-.4px}
+    .dd-mapper-mid{width:43px;height:43px;background:#facc15;font-size:14px;border-color:#fff}
+    .dd-mapper-front{width:13px;height:13px;background:#fff;border:2px solid #334155}
+    .dd-mapper-back{width:13px;height:13px;background:#ef4444;border:2px solid #fff}
+    .dd-mapper-hole-number{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+      background:#0f172a;color:#fff;border:2px solid #facc15;border-radius:50%;
+      box-shadow:0 2px 7px rgba(0,0,0,.7);font-weight:950;font-size:14px}
     .playerGlMarker {
       display: inline-flex; align-items: center; gap: 5px;
       color: #fff; font-weight: 900; font-size: 12px; line-height: 1;
@@ -121,6 +132,7 @@
       font-size:12px; font-weight:800; box-shadow:var(--shadow);
     }
     .apiCourseNotice[hidden] { display:none!important; }
+    body.api-course #mapperStyleSettingsRow { display:none!important; }
     body.api-course #playerViewBtn,
     body.api-course #holeViewBtn,
     body.api-course #cartViewBtn,
@@ -934,6 +946,17 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
           <button class="settingsActionBtn" id="bagBtn">Build Bag</button>
         </div>
 
+        <div class="settingsRow" id="mapperStyleSettingsRow">
+          <div class="settingsRowText">
+            <strong>Map Markers &amp; Line</strong>
+            <span>Mapper Style shows larger yellow TEE/MID markers, small FRONT/BACK markers, and a striped centreline with the hole number. The white-fog outline stays unchanged.</span>
+          </div>
+          <select class="settingsSelect" id="mapperStyleSelect" aria-label="GPS map marker style">
+            <option value="classic">Classic</option>
+            <option value="mapper">Mapper Style</option>
+          </select>
+        </div>
+
         <div class="settingsRow" id="offlineCourseSettingsRow">
           <div class="settingsRowText">
             <strong>Offline Course</strong>
@@ -1548,6 +1571,12 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     map.getPane('cartPane').style.zIndex = '1040';
     map.getPane('cartPane').style.pointerEvents = 'none';
 
+    // Centreline visuals sit above the focus fog (450) and below GPS markers.
+    map.createPane('mapperGuidePane');
+    map.getPane('mapperGuidePane').style.zIndex = '510';
+    map.getPane('mapperGuidePane').style.pointerEvents = 'none';
+    const mapperStyleLineGroup = L.layerGroup().addTo(map);
+
     const holeFocusCanvas = document.createElement('canvas');
     holeFocusCanvas.style.position = 'absolute';
     holeFocusCanvas.style.inset = '0';
@@ -1858,6 +1887,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     const state = {
       meta:null, course:null, hole:1, viewMode:'cart', markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
+      mapperStyleEnabled:false,
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
       playerAimLine:null,
       playerGlMap:null,
@@ -1893,6 +1923,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     try{
       const savedUnit = localStorage.getItem('tl_distance_unit');
       if(savedUnit === 'm' || savedUnit === 'yd') state.unit = savedUnit;
+      state.mapperStyleEnabled=localStorage.getItem('ddgps_mapper_style_v1')==='mapper';
     }catch(_){}
 
 
@@ -2550,6 +2581,9 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         if(zoomSelect.value !== z) zoomSelect.value = z;
       }
 
+      const styleSelect = $('#mapperStyleSelect');
+      if(styleSelect)styleSelect.value=state.mapperStyleEnabled?'mapper':'classic';
+
       const zoomText = $('#currentInitialZoomText');
       if(zoomText) zoomText.textContent = getInitialZoomLabel();
     }
@@ -2574,6 +2608,15 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       renderBuildBagModal();
     }
 
+    function applyMapperStyleFromSettings(value){
+      const on=value==='mapper';
+      state.mapperStyleEnabled=on;
+      try{localStorage.setItem('ddgps_mapper_style_v1',on?'mapper':'classic');}catch(_){}
+      if(state.course)renderHole();
+      updateSettingsControls();
+      toast(on?'Mapper Style enabled':'Classic map markers enabled');
+    }
+
     function applyInitialZoomFromSettings(value){
       const z = setGpsInitialTileZoom(value);
       if(state.course){
@@ -2588,8 +2631,75 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
 
     // Markers & fitting
-    function clearMarkers(){ state.markers.forEach(m=>m.remove()); state.markers=[]; }
+    function clearMarkers(){
+      state.markers.forEach(m=>m.remove());
+      state.markers=[];
+      mapperStyleLineGroup.clearLayers();
+    }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
+
+    function mapperStylePinIcon(kind){
+      const styles={
+        TEE:{klass:'dd-mapper-tee',size:34,text:'TEE'},
+        MID:{klass:'dd-mapper-mid',size:43,text:'MID'},
+        FRONT:{klass:'dd-mapper-front',size:13,text:''},
+        BACK:{klass:'dd-mapper-back',size:13,text:''}
+      };
+      const item=styles[kind];
+      return L.divIcon({className:'',html:'<span class="dd-mapper-pin '+item.klass+'">'+item.text+'</span>',
+        iconSize:[item.size,item.size],iconAnchor:[item.size/2,item.size/2]});
+    }
+    function mapperStyleValidPoint(p){
+      return !!p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))
+        &&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lng))<=180;
+    }
+    function mapperStyleLabelPosition(path){
+      if(path.length<2)return null;
+      const lengths=[];let total=0;
+      for(let i=1;i<path.length;i++){const d=distMeters(path[i-1],path[i]);lengths.push(d);total+=d;}
+      if(total<1)return path[Math.floor(path.length/2)];
+      let target=total*0.53;
+      for(let i=1;i<path.length;i++){
+        const length=lengths[i-1];
+        if(target<=length&&length>0){
+          const t=target/length,a=path[i-1],b=path[i];
+          return {lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t};
+        }
+        target-=length;
+      }
+      return path[Math.floor(path.length/2)];
+    }
+    function renderMapperStylePins(hole,pins){
+      for(const key of ['TEE','FRONT','MID','BACK']){
+        const point=pins[key];
+        if(mapperStyleValidPoint(point))addMarker(point.lat,point.lng,mapperStylePinIcon(key),key);
+      }
+      const tee=pins.TEE,target=pins.MID||pins.BACK;
+      if(!mapperStyleValidPoint(tee)||!mapperStyleValidPoint(target))return;
+      const src=Array.isArray(hole.outlineControlPoints)?hole.outlineControlPoints:[];
+      const path=src.filter(mapperStyleValidPoint).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
+      if(path.length<2){path.length=0;path.push(tee,target);}
+      else{
+        if(distMeters(path[0],tee)>3)path.unshift(tee);
+        if(distMeters(path[path.length-1],target)>3)path.push(target);
+      }
+      if(path.length<2||path.some(p=>!mapperStyleValidPoint(p)))return;
+      const latlngs=path.map(p=>[p.lat,p.lng]);
+      // Stripes follow the mapped hole centreline. They are not the boundary.
+      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#14202b',weight:6,opacity:.75,
+        interactive:false,lineCap:'round',lineJoin:'round'}).addTo(mapperStyleLineGroup);
+      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#fff',weight:3.5,opacity:1,
+        dashArray:'10,12',interactive:false,lineCap:'round'}).addTo(mapperStyleLineGroup);
+      L.polyline(latlngs,{pane:'mapperGuidePane',color:'#facc15',weight:3.5,opacity:1,
+        dashArray:'10,12',dashOffset:'11',interactive:false,lineCap:'round'}).addTo(mapperStyleLineGroup);
+      const label=mapperStyleLabelPosition(path);
+      if(label){
+        const number=Number(state.hole);
+        const icon=L.divIcon({className:'',html:'<div class="dd-mapper-hole-number">'+number+'</div>',
+          iconSize:[30,30],iconAnchor:[15,15]});
+        addMarker(label.lat,label.lng,icon,'Hole '+number);
+      }
+    }
 
     function isMobileView(){
       return window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
@@ -3511,10 +3621,14 @@ function ensureInitialFraming(){
       updateViewButtonStates();
 
       const p = h.pins || {};
-      if (p.TEE)   addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
-      if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
-      if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
-      if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
+      if(state.mapperStyleEnabled&&!state.apiMode){
+        renderMapperStylePins(h,p);
+      }else{
+        if (p.TEE)   addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
+        if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
+        if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
+        if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
+      }
 
       if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
@@ -3616,6 +3730,7 @@ function ensureInitialFraming(){
     });
     $('#unitSelect')?.addEventListener('change', (e)=> setUnitFromSettings(e.target.value));
     $('#initialZoomSelect')?.addEventListener('change', (e)=> applyInitialZoomFromSettings(e.target.value));
+    $('#mapperStyleSelect')?.addEventListener('change', (e)=> applyMapperStyleFromSettings(e.target.value));
 
     // Build Your Bag
     $('#bagBtn')?.addEventListener('click', openBuildBagModal);
