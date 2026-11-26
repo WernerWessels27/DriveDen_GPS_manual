@@ -10,7 +10,8 @@ function matchVerified(records,name,club,pars,tee){
     if(!Array.isArray(r)||!Array.isArray(r[2]))return false;
     if(generic.test(n)&&(!cl||r[1]!==cl))return false;
     if(cl&&cl!==n&&r[1]!==cl&&r[0]!==cl+" "+n&&r[0]!==n+" "+cl)return false;
-    return combined.includes(r[0]);
+    // Resolve normalized-name collisions using the full hole-by-hole par sequence before rejecting ambiguity.
+    return combined.includes(r[0]) && r[2].some(t=>Array.isArray(t)&&t[2]===pars.join(''));
   });
   if(matches.length!==1)return [];
   const grouped=new Map();
