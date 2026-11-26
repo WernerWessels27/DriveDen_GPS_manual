@@ -1609,6 +1609,84 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       mapperGuideRaf=null;mapperGuideCanvas.style.display='none';
     }
 
+    // Hazard overlay uses rotation-aware screen coordinates, like the fairway guide.
+    const hazardCanvas=document.createElement('canvas');
+    Object.assign(hazardCanvas.style,{position:'absolute',inset:'0',width:'100%',height:'100%',zIndex:'515',pointerEvents:'none',display:'none'});
+    $('#map').appendChild(hazardCanvas);
+    const hazardCtx=hazardCanvas.getContext('2d');
+    let hazardRaf=null;
+    function updateHazards(){
+      if(hazardRaf!==null)cancelAnimationFrame(hazardRaf);
+      hazardRaf=requestAnimationFrame(drawHazards);
+    }
+    function clearHazards(){
+      if(hazardRaf!==null)cancelAnimationFrame(hazardRaf);
+      hazardRaf=null;hazardCanvas.style.display='none';
+    }
+    function hazardDistances(origin,points,closed){
+      const mx=111320*Math.cos(origin.lat*Math.PI/180),my=111132;
+      const xy=p=>({x:(p.lng-origin.lng)*mx,y:(p.lat-origin.lat)*my});
+      const pts=points.map(xy);let near=Infinity,far=0,nearPoint=null,farPoint=null;
+      for(let i=0;i<pts.length;i++){
+        const p=pts[i],d=Math.hypot(p.x,p.y);
+        if(d>far){far=d;farPoint=points[i];}
+        if(d<near){near=d;nearPoint=points[i];}
+      }
+      const n=closed?pts.length:pts.length-1;
+      for(let i=0;i<n;i++){
+        const a=pts[i],b=pts[(i+1)%pts.length],dx=b.x-a.x,dy=b.y-a.y;
+        const t=Math.max(0,Math.min(1,-(a.x*dx+a.y*dy)/(dx*dx+dy*dy||1)));
+        const x=a.x+t*dx,y=a.y+t*dy,d=Math.hypot(x,y);
+        if(d<near){near=d;nearPoint={lat:origin.lat+y/my,lng:origin.lng+x/mx};}
+      }
+      if(closed&&pointInsidePolygon(origin,points)){near=0;nearPoint=origin;}
+      return {near,far,nearPoint,farPoint};
+    }
+    function drawHazards(){
+      hazardRaf=null;
+      const h=state.course?.holes?.[String(state.hole)],hazards=h?.hazards;
+      const origin=fromCart()||h?.pins?.TEE;
+      if(!hazardCtx||!Array.isArray(hazards)||!hazards.length||!mapperStyleValidPoint(origin)||state.apiMode){hazardCanvas.style.display='none';return;}
+      try{
+        const size=map.getSize(),ratio=window.devicePixelRatio||1;
+        const w=Math.max(1,Math.round(size.x*ratio)),height=Math.max(1,Math.round(size.y*ratio));
+        if(hazardCanvas.width!==w)hazardCanvas.width=w;
+        if(hazardCanvas.height!==height)hazardCanvas.height=height;
+        const ctx=hazardCtx;ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,size.x,size.y);
+        const project=p=>map.latLngToContainerPoint(L.latLng(p.lat,p.lng));
+        const placed=[];
+        const label=(p,txt,color,bg)=>{
+          if(!p)return;const s=project(p);if(!Number.isFinite(s.x)||!Number.isFinite(s.y)||s.x<0||s.x>size.x||s.y<0||s.y>size.y)return;
+          ctx.font='bold 11px system-ui,sans-serif';const width=ctx.measureText(txt).width+12;
+          let x=Math.max(2,Math.min(size.x-width-2,s.x-width/2)),y=Math.max(2,Math.min(size.y-23,s.y-23));
+          for(let i=0;i<4;i++){if(!placed.some(b=>x<b.x+b.w+3&&x+width+3>b.x&&y<b.y+23&&y+23>b.y))break;y+=24;}
+          if(y+22>size.y||placed.some(b=>x<b.x+b.w+3&&x+width+3>b.x&&y<b.y+23&&y+23>b.y))return;
+          placed.push({x,y,w:width});
+          ctx.fillStyle=bg;ctx.strokeStyle=color;ctx.lineWidth=1.2;ctx.beginPath();
+          if(ctx.roundRect)ctx.roundRect(x,y,width,21,5);else ctx.rect(x,y,width,21);
+          ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,x+width/2,y+10.5);
+        };
+        const candidates=hazards.map(hz=>{
+          const points=(Array.isArray(hz.points)?hz.points:[]).filter(mapperStyleValidPoint);
+          const closed=hz.kind!=='water_line';
+          if(points.length<(closed?3:2))return null;
+          return {hz,points,closed,...hazardDistances(origin,points,closed)};
+        }).filter(Boolean).sort((a,b)=>a.near-b.near).slice(0,6);
+        for(const a of candidates){
+          const bunker=a.hz.kind==='bunker',color=bunker?'#e8cb94':'#61cbff',bg=bunker?'#433b2c':'#132e42';
+          const pts=a.points.map(project);if(!pts.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)))continue;
+          ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+          if(a.closed){ctx.closePath();ctx.fillStyle=bunker?'rgba(216,183,122,.24)':'rgba(56,182,255,.20)';ctx.fill();}
+          ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke();
+          const suffix=state.unit==='yd'?' yd':' m';
+          const distance=m=>Math.round(state.unit==='yd'?m*1.0936133:m)+suffix;
+          label(a.nearPoint,(bunker?'Bunker ':a.closed?'Water ':'Waterway ')+distance(a.near),color,bg);
+          if(a.closed&&a.far-a.near>=8)label(a.farPoint,'Far edge '+distance(a.far),color,bg);
+        }
+        hazardCanvas.style.display='block';
+      }catch(_){hazardCanvas.style.display='none';}
+    }
+
     const holeFocusCanvas = document.createElement('canvas');
     holeFocusCanvas.style.position = 'absolute';
     holeFocusCanvas.style.inset = '0';
@@ -2599,6 +2677,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       }
 
       updateSettingsControls();
+      updateHazards();
       updateBuildBagSuggestion(pins);
       updateLayupUI(); // keep layup distances/labels in sync
     }
@@ -2667,6 +2746,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       state.markers.forEach(m=>m.remove());
       state.markers=[];
       clearMapperGuide();
+      clearHazards();
     }
     function addMarker(lat,lng,icon,title=''){ const m=L.marker([lat,lng],{icon,title}).addTo(map); state.markers.push(m); return m; }
 
@@ -3279,6 +3359,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     }
     map.on('move zoom zoomend moveend resize viewreset rotate rotateend', ()=>{
       if(mapperGuidePoints.length>=2)updateMapperGuide();
+      updateHazards();
       updateFocusMask();
       updateCartAboveFocusOverlay();
     });
