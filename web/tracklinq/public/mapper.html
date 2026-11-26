@@ -131,6 +131,7 @@
         <button id="autoOutlineCurrent" type="button">Outline Current Hole</button>
       </div>
       <div class="saveRow"><button id="autoOutlineAll" type="button">Outline All Holes with TEE + GREEN</button><button id="suggestGreenEdges" type="button">Suggest FRONT/BACK from TEE + MID</button></div>
+      <div style="margin-top:9px"><strong>Mapped hazards — selected hole</strong><div id="mappedHazardList" class="muted">Auto Map Course to find hazards.</div><div class="saveRow"><button id="clearMappedHazards" type="button">Remove All Hazards for This Hole</button></div></div>
       <div id="autoOutlineStatus" class="status">Auto outlines are approximate. Adjust 2–6 centreline handles and width, then review on the satellite image.</div>
     </section>
 
@@ -1227,6 +1228,7 @@
 
       // Recreate saved hole outline
       drawSavedOutline(h?.outline);
+      showMappedHazards();
       renderWholeCourseOverview();
       updateMappingCompleteness();
     }
@@ -1385,6 +1387,59 @@
       if(sorted.at(-1).score-sorted[0].score<6 || sorted.at(-1).score-sorted[0].score>90)return null;
       return {front:sorted[0].p,back:sorted.at(-1).p,centre};
     }
+    const mappedHazardLayer=L.layerGroup().addTo(map);
+    function showMappedHazards(){
+      mappedHazardLayer.clearLayers();
+      const list=$('#mappedHazardList');if(!list)return;
+      list.replaceChildren();
+      const hole=state.course.holes[String(state.hole)],hazards=Array.isArray(hole?.hazards)?hole.hazards:[];
+      if(!hazards.length){list.textContent='No mapped hazards for this hole.';return;}
+      hazards.forEach((h,i)=>{
+        const color=h.kind==='bunker'?'#d8b77a':'#38b6ff';
+        const points=h.points.map(p=>[p.lat,p.lng]);
+        const layer=(h.kind==='water_line'?L.polyline(points,{color,weight:3}):L.polygon(points,{color,weight:2,fillOpacity:.25})).addTo(mappedHazardLayer);
+        layer.bindTooltip(h.kind==='bunker'?'Bunker':h.kind==='water_line'?'Waterway':'Water');
+        const row=document.createElement('div');row.style.cssText='display:flex;gap:6px;align-items:center;margin:4px 0';
+        const label=document.createElement('span');label.textContent=(h.kind==='bunker'?'Bunker':h.kind==='water_line'?'Waterway':'Water')+' '+(i+1);label.style.flex='1';
+        const locate=document.createElement('button');locate.type='button';locate.textContent='View';locate.onclick=()=>map.fitBounds(layer.getBounds(),{padding:[35,35],maxZoom:19});
+        const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.onclick=()=>{hole.hazards.splice(i,1);$('#verifyCoordinates').checked=false;showMappedHazards();};
+        row.append(label,locate,remove);list.append(row);
+      });
+    }
+    $('#clearMappedHazards').addEventListener('click',()=>{
+      const hole=state.course.holes[String(state.hole)];if(!hole?.hazards?.length)return;
+      if(confirm('Remove all mapped hazards for this hole?')){hole.hazards=[];$('#verifyCoordinates').checked=false;showMappedHazards();}
+    });
+    function assignMappedHazards(features,onlyMissing){
+      const candidates=(features||[]).filter(f=>['water','bunker','water_line','water_hazard','lateral_water_hazard'].includes(f.tags?.golf)).map(f=>{
+        const kind=f.tags.golf==='bunker'?'bunker':f.tags.golf==='water_line'?'water_line':'water';
+        const points=osmGeoPoints(f).filter(mapPointOK);
+        return {id:String(f.type)+':'+String(f.id),kind,points};
+      }).filter(h=>h.points.length>=(h.kind==='water_line'?2:4)&& (h.kind==='water_line'||gpsMeters(h.points[0],h.points.at(-1))<2));
+      let count=0;
+      for(const hole of Object.values(state.course.holes||{})){
+        if(onlyMissing&&Array.isArray(hole.hazards))continue;
+        const route=(hole.outlineControlPoints||[]).filter(mapPointOK);
+        if(route.length<2)continue;
+        const origin=route[0],mx=111320*Math.cos(origin.lat*Math.PI/180),my=111132;
+        const xy=p=>({x:(p.lng-origin.lng)*mx,y:(p.lat-origin.lat)*my});
+        const r=route.map(xy);
+        const segmentDist=(p,a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);};
+        const intersect=(a,b,c,d)=>{const cross=(p,q,s)=>(q.x-p.x)*(s.y-p.y)-(q.y-p.y)*(s.x-p.x);return Math.max(Math.min(a.x,b.x),Math.min(c.x,d.x))<=Math.min(Math.max(a.x,b.x),Math.max(c.x,d.x))&&Math.max(Math.min(a.y,b.y),Math.min(c.y,d.y))<=Math.min(Math.max(a.y,b.y),Math.max(c.y,d.y))&&cross(a,b,c)*cross(a,b,d)<=0&&cross(c,d,a)*cross(c,d,b)<=0;};
+        const found=[];
+        for(const h of candidates){
+          const pts=h.points.map(xy);let near=Infinity;
+          for(let i=1;i<r.length;i++)for(let j=1;j<pts.length;j++){
+            const a=r[i-1],b=r[i],c=pts[j-1],d=pts[j];
+            near=Math.min(near,intersect(a,b,c,d)?0:Math.min(segmentDist(c,a,b),segmentDist(d,a,b),segmentDist(a,c,d),segmentDist(b,c,d)));
+          }
+          if(near<=Math.max(45,(Number(hole.outlineWidthM)||65)/2+20))found.push({h,near});
+        }
+        found.sort((a,b)=>a.near-b.near);
+        hole.hazards=found.slice(0,16).map(({h})=>h);count+=hole.hazards.length;
+      }
+      showMappedHazards();return count;
+    }
     function suggestOSMGeometry(features,onlyMissing=true){
       const course=state.course;
       let teeN=0,outlineN=0,edgesN=0,midN=0,matched=0,disagree=0;
@@ -1473,7 +1528,9 @@
         if(state.allHolesVisible)fitMapToEntireCourse();
         else fitMapToCurrentHole();
       }
-      return {matched,teeN,outlineN,edgesN,midN,disagree,notes:perHole};
+      const hazardN=assignMappedHazards(features,onlyMissing);
+      if(hazardN){$('#verifyCoordinates').checked=false;}
+      return {matched,teeN,outlineN,edgesN,midN,disagree,hazardN,notes:perHole};
     }
     async function autoMapCourseFromOSM(){
       saveHoleToState();
@@ -1500,7 +1557,7 @@
         if(!response.ok||!data.ok){if(response.status===401)mapperPublishSecret='';throw Error(data.error||'Map request failed');}
         const outcome=suggestOSMGeometry(data.features,!!$('#osmOnlyMissing').checked);
         const preview=outcome.notes.slice(0,7).join(' • ');
-        msg.textContent=`OSM matched ${outcome.matched}/${state.holeCount} hole routes. Added ${outcome.teeN} TEE, ${outcome.edgesN} FRONT/BACK, ${outcome.outlineN} curved outlines; switched ${outcome.midN} MID positions to mapped green centres (API reference retained). ${outcome.disagree} API MID positions differ from OSM greens. ${preview} ${outcome.notes.length>7?' …':''} All suggestions require satellite review. © OpenStreetMap contributors (ODbL).`;
+        msg.textContent=`OSM matched ${outcome.matched}/${state.holeCount} hole routes. Added ${outcome.teeN} TEE, ${outcome.edgesN} FRONT/BACK, ${outcome.outlineN} curved outlines and mapped ${outcome.hazardN} hole hazards; switched ${outcome.midN} MID positions to mapped green centres (API reference retained). ${outcome.disagree} API MID positions differ from OSM greens. ${preview} ${outcome.notes.length>7?' …':''} All suggestions require satellite review. © OpenStreetMap contributors (ODbL).`;
         if(!outcome.matched)msg.textContent+=' No reliable routes found; nothing was changed.';
       }catch(e){msg.textContent=`Could not auto-map: ${e.message||e}. Existing course data unchanged.`;}
       finally{button.disabled=false;}
