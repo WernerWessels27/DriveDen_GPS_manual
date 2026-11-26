@@ -129,7 +129,7 @@
       font-size:12px; font-weight:800; box-shadow:var(--shadow);
     }
     .apiCourseNotice[hidden] { display:none!important; }
-    body.api-course #mapperStyleSettingsRow { display:none!important; }
+    body.api-course #hazardsToggleBtn { display:none!important; }
     body.api-course #playerViewBtn,
     body.api-course #holeViewBtn,
     body.api-course #cartViewBtn,
@@ -213,6 +213,9 @@
   border-radius: 14px; background: var(--panel); border: 1px solid var(--chip-border); color: var(--text); cursor: pointer;
   font-size: 24px; user-select: none; box-shadow: var(--shadow);
 }
+#hazardsToggleBtn{font-size:10px;font-weight:900;line-height:1;gap:2px;align-content:center}
+#hazardsToggleBtn svg{width:20px;height:20px}
+#hazardsToggleBtn[aria-pressed="true"]{color:#38b6ff}
 .viewBtn[aria-pressed="true"]{
   border-color:#38b6ff;
   box-shadow:0 0 0 3px rgba(56,182,255,.22), var(--shadow);
@@ -943,17 +946,6 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
           <button class="settingsActionBtn" id="bagBtn">Build Bag</button>
         </div>
 
-        <div class="settingsRow" id="mapperStyleSettingsRow">
-          <div class="settingsRowText">
-            <strong>Map Markers &amp; Line</strong>
-            <span>Mapper Style shows larger DriveDen-blue TEE/MID markers, small FRONT/BACK markers, and a straight dotted TEE → hole number → MID line. The white-fog outline stays unchanged.</span>
-          </div>
-          <select class="settingsSelect" id="mapperStyleSelect" aria-label="GPS map marker style">
-            <option value="classic">Classic</option>
-            <option value="mapper">Mapper Style</option>
-          </select>
-        </div>
-
         <div class="settingsRow" id="offlineCourseSettingsRow">
           <div class="settingsRowText">
             <strong>Offline Course</strong>
@@ -1076,6 +1068,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
 
   <!-- Bottom-left stacked view icons -->
   <div class="viewIcons">
+    <button class="viewBtn" id="hazardsToggleBtn" type="button" aria-pressed="true" title="Show or hide hazards and fairway guide" aria-label="Show or hide hazards and fairway guide"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3z" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round"/><path d="M12 9v5" style="stroke:currentColor;stroke-width:2;stroke-linecap:round"/><circle cx="12" cy="17.5" r="1" style="fill:currentColor"/></svg><span>HAZARDS</span></button>
     <button class="viewBtn" id="apiRecenterBtn" title="Recenter CART and MID" aria-label="Recenter CART and MID" type="button"><svg aria-hidden="true" viewBox="-0.08 0 20.163 20.163" xmlns="http://www.w3.org/2000/svg" fill="currentColor"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <g id="golf-cart" transform="translate(-2 -1.837)"> <path id="secondary" fill="currentColor" d="M20,13H9l-.72-1.45a1,1,0,0,0-.9-.55H4a1,1,0,0,0-1,1v6a1,1,0,0,0,1,1H5a2,2,0,0,1,4,0h6a2,2,0,0,1,4,0h1a1,1,0,0,0,1-1V14A1,1,0,0,0,20,13Z"/> <path id="primary" d="M5,19H4a1,1,0,0,1-1-1V12a1,1,0,0,1,1-1H7.38a1,1,0,0,1,.9.55L9,13H20a1,1,0,0,1,1,1v4a1,1,0,0,1-1,1H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> <path id="primary-2" data-name="primary" d="M6,3v8M17,3l1.82,10M15,19H9m5.82-6-.55-3M7,17a2,2,0,1,0,2,2A2,2,0,0,0,7,17Zm10,0a2,2,0,1,0,2,2A2,2,0,0,0,17,17ZM4,3H19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/> </g> </g> </svg></button>
     <button class="viewBtn" id="apiGreenZoomBtn" title="Zoom to green" aria-label="Zoom to green" type="button"><svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" id="golf-3" data-name="Flat Color" xmlns="http://www.w3.org/2000/svg" class="icon flat-color"> <g id="SVGRepo_bgCarrier" stroke-width="0"/> <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/> <g id="SVGRepo_iconCarrier"> <path id="secondary" d="M8.44,12a8.19,8.19,0,0,1,2.3.39,13.58,13.58,0,0,0,3.93.54c3,0,6.33,1.42,6.33,4.54C21,22,14.25,22,12,22c-8.15,0-9-3.81-9-5.44C3,13.7,5,12,8.44,12Z" style="fill: #38b6ff;"/> <path id="primary" d="M8.55,6.11,14,3.38V3a1,1,0,0,1,2,0V16a1,1,0,0,1-2,0V10.62L8.55,7.89a1,1,0,0,1,0-1.78Z" style="fill: #000000;"/> </g> </svg></button>
     <button title="Player View (TEE → GREEN)" class="viewBtn" id="playerViewBtn" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L21 21H3L12 3Z" fill="#38b6ff" opacity="0.22"/><path d="M12 3L21 21H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 6V19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3"/><circle cx="12" cy="18.5" r="1.8" fill="currentColor"/><circle cx="12" cy="5" r="1.6" fill="#38b6ff"/></svg></button>
@@ -1577,7 +1570,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     let mapperGuidePoints=[],mapperGuideRaf=null;
     function redrawMapperGuide(){
       mapperGuideRaf=null;
-      if(!mapperGuideCtx||mapperGuidePoints.length<2){mapperGuideCanvas.style.display='none';return;}
+      if(!state.hazardsEnabled||!mapperGuideCtx||mapperGuidePoints.length<2){mapperGuideCanvas.style.display='none';return;}
       try{
         const size=map.getSize(),ratio=window.devicePixelRatio||1;
         const w=Math.max(1,Math.round(size.x*ratio)),h=Math.max(1,Math.round(size.y*ratio));
@@ -1626,10 +1619,9 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     function hazardDistances(origin,points,closed){
       const mx=111320*Math.cos(origin.lat*Math.PI/180),my=111132;
       const xy=p=>({x:(p.lng-origin.lng)*mx,y:(p.lat-origin.lat)*my});
-      const pts=points.map(xy);let near=Infinity,far=0,nearPoint=null,farPoint=null;
+      const pts=points.map(xy);let near=Infinity,nearPoint=null;
       for(let i=0;i<pts.length;i++){
         const p=pts[i],d=Math.hypot(p.x,p.y);
-        if(d>far){far=d;farPoint=points[i];}
         if(d<near){near=d;nearPoint=points[i];}
       }
       const n=closed?pts.length:pts.length-1;
@@ -1640,13 +1632,13 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         if(d<near){near=d;nearPoint={lat:origin.lat+y/my,lng:origin.lng+x/mx};}
       }
       if(closed&&pointInsidePolygon(origin,points)){near=0;nearPoint=origin;}
-      return {near,far,nearPoint,farPoint};
+      return {near,nearPoint};
     }
     function drawHazards(){
       hazardRaf=null;
       const h=state.course?.holes?.[String(state.hole)],hazards=h?.hazards;
       const origin=fromCart()||h?.pins?.TEE;
-      if(!hazardCtx||!Array.isArray(hazards)||!hazards.length||!mapperStyleValidPoint(origin)||state.apiMode){hazardCanvas.style.display='none';return;}
+      if(!state.hazardsEnabled||!hazardCtx||!Array.isArray(hazards)||!hazards.length||!mapperStyleValidPoint(origin)||state.apiMode){hazardCanvas.style.display='none';return;}
       try{
         const size=map.getSize(),ratio=window.devicePixelRatio||1;
         const w=Math.max(1,Math.round(size.x*ratio)),height=Math.max(1,Math.round(size.y*ratio));
@@ -1681,7 +1673,6 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
           const suffix=state.unit==='yd'?' yd':' m';
           const distance=m=>Math.round(state.unit==='yd'?m*1.0936133:m)+suffix;
           label(a.nearPoint,(bunker?'Bunker ':a.closed?'Water ':'Waterway ')+distance(a.near),color,bg);
-          if(a.closed&&a.far-a.near>=8)label(a.farPoint,'Far edge '+distance(a.far),color,bg);
         }
         hazardCanvas.style.display='block';
       }catch(_){hazardCanvas.style.display='none';}
@@ -1997,7 +1988,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     const state = {
       meta:null, course:null, hole:1, viewMode:'cart', markers:[], cartMarker:null,
       unit:'m', // 'm' or 'yd'
-      mapperStyleEnabled:false,
+      hazardsEnabled:true,
       layupMarker:null, layupSolid:null, layupDash:null, layupLabel1:null, layupLabel2:null,
       playerAimLine:null,
       playerGlMap:null,
@@ -2033,7 +2024,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
     try{
       const savedUnit = localStorage.getItem('tl_distance_unit');
       if(savedUnit === 'm' || savedUnit === 'yd') state.unit = savedUnit;
-      state.mapperStyleEnabled=localStorage.getItem('ddgps_mapper_style_v1')==='mapper';
+      state.hazardsEnabled=localStorage.getItem('ddgps_hazards_visible_v1')!=='off';
     }catch(_){}
 
 
@@ -2692,8 +2683,7 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
         if(zoomSelect.value !== z) zoomSelect.value = z;
       }
 
-      const styleSelect = $('#mapperStyleSelect');
-      if(styleSelect)styleSelect.value=state.mapperStyleEnabled?'mapper':'classic';
+      $('#hazardsToggleBtn')?.setAttribute('aria-pressed',String(state.hazardsEnabled));
 
       const zoomText = $('#currentInitialZoomText');
       if(zoomText) zoomText.textContent = getInitialZoomLabel();
@@ -2719,13 +2709,13 @@ body[data-large-text="on"] .noGoWarningBtn { font-size: 24px; padding: 16px 28px
       renderBuildBagModal();
     }
 
-    function applyMapperStyleFromSettings(value){
-      const on=value==='mapper';
-      state.mapperStyleEnabled=on;
-      try{localStorage.setItem('ddgps_mapper_style_v1',on?'mapper':'classic');}catch(_){}
-      if(state.course)renderHole();
+    function toggleHazards(){
+      state.hazardsEnabled=!state.hazardsEnabled;
+      try{localStorage.setItem('ddgps_hazards_visible_v1',state.hazardsEnabled?'on':'off');}catch(_){}
       updateSettingsControls();
-      toast(on?'Mapper Style enabled':'Classic map markers enabled');
+      if(state.hazardsEnabled){updateMapperGuide();updateHazards();}
+      else{mapperGuideCanvas.style.display='none';clearHazards();}
+      toast(state.hazardsEnabled?'Hazards on':'Hazards off');
     }
 
     function applyInitialZoomFromSettings(value){
@@ -3711,14 +3701,14 @@ function ensureInitialFraming(){
       updateViewButtonStates();
 
       const p = h.pins || {};
-      if(state.mapperStyleEnabled&&!state.apiMode){
-        renderMapperStylePins(h,p);
-      }else{
-        if (p.TEE)   addMarker(p.TEE.lat, p.TEE.lng, ICONS.TEE, 'TEE');
-        if (p.FRONT) addMarker(p.FRONT.lat, p.FRONT.lng, ICONS.FRONT, 'FRONT');
-        if (p.MID)   addMarker(p.MID.lat, p.MID.lng, ICONS.MID, 'MID');
-        if (p.BACK)  addMarker(p.BACK.lat, p.BACK.lng, ICONS.BACK, 'BACK');
+      if(!state.apiMode)renderMapperStylePins(h,p);
+      else {
+        for(const key of ['TEE','FRONT','MID','BACK']){
+          const point=p[key];
+          if(mapperStyleValidPoint(point))addMarker(point.lat,point.lng,mapperStylePinIcon(key),key);
+        }
       }
+      $('#hazardsToggleBtn')?.setAttribute('aria-pressed',String(state.hazardsEnabled));
 
       if (p.TOILET) addMarker(p.TOILET.lat, p.TOILET.lng, ICONS.TOILET, 'Toilet');
       (p.TAPS || []).forEach(t => addMarker(t.lat, t.lng, ICONS.TAPS, 'Drinking water'));
@@ -3820,7 +3810,7 @@ function ensureInitialFraming(){
     });
     $('#unitSelect')?.addEventListener('change', (e)=> setUnitFromSettings(e.target.value));
     $('#initialZoomSelect')?.addEventListener('change', (e)=> applyInitialZoomFromSettings(e.target.value));
-    $('#mapperStyleSelect')?.addEventListener('change', (e)=> applyMapperStyleFromSettings(e.target.value));
+    $('#hazardsToggleBtn')?.addEventListener('click',toggleHazards);
 
     // Build Your Bag
     $('#bagBtn')?.addEventListener('click', openBuildBagModal);
