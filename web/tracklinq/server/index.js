@@ -180,10 +180,22 @@ app.post('/api/mapper/publish',enhancedAdminAuth,express.json({limit:'8mb'}),(er
     await ensureEnhancedTable();
     // Keep provider imports traceable; independently review coordinates and
     // confirm provider retention/reuse rights before relying on source data.
-    const id=publishedCourseId(data);
+    const name=String(data.course.name).slice(0,160).trim();
+    const proposedId=publishedCourseId(data);
+    const {rows:matches}=await query(
+      'SELECT course_id,course_name,updated_at,course_data FROM driveden_enhanced_courses WHERE lower(btrim(course_name))=lower($1) OR course_id=$2 ORDER BY created_at,course_id',
+      [name,proposedId]);
+    const duplicateOptions=matches.map(r=>({id:r.course_id,name:r.course_name,updatedAt:r.updated_at}));
+    const requested=String(req.body?.replaceCourseId||'');
+    const selected=matches.find(r=>r.course_id===requested);
+    if(matches.length&&!selected){
+      return res.status(409).json({ok:false,error:'An existing Enhanced course matches. Confirm which version to replace.',duplicates:duplicateOptions});
+    }
+    if(requested&&!selected)return res.status(409).json({ok:false,error:'The selected course has changed. Publish again to refresh the matching list.'});
+    const id=selected?.course_id||proposedId;
     const newData=structuredClone(data);
     newData.course.id=id;
-    newData.course.pin=''; // published library is Guest access, not a fleet PIN
+    newData.course.pin=selected?.course_data?.course?.pin||''; // retain any existing association; new Enhanced courses are Guest access
     newData.course.name=String(newData.course.name).slice(0,160).trim();
     newData.publishedAt=new Date().toISOString();
     newData.publishedBy='driveden-mapper';
@@ -196,7 +208,7 @@ app.post('/api/mapper/publish',enhancedAdminAuth,express.json({limit:'8mb'}),(er
         source_api_id=EXCLUDED.source_api_id,updated_at=NOW()`,
       [id,newData.course.name,JSON.stringify(newData),apiId]);
     res.setHeader('Cache-Control','no-store');
-    res.json({ok:true,id,name:newData.course.name,holes:Object.keys(newData.holes).length});
+    res.json({ok:true,id,name:newData.course.name,holes:Object.keys(newData.holes).length,replaced:!!selected});
   }catch(e){console.error('Mapper publish failure',e);res.status(500).json({ok:false,error:'Could not publish course.'});}
 });
 // ===== END ENHANCED COURSE PUBLISHING =====
