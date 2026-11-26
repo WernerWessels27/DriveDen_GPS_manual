@@ -1620,7 +1620,13 @@
         const outcome=suggestOSMGeometry(data.features,!!$('#osmOnlyMissing').checked);
         const preview=outcome.notes.slice(0,7).join(' • ');
         msg.textContent=`OSM matched ${outcome.matched}/${state.holeCount} hole routes. Added ${outcome.teeN} TEE, ${outcome.edgesN} FRONT/BACK, ${outcome.outlineN} curved outlines and mapped ${outcome.hazardN} hole hazards; switched ${outcome.midN} MID positions to mapped green centres (API reference retained). ${outcome.disagree} API MID positions differ from OSM greens. ${preview} ${outcome.notes.length>7?' …':''} All suggestions require satellite review. © OpenStreetMap contributors (ODbL).`;
-        if(!outcome.matched)msg.textContent+=' No reliable new hole routes found.';
+        if(!outcome.matched){
+          const routes=(data.features||[]).filter(f=>f.tags?.golf==='hole').length;
+          msg.textContent+=routes
+            ? ' '+routes+' nearby OSM routes found, but none matched the imported hole numbers and green coordinates. Check the selected course layout.'
+            : ' No mapped hole routes returned for this location.';
+          if(data.fallbackUnavailable)msg.textContent+=' Live map lookup was unavailable; try again later.';
+        }
       }catch(e){msg.textContent=`Could not auto-map: ${e.message||e}. Existing course data unchanged.`;}
       finally{button.disabled=false;}
     }
