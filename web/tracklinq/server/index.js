@@ -214,7 +214,7 @@ const osmGolfIndexDir = path.join(__dirname, '..', 'data', 'osm-golf-tiles');
 const osmIndexTileCache = new Map();
 function readIndexedOSMGolfFeatures(lat,lng,radiusM) {
   if (!fs.existsSync(path.join(osmGolfIndexDir,'manifest.json'))) return null;
-  const features=[],seen=new Set();
+  const features=[],hazards=[],seen=new Set();
   const latSpan=(radiusM+750)/111132;
   const lngSpan=(radiusM+750)/(111320*Math.max(.2,Math.cos(lat*Math.PI/180)));
   for(let y=Math.floor(lat)-1;y<=Math.floor(lat)+1;y++) {
@@ -234,7 +234,6 @@ function readIndexedOSMGolfFeatures(lat,lng,radiusM) {
         }
       }
       for(const f of tile) {
-        if(features.length>=3000) break;
         if(!f || !['hole','tee','green','bunker','water','water_line'].includes(f?.tags?.golf))continue;
         const pts=f.geometry;
         if(!Array.isArray(pts)||!pts.length)continue;
@@ -242,11 +241,12 @@ function readIndexedOSMGolfFeatures(lat,lng,radiusM) {
         const id=String(f.type)+':'+String(f.id);
         if(seen.has(id))continue;
         seen.add(id);
-        features.push(f);
+        if(['hole','tee','green'].includes(f.tags.golf))features.push(f);
+        else hazards.push(f);
       }
     }
   }
-  return features;
+  return [...features,...hazards.slice(0,Math.max(0,3000-features.length))];
 }
 
 const osmMapCache = new Map();
@@ -311,15 +311,26 @@ app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
   osmMapRate.set(client, usage && now-usage.start<60_000 ? {start:usage.start,count:usage.count+1} : {start:now,count:1});
 
   const key = `${lat.toFixed(3)}:${lng.toFixed(3)}:${Math.round(radius/100)}`;
-  // The local country extract is available after the index-building Action
-  // commits its tiles. Zero nearby OSM golf features is a valid empty result;
-  // never fall back to a failing external server once an index is installed.
+  // Prefer the indexed geometry, but an empty route result must not suppress fallback.
   const indexedFeatures=readIndexedOSMGolfFeatures(lat,lng,radius);
-  if(indexedFeatures!==null) {
+  const hasRoutes=features=>Array.isArray(features)&&features.some(f=>f.tags?.golf==='hole');
+  const mergeFeatures=features=>{
+    const merged=new Map();
+    for(const f of [...(indexedFeatures||[]),...(features||[])]){
+      const kind=f.tags?.golf;
+      // The index and Overpass can use different identifier formats.
+      const id=String(f.id).replace(/^(?:way|node|relation)[\/:]?/,'').replace(/^[wnr](?=\d)/,'');
+      const key=kind+':'+id;
+      merged.set(key,f);
+    }
+    return [...merged.values()].sort((a,b)=>Number(!['hole','tee','green'].includes(a.tags?.golf))-Number(!['hole','tee','green'].includes(b.tags?.golf)));
+  };
+  if(hasRoutes(indexedFeatures)) {
     res.setHeader('Cache-Control','no-store');
     return res.json({ok:true,features:indexedFeatures,source:'Geofabrik OSM country extract',
       cached:true,indexed:true,attribution:'© OpenStreetMap contributors (ODbL)'});
   }
+  console.info('OSM index route fallback:',lat.toFixed(4),lng.toFixed(4),'radius',Math.round(radius),'indexed features',indexedFeatures?.length||0);
   let cached = osmMapCache.get(key);
   if (!cached) {
     // A previous successful lookup should survive app restarts/deploys.
@@ -335,13 +346,13 @@ app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
       console.warn('OSM cache read unavailable:',err?.message);
     }
   }
-  if (cached && now - cached.fetchedAt < OSM_FRESH_FOR_MS) {
+  if (cached && hasRoutes(cached.features) && now - cached.fetchedAt < OSM_FRESH_FOR_MS) {
     res.setHeader('Cache-Control','no-store');
-    return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true,
+    return res.json({ok:true,features:mergeFeatures(cached.features),source:'OpenStreetMap',cached:true,
       attribution:'© OpenStreetMap contributors (ODbL)'});
   }
   if (osmPendingRequests >= 2) {
-    if (cached) return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true,stale:true,
+    if (cached && hasRoutes(cached.features)) return res.json({ok:true,features:mergeFeatures(cached.features),source:'OpenStreetMap',cached:true,stale:true,
       attribution:'© OpenStreetMap contributors (ODbL)'});
     return res.status(503).json({ok:false,error:'Another map lookup is running. Please retry shortly.'});
   }
@@ -386,7 +397,7 @@ app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
             features=EXCLUDED.features, updated_at=NOW()`,[key,JSON.stringify(features)]);
         } catch(err) { console.warn('OSM cache write unavailable:',err?.message); }
         res.setHeader('Cache-Control','no-store');
-        return res.json({ok:true,features,source:'OpenStreetMap',cached:false,
+        return res.json({ok:true,features:mergeFeatures(features),source:'OpenStreetMap',cached:false,
           attribution:'© OpenStreetMap contributors (ODbL)'});
       }catch(err) {
         console.warn(`OSM lookup ${provider.label} failed after ${Date.now()-start}ms: ${err?.name||'Error'}`);
@@ -394,12 +405,13 @@ app.post('/api/mapper/osm-features', enhancedAdminAuth, async (req,res)=>{
           ? 'Public map servers are taking too long.' : 'Could not reach the public map servers.';
       }
     }
-    if(cached && now-cached.fetchedAt < OSM_STALE_FOR_MS) {
+    if(cached && hasRoutes(cached.features) && now-cached.fetchedAt < OSM_STALE_FOR_MS) {
       res.setHeader('Cache-Control','no-store');
       console.warn('OSM providers busy; using last successful cached geometry.');
-      return res.json({ok:true,features:cached.features,source:'OpenStreetMap',cached:true,stale:true,
+      return res.json({ok:true,features:mergeFeatures(cached.features),source:'OpenStreetMap',cached:true,stale:true,
         attribution:'© OpenStreetMap contributors (ODbL)'});
     }
+    if(indexedFeatures!==null) return res.json({ok:true,features:indexedFeatures,source:'Geofabrik OSM country extract',indexed:true,fallbackUnavailable:true,attribution:'© OpenStreetMap contributors (ODbL)'});
     return res.status(503).json({ok:false,error:`Could not load OpenStreetMap mapping: ${lastFailure} You can retry shortly; your course data is safe.`});
   } finally { osmPendingRequests--; }
 });
