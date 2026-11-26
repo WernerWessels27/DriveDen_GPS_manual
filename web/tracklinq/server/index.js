@@ -22,7 +22,12 @@ const query = (text, params) => pool.query(text, params);
 const app = express();
 // Railway typically forwards traffic through one reverse proxy.
 app.set('trust proxy', 1);
-app.use(express.json());
+const defaultJsonParser=express.json();
+app.use((req,res,next)=>{
+  // The authenticated Mapper publishing route has its own larger bounded parser.
+  if(req.method==='POST' && req.path==='/api/mapper/publish')return next();
+  return defaultJsonParser(req,res,next);
+});
 app.use(morgan("tiny"));
 
 const __filename = fileURLToPath(import.meta.url);
@@ -164,7 +169,10 @@ app.get('/api/enhanced-courses', async (_req,res)=>{
   }catch(e){res.status(503).json({ok:false,error:'Course library unavailable'});}
 });
 
-app.post('/api/mapper/publish',enhancedAdminAuth,async(req,res)=>{
+app.post('/api/mapper/publish',enhancedAdminAuth,express.json({limit:'8mb'}),(err,req,res,next)=>{
+  if(err?.type==='entity.too.large')return res.status(413).json({ok:false,error:'Course file exceeds the 8 MB publishing limit. Simplify hazard geometry or remove unnecessary hazards and retry.'});
+  return next(err);
+},async(req,res)=>{
   try{
     const data=req.body?.course;
     const err=validateEnhancedCourse(data);
